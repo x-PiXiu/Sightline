@@ -1,0 +1,2 @@
+# Linux C++ 项目：统一 LF，防止 CRLF 破坏 WSL 构建/脚本
+* text=auto eol=lf
