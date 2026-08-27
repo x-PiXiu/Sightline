@@ -27,12 +27,14 @@ struct SightlineConfig {
     app::SessionService::Config session;
     app::RoomService::Config room;
 
-    // 命令行覆盖：./sightline [port]
+    // 命令行：./sightline [port] [debug]   —— debug 时日志级别降为 DEBUG（实时观察连接进出）
     static SightlineConfig fromArgs(int argc, char* argv[]) {
         SightlineConfig c;
         if (argc > 1) c.port = static_cast<uint16_t>(std::stoi(argv[1]));
+        if (argc > 2 && std::string(argv[2]) == "debug") c.debug_log = true;
         return c;
     }
+    bool debug_log = false;
 };
 
 } // namespace sightline

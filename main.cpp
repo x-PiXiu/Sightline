@@ -51,7 +51,8 @@ int main(int argc, char* argv[]) {
     logger.addSink(std::make_unique<common::logger::ConsoleSink>());
     logger.setRateLimitPerSecond(100);
     logger.setAsyncLogging(true);
-    logger.setLogLevel(common::logger::LogLevel::INFO);
+    logger.setLogLevel(cfg.debug_log ? common::logger::LogLevel::DEBUG
+                                     : common::logger::LogLevel::INFO);
     if (cfg.file_log) {   // 生产：追加滚动文件（8MB×5 个），控制台留给开发期
         std::filesystem::create_directories(cfg.log_dir);
         logger.addSink(std::make_unique<common::logger::FileSink>(
