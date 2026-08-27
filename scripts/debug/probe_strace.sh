@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # strace 诊断：观察 epoll_ctl / epoll_wait 的真实系统调用序列
 set -u
-cd "$(dirname "$0")/../build" || exit 1
+cd "$(dirname "$0")/../../build" || exit 1
 rm -f strace.log
 strace -f -tt -e trace=epoll_create1,epoll_ctl,epoll_wait,accept4,accept,read,write -o strace.log ./sightline > server.log 2>&1 &
 SERVER_PID=$!

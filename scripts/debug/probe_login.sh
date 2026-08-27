@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 诊断探针：起服 → 单客户端 Login → 打印收包与服务器日志
 set -u
-cd "$(dirname "$0")/../build" || exit 1
+cd "$(dirname "$0")/../../build" || exit 1
 make -j4 > /dev/null 2>&1
 rm -f server.log
 ./sightline > server.log 2>&1 &

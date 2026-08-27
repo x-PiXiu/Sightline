@@ -3,7 +3,7 @@
 # 登录 → 进房(×2) → RoomStart → 互见移动 → A 开火命中 B → 验证 HitEvent
 import socket, struct, sys, time
 
-HOST, PORT = "127.0.0.1", 8888
+HOST, PORT = "127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 8891
 
 def frame(msg_id: int, payload: bytes) -> bytes:
     return struct.pack("<HH", len(payload), msg_id) + payload
