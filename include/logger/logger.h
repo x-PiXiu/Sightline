@@ -218,10 +218,15 @@ namespace common {
             
             /**
              * @brief 启用或禁用异步日志
-             * 
+             *
              * @param enabled true启用，false禁用
+             * @details 原实现只置标志而不启动工作线程（半成品：日志会积压后丢弃），
+             *          此处补上线程启动；startAsyncThread 幂等
              */
-            void setAsyncLogging(bool enabled) { async_logging_ = enabled; }
+            void setAsyncLogging(bool enabled) {
+                async_logging_ = enabled;
+                if (enabled) startAsyncThread();
+            }
             
             // 日志记录方法
             void trace(const std::string& message, const char* file = "", int line = 0);

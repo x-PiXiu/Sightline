@@ -485,6 +485,7 @@ namespace common {
          * 创建并启动异步日志处理工作线程。
          */
         void Logger::startAsyncThread() {
+            if (async_thread_) return;   // 幂等：重复启用不重复建线程
             async_thread_ = std::make_unique<std::thread>(&Logger::asyncLogWorker, this);
         }
         
