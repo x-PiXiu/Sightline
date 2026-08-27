@@ -41,22 +41,47 @@ namespace common
         }
 
         void HierarchicalTimingWheel::tick(){
+            // ⭐架构修订：到期判定改为"堆直驱"，槽位结构停用
+            //
+            // 槽位机器（L3 入口判定 → 逐层降级搬运 → 指针扫槽）存在连环缺陷：
+            // ① 入口从最粗层判定，任意延迟都先落 L3 再逐层下搬；
+            // ② 未到期者滞留已扫过的槽，要等整圈才会被再处理（周期停摆根因之一）；
+            // ③ carry 链在 tick 间隔 < 槽宽时锁死高层推进（根因之二）。
+            // 而 expiration_heap_ 中本就存有每个定时器的精确到期时刻
+            // （getNextExpiration 一直靠它驱动 timerfd）——直接扫堆即得全部到期者，
+            // 精度 = tick 间隔，且消灭"指针-槽位对齐"这一整类缺陷。
             auto now = std::chrono::steady_clock::now();
-            
-            // ✅ 阶段1：先推进时间轮指针
-            for (size_t level = 0; level < levels_.size(); ++level) {
-                bool carry = levels_[level].advance(now);
-                // 如果需要进位，继续推进上层
-                if (!carry) break;
+
+            std::vector<std::shared_ptr<Timer>> due;
+            {
+                std::lock_guard<std::mutex> lock(timer_mutex_);
+                while (!expiration_heap_.empty() && expiration_heap_.top().expire_time <= now) {
+                    auto entry = expiration_heap_.top();
+                    expiration_heap_.pop();
+                    auto it = timer_map_.find(entry.timer_id);
+                    if (it == timer_map_.end()) continue;              // 已取消/已触发的陈旧堆项
+                    auto timer = it->second.lock();
+                    if (!timer || timer->cancelled) { timer_map_.erase(it); continue; }
+                    if (entry.expire_time != timer->expire_time) continue;   // 周期重入的陈旧轮次
+                    due.push_back(timer);
+                }
             }
 
-            // ✅ 阶段2：处理高层到低层的搬运（从高到低，避免重复搬运）
-            for (int level = static_cast<int>(levels_.size()) - 1; level > 0; --level) {
-                processCurrentSlotTimers(level, now);
-            }
+            for (auto& timer : due) {
+                submitAsyncTask([timer] { timer->callback(); });
 
-            // ✅ 阶段3：处理 L0 层到期定时器
-            processExpiredTimers(0, now);
+                if (timer->interval.count() > 0) {
+                    // 周期：从原到期时间推下一轮（避免累积误差），严重滞后则追赶
+                    auto next = timer->expire_time + timer->interval;
+                    while (next <= now) next += timer->interval;
+                    std::lock_guard<std::mutex> lock(timer_mutex_);
+                    timer->expire_time = next;
+                    expiration_heap_.push({next, timer->id});   // map 条目复用，id 不变
+                } else {
+                    std::lock_guard<std::mutex> lock(timer_mutex_);
+                    timer_map_.erase(timer->id);                // 一次性：出账
+                }
+            }
 
             last_tick_time_ = now;
         }
@@ -269,8 +294,15 @@ namespace common
                         ++it;
                     }
                 } else {
-                    // L0 且未到期 —— 保留，等待下次 tick
-                    ++it;
+                    // 未到期且不能降级 —— ⭐修复周期定时器停摆：
+                    // 指针已扫到本槽但未到期时，绝不能留在原地（指针已过去，
+                    // 要等整圈才会再扫到——runEvery 首次触发后即停摆的根因），
+                    // 必须按剩余时间重插到未来槽位
+                    it = slot.erase(it);
+                    {
+                        std::lock_guard<std::mutex> lock(timer_mutex_);
+                        insertTimer(timer, now);
+                    }
                 }
             }
 
