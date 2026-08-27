@@ -103,7 +103,9 @@ public:
                  std::to_string(stats_.msgs_out.load()) +
                  " bytes(in/out)=" + std::to_string(stats_.bytes_in.load()) + "/" +
                  std::to_string(stats_.bytes_out.load()) +
-                 " rooms=" + std::to_string(rooms_.roomCount()));
+                 " rooms=" + std::to_string(rooms_.roomCount()) +
+                 " timerfd_settime=" + std::to_string(logic_loop_.timerfdSettimeCount() - last_timerfd_count_) + "/周期");
+        last_timerfd_count_ = logic_loop_.timerfdSettimeCount();
     }
 
 private:
@@ -226,6 +228,7 @@ private:
     std::mutex conns_mutex_;                                   // 保护 connections_
     std::unordered_map<uint64_t, TcpConnectionPtr> connections_;
     uint64_t next_conn_id_ = 1;                                // 仅主 loop 访问
+    uint64_t last_timerfd_count_ = 0;                           // stats 的 timerfd 速率差分
     Stats stats_;
 };
 

@@ -515,6 +515,7 @@ namespace common {
 
             // 驱动时间轮（timerfd 读事件发生在 IO 线程，直接 tick；
             // 时间轮回调经由 asyncTaskSubmitter → runInLoop 保证也在 IO 线程执行）
+            timerfd_deadline_ = std::chrono::steady_clock::time_point::max();   // 已到期，目标失效
             if (timing_wheel_) {
                 timing_wheel_->tick();
                 resetTimerfd();
@@ -570,6 +571,17 @@ namespace common {
             if (nextExpireMs <= 0) {
                 nextExpireMs = 1; // 至少1ms，避免过于频繁的触发
             }
+
+            // ⭐syscall 剪枝：心跳这类"每消息重排"会让 resetTimerfd 被高频调用，
+            // 但绝大多数时刻新目标不早于当前睡向时刻——只有确实提前才动 timerfd。
+            // （30k 连接档曾因此每秒数万次 settime，直接喂出 p99 尖刺）
+            auto deadline = std::chrono::steady_clock::now() +
+                            std::chrono::milliseconds(nextExpireMs);
+            if (deadline >= timerfd_deadline_) {
+                return;   // 已睡向更早（或同一）时刻，无需 syscall
+            }
+            timerfd_deadline_ = deadline;
+            timerfd_settime_count_.fetch_add(1, std::memory_order_relaxed);
 
             struct itimerspec new_value;
             struct itimerspec old_value;

@@ -80,6 +80,9 @@ namespace common {
                 }
             }
 
+            // 可观测：timerfd_settime 系统调用累计次数（心跳热路径诊断）
+            uint64_t timerfdSettimeCount() const { return timerfd_settime_count_.load(std::memory_order_relaxed); }
+
         private:
             EventLoopConfig config_;
 
@@ -97,9 +100,12 @@ namespace common {
             std::vector<Functor> pendingFunctors_;
             std::atomic<bool> callingPendingFunctors_;
 
-            std::unique_ptr<timer::HierarchicalTimingWheel> timing_wheel_;  // 分层时间轮
+            std::unique_ptr<timer::HierarchicalTimingWheel> timing_wheel_;  // 定时器（堆直驱到期）
             int timerFd_;                         // timerfd：把定时器挂进 epoll 统一事件源
             std::unique_ptr<Channel> timerChannel_;
+            std::chrono::steady_clock::time_point timerfd_deadline_ =
+                std::chrono::steady_clock::time_point::max();   // 当前 timerfd 睡向的时刻（跳过无谓 syscall）
+            std::atomic<uint64_t> timerfd_settime_count_{0};
 
             void initTimer();                     // 按需创建 timerfd + Channel
             void initializeEpoll();

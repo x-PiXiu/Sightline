@@ -223,7 +223,7 @@ private:
             }
             if (errno == EAGAIN || errno == EWOULDBLOCK) break;   // 内核发送缓冲满
             if (errno == EINTR) continue;
-            LOG_ERROR("TcpConnection::handleWrite error, conn=" + std::to_string(id_));
+            LOG_WARNING("TcpConnection::handleWrite error, conn=" + std::to_string(id_));
             break;
         }
         if (output_buffer_.readableBytes() == 0) {
