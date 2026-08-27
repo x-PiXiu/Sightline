@@ -265,7 +265,7 @@ namespace common {
                 assertInLoopThread(); // 确保定时器操作在 loop 线程进行，或确保线程安全
                 if (!timing_wheel_) {
                     LOG_ERROR("Timing wheel not initialized");
-                    return 0; // 🔧 不抛出异常，避免程序崩溃
+                    return 0;
                 }
 
                 //当添加定时器时，按需创建timerFd_和timerChannel_
@@ -273,13 +273,19 @@ namespace common {
                     initTimer();
                 }
 
-                return timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
+                uint64_t id = timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
+
+                // 关键：新定时器可能比 timerfd 当前睡向的时刻更早到期，
+                // 必须立刻把唤醒源压向"最近到期"，否则它只能搭下一次 tick 的晚班车
+                // （例：timerfd 正睡向 8s 后的心跳超时，中途插入 3s 的重生定时器会迟到）
+                resetTimerfd();
+                return id;
 
             } catch (const std::exception& e) {
-                LOG_ERROR("Exception in runEvery: " + std::string(e.what()));
-                return 0;  // 返回0表示失败
+                LOG_ERROR("Exception in runAfter: " + std::string(e.what()));
+                return 0;
             } catch (...) {
-                LOG_ERROR("Unknown exception in runEvery");
+                LOG_ERROR("Unknown exception in runAfter");
                 return 0;
             }
 
@@ -295,6 +301,7 @@ namespace common {
                 }
 
                 uint64_t timer_id = timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb), std::chrono::milliseconds(ms));
+                resetTimerfd();   // 同 runAfter：新周期定时器可能更早到期
                 return timer_id;
 
             } catch (const std::exception& e) {

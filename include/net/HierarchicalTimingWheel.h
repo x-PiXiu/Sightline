@@ -63,26 +63,19 @@ namespace common
                       size(wheel_size),                                    // 记录槽位总数
                       base_time(std::chrono::steady_clock::now()) {}
 
-                //  推进一层，返回是否转完一圈（用于触发上层）
+                //  推进一层，返回是否转完一圈（用于触发上层进位）
+                //  数学不变量：指针位置 ≡ (base_time / slot_duration) mod size，
+                //  余数（< slot_duration）留在 base_time 里给下次，绝不丢弃——
+                //  旧实现整圈时 base_time=now 丢余数且指针提前停在 0，会造成
+                //  恒定相位滞后（实测最多落后一个槽宽：L1 层即 +256ms）
                 bool advance(TimePoint now) {
-                    //  时间补偿：计算自 base_time 以来应推进多少槽
                     auto elapsed = now - base_time;
                     if (elapsed < slot_duration) return false; // 未到下一个槽
 
                     uint64_t ticks = elapsed / slot_duration;
-                    if (ticks == 0) return false;
-
-                    // 支持跳 tick（系统卡顿、tick 延迟时）
-                    for (uint64_t i = 0; i < ticks && i < size; ++i) {
-                        current_slot = (current_slot + 1) % size;
-                        if (current_slot == 0) {
-                            base_time = now; // 重置 base_time，避免累积误差
-                            return true;     // 转完一圈，需要进位
-                        }
-                    }
-                    //  更新 base_time，避免浮点误差累积
-                    base_time += ticks * slot_duration;
-                    return false;
+                    current_slot = (current_slot + ticks) % size;  // 相位连续推进
+                    base_time += ticks * slot_duration;            // 保留亚槽精度
+                    return elapsed >= size * slot_duration;        // 是否跨满一圈（进位判定）
                 }
 
                 //  计算"相对于本层当前圈"的槽位（不是全局时间！）
