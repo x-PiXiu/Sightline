@@ -3,13 +3,13 @@
 #include <chrono>
 #include <cstdio>
 #include <thread>
-#include "net/HierarchicalTimingWheel.h"
+#include "net/heap_scheduler.h"
 
-using common::timer::HierarchicalTimingWheel;
+using common::timer::HeapScheduler;
 using Clock = std::chrono::steady_clock;
 
 int main() {
-    HierarchicalTimingWheel wheel;   // 同步执行（不设 submitter）
+    HeapScheduler wheel;   // 同步执行（不设 submitter）
     auto t0 = Clock::now();
     auto ms = [&]{ return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-t0).count(); };
 

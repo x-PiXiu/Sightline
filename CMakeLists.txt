@@ -19,7 +19,7 @@ add_library(sightline_net STATIC
     src/net/event_loop.cpp
     src/net/socket.cpp
     src/net/inet_address.cpp
-    src/net/HierarchicalTimingWheel.cpp
+    src/net/heap_scheduler.cpp
     src/logger/logger.cpp
 )
 target_link_libraries(sightline_net PUBLIC Threads::Threads)

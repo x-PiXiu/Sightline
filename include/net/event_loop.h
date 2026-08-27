@@ -15,7 +15,7 @@
 #include <thread>
 #include <vector>
 #include "epoll.h"
-#include "HierarchicalTimingWheel.h"
+#include "heap_scheduler.h"
 
 namespace common {
     namespace network {
@@ -100,7 +100,7 @@ namespace common {
             std::vector<Functor> pendingFunctors_;
             std::atomic<bool> callingPendingFunctors_;
 
-            std::unique_ptr<timer::HierarchicalTimingWheel> timing_wheel_;  // 定时器（堆直驱到期）
+            std::unique_ptr<timer::HeapScheduler> scheduler_;   // 定时器（堆直驱）  // 定时器（堆直驱到期）
             int timerFd_;                         // timerfd：把定时器挂进 epoll 统一事件源
             std::unique_ptr<Channel> timerChannel_;
             std::chrono::steady_clock::time_point timerfd_deadline_ =

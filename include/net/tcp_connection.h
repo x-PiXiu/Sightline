@@ -16,7 +16,7 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "adapters/buffer.h"
+#include "net/buffer.h"
 #include "net/event_loop.h"
 #include "net/channel.h"
 #include "net/socket.h"

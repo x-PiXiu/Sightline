@@ -14,6 +14,8 @@ public:
 
     // ms 毫秒后执行 cb（回调在逻辑线程执行）；返回定时器 id，0 = 失败
     virtual uint64_t runAfter(int ms, std::function<void()> cb) = 0;
+    // 每 ms 毫秒周期执行 cb（惰性心跳等低频巡检用）
+    virtual uint64_t runEvery(int ms, std::function<void()> cb) = 0;
     virtual void cancel(uint64_t id) = 0;
 };
 

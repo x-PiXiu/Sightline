@@ -17,8 +17,8 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
-#include "adapters/acceptor.h"
-#include "adapters/tcp_connection.h"
+#include "net/acceptor.h"
+#include "net/tcp_connection.h"
 #include "adapters/protocol_codec.h"
 #include "application/dto.h"
 #include "application/ports/i_game_channel.h"
@@ -70,14 +70,23 @@ public:
     void sendTo(app::PlayerId pid, const app::GameEvent& ev) override {
         auto cit = findConn(sessions_.connIdOf(pid));
         if (cit == nullptr) return;
-        const auto& wire = ev_wire(ev);
+        // 编码一次，所有收件人共享同一份 wire（sendToAll 免重复编码）
+        const std::string& wire = ev_wire(ev);
         stats_.msgs_out.fetch_add(1, std::memory_order_relaxed);
         stats_.bytes_out.fetch_add(wire.size(), std::memory_order_relaxed);
         cit->send(wire);    // 跨线程安全：内部投递到该连接的 IO loop
     }
 
     void sendToAll(const std::vector<app::PlayerId>& pids, const app::GameEvent& ev) override {
-        for (auto pid : pids) sendTo(pid, ev);
+        if (pids.empty()) return;
+        const std::string& wire = ev_wire(ev);   // 广播编码一次
+        for (auto pid : pids) {
+            auto cit = findConn(sessions_.connIdOf(pid));
+            if (cit == nullptr) continue;
+            stats_.msgs_out.fetch_add(1, std::memory_order_relaxed);
+            stats_.bytes_out.fetch_add(wire.size(), std::memory_order_relaxed);
+            cit->send(wire);
+        }
     }
 
     void close(app::PlayerId pid) override {

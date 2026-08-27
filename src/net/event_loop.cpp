@@ -137,10 +137,10 @@ namespace common {
             wakeupChannel_->setReadCallback([this] { handleRead(); });
             wakeupChannel_->enableReading();
 
-            timing_wheel_ = std::make_unique<timer::HierarchicalTimingWheel>();
+            scheduler_ = std::make_unique<timer::HeapScheduler>();
 
             // 这确保了定时器回调最终会在 EventLoop 线程中执行
-            timing_wheel_->setAsyncTaskSubmitter(
+            scheduler_->setAsyncTaskSubmitter(
                 [this](std::function<void()> task) {
                     this->runInLoop(std::move(task));
                 }
@@ -263,7 +263,7 @@ namespace common {
         uint64_t EventLoop::runAfter(int ms, std::function<void()> cb) {
             try {
                 assertInLoopThread(); // 确保定时器操作在 loop 线程进行，或确保线程安全
-                if (!timing_wheel_) {
+                if (!scheduler_) {
                     LOG_ERROR("Timing wheel not initialized");
                     return 0;
                 }
@@ -273,7 +273,7 @@ namespace common {
                     initTimer();
                 }
 
-                uint64_t id = timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
+                uint64_t id = scheduler_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
 
                 // 关键：新定时器可能比 timerfd 当前睡向的时刻更早到期，
                 // 必须立刻把唤醒源压向"最近到期"，否则它只能搭下一次 tick 的晚班车
@@ -300,7 +300,7 @@ namespace common {
                     initTimer();
                 }
 
-                uint64_t timer_id = timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb), std::chrono::milliseconds(ms));
+                uint64_t timer_id = scheduler_->addTimer(std::chrono::milliseconds(ms), std::move(cb), std::chrono::milliseconds(ms));
                 resetTimerfd();   // 同 runAfter：新周期定时器可能更早到期
                 return timer_id;
 
@@ -314,10 +314,10 @@ namespace common {
         }
 
         void EventLoop::cancelTimer(uint64_t id) {
-            //    注意：cancel 可以在非 loop 线程调用，因为 timing_wheel_->cancelTimer 是线程安全的
+            //    注意：cancel 可以在非 loop 线程调用，因为 scheduler_->cancelTimer 是线程安全的
             //    它内部有 mutex 保护 timer_map_
-            if (timing_wheel_) {
-                timing_wheel_->cancelTimer(id);
+            if (scheduler_) {
+                scheduler_->cancelTimer(id);
             }
         }
 
@@ -516,11 +516,11 @@ namespace common {
             // 驱动时间轮（timerfd 读事件发生在 IO 线程，直接 tick；
             // 时间轮回调经由 asyncTaskSubmitter → runInLoop 保证也在 IO 线程执行）
             timerfd_deadline_ = std::chrono::steady_clock::time_point::max();   // 已到期，目标失效
-            if (timing_wheel_) {
-                timing_wheel_->tick();
+            if (scheduler_) {
+                scheduler_->tick();
                 resetTimerfd();
             } else {
-                LOG_ERROR("timing_wheel_ is null in handleTimerfdRead()!");
+                LOG_ERROR("scheduler_ is null in handleTimerfdRead()!");
             }
         }
 
@@ -555,8 +555,8 @@ namespace common {
 
         void EventLoop::resetTimerfd() {
 
-            if (!timing_wheel_) {
-                LOG_ERROR("[TIMER_FD] ❌ timing_wheel_ is null in resetTimerfd()!");
+            if (!scheduler_) {
+                LOG_ERROR("[TIMER_FD] ❌ scheduler_ is null in resetTimerfd()!");
                 return;
             }
 
@@ -565,7 +565,7 @@ namespace common {
                 return;
             }
 
-            int nextExpireMs = timing_wheel_->getNextExpiration(config_.epoll_timeout);
+            int nextExpireMs = scheduler_->getNextExpiration(config_.epoll_timeout);
 
             // 边界检查：确保延迟时间合理
             if (nextExpireMs <= 0) {

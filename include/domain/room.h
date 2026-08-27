@@ -86,6 +86,21 @@ public:
 
     void finish() { state_ = RoomState::Finished; }
 
+    // 重开一局：结算后复位状态并保留玩家（ kills/hp/位置全部重置），
+    // 人够则立即再开战。业务缺口修复：此前 Finished 房间永久滞留，玩家只能断线重连
+    bool rematch() {
+        if (state_ != RoomState::Finished) return false;
+        state_ = RoomState::Waiting;
+        int index = 0;
+        for (auto& [id, p] : players_) {
+            p.kills = 0;
+            p.resetHp(rules_.max_hp);
+            p.alive = true;
+            p.position = spawnPoint(index++);
+        }
+        return tryStart();
+    }
+
     // ---- 查询 ----
     const Player* findPlayer(PlayerId pid) const {
         auto it = players_.find(pid);

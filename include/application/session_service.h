@@ -1,7 +1,12 @@
-// application/session_service.h —— 会话用例：登录身份、心跳保活、超时踢人
+// application/session_service.h —— 会话用例：登录身份、心跳保活（惰性扫描）、超时踢人
 // 只依赖 domain + ports（IGameChannel / ITimerScheduler），可被 Fake 双测。
+//
+// 心跳设计（惰性扫描式）：每会话只记 last_active 时间戳，单个 runEvery 扫描器
+// 周期巡检超时——替代早期"每消息 cancel+add 重排"（3 万连接档每秒数万次
+// 锁+堆操作压主循环）。用低频操作实现低频语义。
 
 #pragma once
+#include <chrono>
 #include <unordered_map>
 #include <string>
 #include <functional>
@@ -16,6 +21,7 @@ class SessionService {
 public:
     struct Config {
         int heartbeat_timeout_ms = 8000;   // 超过此时长无任何消息即踢出
+        int scan_interval_ms = 1000;       // 心跳扫描周期（踢人精度粒度）
     };
 
     // on_player_gone：玩家彻底离开（断线或被踢）时回调，由 main 接到 RoomService
@@ -27,7 +33,10 @@ public:
                    std::function<void(PlayerId)> on_player_gone,
                    const Config& config)
         : channel_(channel), timers_(timers),
-          on_player_gone_(std::move(on_player_gone)), config_(config) {}
+          on_player_gone_(std::move(on_player_gone)), config_(config) {
+        // 唯一的心跳定时器：周期扫描（替代每会话一个重排定时器）
+        timers_.runEvery(config_.scan_interval_ms, [this] { scanHeartbeats(); });
+    }
 
     // ---- 连接生命周期（由 adapters 的连接回调驱动）----
 
@@ -50,9 +59,9 @@ public:
         PlayerSession s;
         s.conn_id = conn_id;
         s.name = cmd.name.empty() ? ("Player" + std::to_string(pid)) : cmd.name;
+        s.last_active = std::chrono::steady_clock::now();
         sessions_[pid] = s;
         conn_to_player_[conn_id] = pid;
-        scheduleHeartbeat(pid);
         channel_.sendTo(pid, LoginAckEvent{pid});
     }
 
@@ -61,10 +70,10 @@ public:
         channel_.sendTo(pid, PongEvent{cmd.client_time});
     }
 
-    // 任意消息都会喂狗（GameServer 分发时统一调用）
+    // 任意消息都会喂狗：只打时间戳，零定时器操作
     void onActivity(PlayerId pid) {
-        if (!has(pid)) return;
-        scheduleHeartbeat(pid);
+        auto it = sessions_.find(pid);
+        if (it != sessions_.end()) it->second.last_active = std::chrono::steady_clock::now();
     }
 
     // ---- 查询 ----
@@ -88,26 +97,24 @@ private:
     struct PlayerSession {
         uint64_t conn_id = 0;
         std::string name;
-        uint64_t heartbeat_timer = 0;
+        std::chrono::steady_clock::time_point last_active;
     };
 
-    void scheduleHeartbeat(PlayerId pid) {
-        auto it = sessions_.find(pid);
-        if (it == sessions_.end()) return;
-        if (it->second.heartbeat_timer) timers_.cancel(it->second.heartbeat_timer);
-        it->second.heartbeat_timer = timers_.runAfter(config_.heartbeat_timeout_ms, [this, pid] {
-            auto s = sessions_.find(pid);
-            if (s == sessions_.end()) return;
-            s->second.heartbeat_timer = 0;
-            channel_.sendTo(pid, KickEvent{1});          // 1 = 心跳超时
-            channel_.close(pid);                          // 触发 onClose → onDisconnected → dropPlayer
-        });
+    // 单定时器巡检：超时会话 → 通告 + 断开（随后的 onDisconnected 完成清理与联动）
+    void scanHeartbeats() {
+        auto now = std::chrono::steady_clock::now();
+        for (auto it = sessions_.begin(); it != sessions_.end(); ++it) {
+            auto idle = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - it->second.last_active).count();
+            if (idle < config_.heartbeat_timeout_ms) continue;
+            channel_.sendTo(it->first, KickEvent{1});   // 1 = 心跳超时
+            channel_.close(it->first);
+        }
     }
 
     void dropPlayer(PlayerId pid) {
         auto it = sessions_.find(pid);
         if (it == sessions_.end()) return;
-        if (it->second.heartbeat_timer) timers_.cancel(it->second.heartbeat_timer);
         sessions_.erase(it);
         if (on_player_gone_) on_player_gone_(pid);
     }

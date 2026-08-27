@@ -9,7 +9,7 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include "adapters/buffer.h"
+#include "net/buffer.h"
 #include "application/dto.h"
 
 namespace sightline::adapters {

@@ -18,6 +18,7 @@ public:
     struct Config {
         domain::RoomRules room_rules;    // 每间房的对战规则
         int respawn_delay_ms = 3000;     // 阵亡后重生倒计时
+        int rematch_delay_ms = 5000;     // 结算后自动重开倒计时
     };
 
     RoomService(IGameChannel& channel, ITimerScheduler& timers)
@@ -71,7 +72,21 @@ public:
         }
         if (r.game_over) {
             channel_.sendToAll(room->playerIds(), GameOverEvent{r.winner});
+            scheduleRematch(room->id());
         }
+    }
+
+    // 结算 N 秒后自动重开：玩家保留、状态复位、人够即再战（协议复用 RoomStart，零改动）
+    void scheduleRematch(domain::RoomId room_id) {
+        timers_.runAfter(config_.rematch_delay_ms, [this, room_id] {
+            auto it = rooms_.find(room_id);
+            if (it == rooms_.end()) return;         // 房间已回收（全走光）
+            auto& room = it->second;
+            if (room.rematch()) {
+                channel_.sendToAll(room.playerIds(), RoomStartEvent{room.playerIds()});
+            }
+            // 人不够（有玩家离开）：留在 Waiting 等新加入者补位
+        });
     }
 
     // ---- 玩家彻底离开（断线/被踢），由 SessionService 回调进来 ----
@@ -83,6 +98,7 @@ public:
         channel_.sendToAll(room->playerIds(), PlayerLeftEvent{pid});
         if (out.game_over) {
             channel_.sendToAll(room->playerIds(), GameOverEvent{out.winner});
+            scheduleRematch(room->id());
         }
         if (room->playerCount() == 0) rooms_.erase(room->id());   // 空房即回收
     }

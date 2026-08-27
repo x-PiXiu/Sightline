@@ -49,6 +49,10 @@ struct FakeTimer : ITimerScheduler {
         items.push_back({next_id, ms, std::move(cb)});
         return next_id++;
     }
+    uint64_t runEvery(int ms, std::function<void()> cb) override {
+        items.push_back({next_id, ms, std::move(cb)});   // 测试中按一次性触发即可
+        return next_id++;
+    }
     void cancel(uint64_t id) override {
         for (auto& it : items) if (it.id == id) it.cancelled = true;
     }
@@ -65,8 +69,10 @@ int main() {
     FakeTimer timers;
 
     RoomService rooms(channel, timers);
+    // 心跳超时设 0：扫描器一触发即判超时（确定性测试惰性心跳路径）
     SessionService sessions(channel, timers,
-                             [&rooms](PlayerId pid) { rooms.handlePlayerGone(pid); });
+                             [&rooms](PlayerId pid) { rooms.handlePlayerGone(pid); },
+                             SessionService::Config{0, 1000});
     const uint64_t CONN_A = 100, CONN_B = 101;
 
     // 1. 登录 → LoginAck
