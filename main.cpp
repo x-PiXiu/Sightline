@@ -43,15 +43,16 @@ private:
 int main(int argc, char* argv[]) {
     using namespace sightline;
 
-    // 日志：显式挂控制台 sink（Logger 默认不添加任何输出目标）
+    // 日志：显式挂控制台 sink + 启用异步（热路径不再承担控制台写出的阻塞）
     auto& logger = common::logger::Logger::getInstance();
     logger.addSink(std::make_unique<common::logger::ConsoleSink>());
+    logger.setAsyncLogging(true);
     logger.setLogLevel(common::logger::LogLevel::INFO);
 
     const auto cfg = SightlineConfig::fromArgs(argc, argv);
 
     // ---- 装配线 ----
-    common::network::EventLoop loop(cfg.loop);          // 框架层：Reactor + 时间轮
+    common::network::EventLoop loop(cfg.loop);          // 主 loop：acceptor + 定时器 + 游戏逻辑
     adapters::TimerWheelAdapter timers(loop);           // Port#2 实现
 
     ChannelProxy proxy;                                 // Port#1 占位
@@ -61,14 +62,24 @@ int main(int argc, char* argv[]) {
         [&rooms](app::PlayerId pid) { rooms.handlePlayerGone(pid); },
         cfg.session);
 
-    adapters::GameServer server(loop, sessions, rooms, cfg.port);   // 适配层 + Port#1 实现
+    // 适配层 + Port#1 实现：主从 Reactor（IO 多线程，逻辑单线程跳回主 loop）
+    adapters::GameServer::Options net_opts;
+    net_opts.io_threads = cfg.io_threads;
+    net_opts.conn.high_water_mark = cfg.high_water_mark;
+    net_opts.conn.rate_bytes_per_sec = cfg.send_rate_bytes_per_sec;
+    adapters::GameServer server(loop, sessions, rooms, cfg.port, net_opts);
     proxy.bind(server);
     server.start();
+
+    // 可观测性：周期上报（走时间轮的周期定时器）
+    loop.runEvery(cfg.stats_interval_s * 1000, [&server] { server.logStats(); });
 
     // ---- 上电 ----
     g_loop = &loop;
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
+    // 压测第一课：不忽略 SIGPIPE，向已 RST 的连接 write 会直接杀死进程（无日志暴毙）
+    std::signal(SIGPIPE, SIG_IGN);
 
     logger.info("Sightline FPS server listening on port " + std::to_string(cfg.port),
                 __FILE__, __LINE__);

@@ -49,6 +49,15 @@ namespace common {
             //获取socket文件描述符
             int fd() const;
 
+            /**
+             * @brief 设置 SO_LINGER（关闭行为策略）
+             * @param on 是否启用 linger
+             * @param seconds 等待秒数（on=true 且 0 = RST 立断丢弃发送队列）
+             * @details 默认关闭（优雅 close，内核排空发送队列）；
+             *          forceClose() 内部使用 linger(1,0) 实现 RST
+             */
+            void setLinger(bool on, int seconds);
+
             //绑定地址
             void bindAddress(const InetAddress &localaddr);
 

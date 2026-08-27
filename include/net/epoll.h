@@ -20,7 +20,7 @@ namespace common {
         public:
             typedef std::vector<struct epoll_event> EventList;
             typedef std::vector<Channel*> ChannelList;
-            typedef std::map<int, Channel*> ChannelMap;
+            typedef std::unordered_map<int, Channel*> ChannelMap;   // O(1) 查找（原 std::map）
 
             /**
             * @brief 构造函数 - 使用参数注入方式

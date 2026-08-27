@@ -30,26 +30,27 @@ namespace common {
         }
 
         Socket::~Socket() {
+            // 优雅关闭（架构修订）：析构不再设 SO_LINGER(0)（RST 会丢弃未发送数据，
+            // 属于"细节绑架策略"）。默认普通 close——内核尽力把发送队列里的数据送达；
+            // 需要 RST 立断的场景（踢人等）显式调用 forceClose()。
             if (sockfd_ != -1) {
-                // 强制关闭socket，确保端口立即释放
-                // 设置 SO_LINGER 为 0，强制立即关闭连接
-                struct linger linger_opt;
-                linger_opt.l_onoff = 1;   // 启用 linger
-                linger_opt.l_linger = 0;  // 立即关闭，不等待数据发送完成
-
-                if (::setsockopt(sockfd_, SOL_SOCKET, SO_LINGER,
-                                &linger_opt, sizeof(linger_opt)) < 0) {
-                    LOG_WARNING("Failed to set SO_LINGER for socket fd: " + std::to_string(sockfd_) +
-                               ", error: " + std::string(strerror(errno)));
-                }
-
-                // 关闭socket
                 if (::close(sockfd_) < 0) {
                     LOG_WARNING("Failed to close socket fd: " + std::to_string(sockfd_) +
                                ", error: " + std::string(strerror(errno)));
-                } else {
                 }
                 sockfd_ = -1;
+            }
+        }
+
+        void Socket::setLinger(bool on, int seconds) {
+            if (sockfd_ < 0) return;
+            struct linger linger_opt;
+            linger_opt.l_onoff = on ? 1 : 0;
+            linger_opt.l_linger = static_cast<unsigned short>(seconds);
+            if (::setsockopt(sockfd_, SOL_SOCKET, SO_LINGER,
+                             &linger_opt, sizeof(linger_opt)) < 0) {
+                LOG_WARNING("Failed to set SO_LINGER for socket fd: " + std::to_string(sockfd_) +
+                           ", error: " + std::string(strerror(errno)));
             }
         }
 
