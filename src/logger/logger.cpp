@@ -435,6 +435,14 @@ namespace common {
          * @param entry 要输出的日志条目
          */
         void Logger::logMessage(const LogEntry& entry) {
+            // 限频护栏：TRACE~WARN 按调用点(file:line)限流，ERROR/FATAL 直通
+            if (rate_limit_per_sec_ > 0 && entry.level <= LogLevel::WARN) {
+                if (!rateLimitAllows(entry)) return;
+            }
+            dispatch(entry);
+        }
+
+        void Logger::dispatch(const LogEntry& entry) {
             if (async_logging_) {
                 asyncLogMessage(entry);
             } else {
@@ -444,6 +452,42 @@ namespace common {
                     sink->write(entry);
                 }
             }
+        }
+
+        bool Logger::rateLimitAllows(const LogEntry& entry) {
+            using namespace std::chrono;
+            std::lock_guard<std::mutex> lock(rate_mutex_);
+
+            // 签名表上限保护：异常多的调用点直接放行（不计数）
+            std::string key = std::string(entry.file ? entry.file : "?") +
+                              ":" + std::to_string(entry.line);
+            auto it = rate_windows_.find(key);
+            if (it == rate_windows_.end()) {
+                if (rate_windows_.size() >= 1024) return true;
+                it = rate_windows_.emplace(key, RateWindow{}).first;
+            }
+            auto& w = it->second;
+            auto now = steady_clock::now();
+
+            if (now - w.window_start >= seconds(1)) {
+                // 窗口滚动：上窗口有丢弃则补一条聚合摘要（直通，不再过滤）
+                if (w.suppressed > 0) {
+                    LogEntry summary("[rate-limit] suppressed " + std::to_string(w.suppressed) +
+                                         " logs from " + key + " in last 1s",
+                                     LogLevel::WARN, entry.file, entry.line);
+                    dispatch(summary);
+                }
+                w.window_start = now;
+                w.count = 0;
+                w.suppressed = 0;
+            }
+
+            if (w.count < rate_limit_per_sec_) {
+                ++w.count;
+                return true;
+            }
+            ++w.suppressed;
+            return false;
         }
         
         /**
@@ -459,17 +503,21 @@ namespace common {
             {
                 std::lock_guard<std::mutex> lock(queue_mutex_);
 
-                // ✅ 检查队列大小，防止无限增长（内存泄漏修复）
+                // 队列满时分级丢弃：低级别(TRACE~INFO)直接丢新条目；
+                // WARN 以上才有资格挤掉最旧的——"丢 DEBUG 保 ERROR"
                 if (async_log_queue_.size() >= MAX_ASYNC_QUEUE_SIZE) {
-                    // 队列已满，丢弃最旧的日志（FIFO策略）
-                    async_log_queue_.pop();
+                    if (entry.level <= LogLevel::INFO) {
+                        async_queue_dropped_count_.fetch_add(1);
+                        return;   // 低级别不入队
+                    }
+                    async_log_queue_.pop();   // 高级别：丢最旧腾位
                     async_queue_dropped_count_.fetch_add(1);
 
                     // 定期警告（每丢弃1000条）
                     size_t dropped = async_queue_dropped_count_.load();
                     if (dropped % 1000 == 0) {
                         // 使用标准输出避免递归死锁
-                        std::cerr << "[Logger] ⚠️  Async log queue full (max=" << MAX_ASYNC_QUEUE_SIZE
+                        std::cerr << "[Logger] Async log queue full (max=" << MAX_ASYNC_QUEUE_SIZE
                                  << "), " << dropped << " messages dropped" << std::endl;
                     }
                 }
@@ -495,30 +543,28 @@ namespace common {
          * 异步处理队列中的日志条目，将它们输出到所有已注册的Sink。
          */
         void Logger::asyncLogWorker() {
+            // 批量写出：整队列 swap 后一次性下发（参考 EventLoop::doPendingFunctors
+            // 的 swap 模式）——一次加锁搬走一批，写盘不再逐条抢锁
             while (!is_shutting_down_) {
-                LogEntry log_entry("", LogLevel::INFO, nullptr, 0);
+                std::queue<LogEntry> batch;
                 {
                     std::unique_lock<std::mutex> lock(queue_mutex_);
-                    queue_cv_.wait(lock, [this] { 
-                        return !async_log_queue_.empty() || is_shutting_down_; 
+                    queue_cv_.wait(lock, [this] {
+                        return !async_log_queue_.empty() || is_shutting_down_;
                     });
-                    
+
                     if (is_shutting_down_ && async_log_queue_.empty()) {
                         break;
                     }
-                    
-                    if (!async_log_queue_.empty()) {
-                        log_entry = async_log_queue_.front();
-                        async_log_queue_.pop();
-                    } else {
-                        continue;
-                    }
+                    batch.swap(async_log_queue_);   // O(1) 整批搬走
                 }
-                
-                // 实际输出日志到所有Sinks
+
                 std::lock_guard<std::mutex> lock(sinks_mutex_);
-                for (const auto& sink : sinks_) {
-                    sink->write(log_entry);
+                while (!batch.empty()) {
+                    for (const auto& sink : sinks_) {
+                        sink->write(batch.front());
+                    }
+                    batch.pop();
                 }
             }
         }

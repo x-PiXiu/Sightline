@@ -19,6 +19,10 @@ struct SightlineConfig {
     size_t send_rate_bytes_per_sec = 0;                  // 每连接发送限速（0=不限）
     int stats_interval_s = 10;                           // 统计上报周期
 
+    // 日志（异步/限频已在 main 默认启用；此处控制生产文件输出）
+    bool file_log = false;                               // true: 追加 FileSink（滚动）
+    std::string log_dir = "logs";
+
     common::network::EventLoopConfig loop;
     app::SessionService::Config session;
     app::RoomService::Config room;

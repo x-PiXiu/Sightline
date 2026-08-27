@@ -16,6 +16,7 @@
 #include <condition_variable>
 #include <chrono>
 #include <vector>
+#include <unordered_map>
 
 namespace common {
     namespace logger {
@@ -227,6 +228,14 @@ namespace common {
                 async_logging_ = enabled;
                 if (enabled) startAsyncThread();
             }
+
+            /**
+             * @brief 同调用点限频（条/秒），0 = 关闭（默认）
+             * @details 签名 = file:line；TRACE~WARN 超限丢弃并在窗口滚动时
+             *          补一条聚合摘要（"suppressed N logs from ..."）；
+             *          ERROR/FATAL 永不限制。风暴期防日志风暴的护栏。
+             */
+            void setRateLimitPerSecond(int n) { rate_limit_per_sec_ = n; }
             
             // 日志记录方法
             void trace(const std::string& message, const char* file = "", int line = 0);
@@ -254,9 +263,22 @@ namespace common {
 
             // 格式化日志消息
             std::string formatMessage(const LogEntry& entry);
-            
-            // 输出日志消息
+
+            // 输出日志消息（含限频过滤；dispatch 为过滤后的实际分发）
             void logMessage(const LogEntry& entry);
+            void dispatch(const LogEntry& entry);
+            bool rateLimitAllows(const LogEntry& entry);
+
+            // 限频窗口：签名=调用点(file:line)，按秒计数，超限丢弃并周期聚合
+            struct RateWindow {
+                std::chrono::steady_clock::time_point window_start =
+                    std::chrono::steady_clock::now();
+                int count = 0;
+                int suppressed = 0;
+            };
+            std::mutex rate_mutex_;
+            std::unordered_map<std::string, RateWindow> rate_windows_;
+            int rate_limit_per_sec_ = 0;
             
             // 🔧 添加异步日志处理方法
             void asyncLogMessage(const LogEntry& entry);

@@ -3,3 +3,5 @@ build/
 *.a
 .idea/
 .vscode/
+loadbot/loadbot
+logs/

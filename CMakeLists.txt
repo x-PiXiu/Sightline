@@ -28,12 +28,15 @@ target_link_libraries(sightline_net PUBLIC Threads::Threads)
 add_executable(sightline main.cpp)
 target_link_libraries(sightline PRIVATE sightline_net)
 
-# ---------- 单元测试（domain/application 零网络依赖，直接编译即可） ----------
+# ---------- 单元测试（domain/application 零网络依赖，直接编译即可；logger 链接 net 库） ----------
 add_executable(test_hitscan       tests/domain/test_hitscan.cpp)
 add_executable(test_room          tests/domain/test_room.cpp)
 add_executable(test_room_service  tests/application/test_room_service.cpp)
+add_executable(test_logger        tests/logger/test_logger.cpp)
+target_link_libraries(test_logger PRIVATE sightline_net)
 
 enable_testing()
 add_test(NAME hitscan      COMMAND test_hitscan)
 add_test(NAME room         COMMAND test_room)
 add_test(NAME room_service COMMAND test_room_service)
+add_test(NAME logger       COMMAND test_logger)

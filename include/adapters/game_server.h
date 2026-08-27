@@ -133,7 +133,7 @@ private:
         }
         io_loop->runInLoop([conn] { conn->establish(); });   // 在其 IO 线程注册读事件
         sessions_.onConnected(id);
-        LOG_INFO("conn#" + std::to_string(id) + " in from " + peer.toIpPort() +
+        LOG_DEBUG("conn#" + std::to_string(id) + " in from " + peer.toIpPort() +
                  ", total=" + std::to_string(currentConnCount()));
     }
 
@@ -150,7 +150,7 @@ private:
         }
         logic_loop_.queueInLoop([this, conn] {
             sessions_.onDisconnected(conn->id());   // → dropPlayer → 联动房间退房
-            LOG_INFO("conn#" + std::to_string(conn->id()) + " closed, total=" +
+            LOG_DEBUG("conn#" + std::to_string(conn->id()) + " closed, total=" +
                      std::to_string(currentConnCount()));
         });
     }

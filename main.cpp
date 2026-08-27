@@ -2,6 +2,7 @@
 // 业务代码对本文件一无所知。
 
 #include <csignal>
+#include <filesystem>
 #include <memory>
 #include "sightline_config.h"
 #include "adapters/game_server.h"
@@ -43,13 +44,19 @@ private:
 int main(int argc, char* argv[]) {
     using namespace sightline;
 
-    // 日志：显式挂控制台 sink + 启用异步（热路径不再承担控制台写出的阻塞）
+    const auto cfg = SightlineConfig::fromArgs(argc, argv);
+
+    // 日志：异步 + 限频（热路径零同步 IO；风暴期按调用点限流防日志风暴）
     auto& logger = common::logger::Logger::getInstance();
     logger.addSink(std::make_unique<common::logger::ConsoleSink>());
+    logger.setRateLimitPerSecond(100);
     logger.setAsyncLogging(true);
     logger.setLogLevel(common::logger::LogLevel::INFO);
-
-    const auto cfg = SightlineConfig::fromArgs(argc, argv);
+    if (cfg.file_log) {   // 生产：追加滚动文件（8MB×5 个），控制台留给开发期
+        std::filesystem::create_directories(cfg.log_dir);
+        logger.addSink(std::make_unique<common::logger::FileSink>(
+            cfg.log_dir + "/sightline.log", 8 * 1024 * 1024, 5));
+    }
 
     // ---- 装配线 ----
     common::network::EventLoop loop(cfg.loop);          // 主 loop：acceptor + 定时器 + 游戏逻辑
