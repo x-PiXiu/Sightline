@@ -1,7 +1,66 @@
+# ===== 构建目录 =====
 build/
+build-*/
+cmake-build-*/
+out/
+
+# ===== CMake 中间产物（源码树内生成时兜底） =====
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+CTestTestfile.cmake
+Testing/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# ===== 编译产物 =====
 *.o
+*.obj
+*.d
 *.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+
+# ===== 可执行文件 =====
+sightline
+loadbot/loadbot
+
+# ===== 日志 =====
+logs/
+*.log
+
+# ===== Python（scripts/） =====
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ===== Go（loadbot/） =====
+*.test
+
+# ===== 压测 / 性能分析产物 =====
+perf.data*
+*.prof
+*.pprof
+*.gcno
+*.gcda
+
+# ===== 崩溃转储 =====
+core
+core.*
+
+# ===== IDE / 编辑器 =====
 .idea/
 .vscode/
-loadbot/loadbot
-logs/
+.clangd/
+.cache/
+*.swp
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
