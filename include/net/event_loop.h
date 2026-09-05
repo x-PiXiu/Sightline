@@ -8,6 +8,7 @@
 #define EVENT_LOOP_H
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <mutex>

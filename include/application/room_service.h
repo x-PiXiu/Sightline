@@ -4,6 +4,7 @@
 
 #pragma once
 #include <unordered_map>
+#include <string>
 #include <vector>
 #include "application/dto.h"
 #include "application/ports/i_game_channel.h"

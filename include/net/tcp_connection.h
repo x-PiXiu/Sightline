@@ -12,6 +12,7 @@
 
 #pragma once
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <memory>

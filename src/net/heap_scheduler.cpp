@@ -1,6 +1,8 @@
 // net/heap_scheduler.cpp —— 定时器调度器实现（堆直驱，演化史见头文件）
 
 #include "net/heap_scheduler.h"
+#include <memory>
+#include <chrono>
 #include "logger/logger.h"
 
 namespace common {

@@ -2,6 +2,8 @@
 // Created by 29108 on 2025/6/30.
 //
 #include "net/channel.h"
+#include <string>
+#include <memory>
 #include "logger/logger.h"
 #include "net/event_loop.h"
 #include <sys/epoll.h>

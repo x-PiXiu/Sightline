@@ -3,6 +3,7 @@
 //
 
 #include "net/socket.h"
+#include <string>
 #include <cstring>
 #include <stdexcept>
 #include <unistd.h>

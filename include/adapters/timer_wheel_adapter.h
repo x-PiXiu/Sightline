@@ -4,6 +4,7 @@
 
 #pragma once
 #include "application/ports/i_timer_scheduler.h"
+#include <functional>
 #include "net/event_loop.h"
 
 namespace sightline::adapters {

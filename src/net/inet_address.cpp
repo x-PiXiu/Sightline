@@ -2,6 +2,7 @@
 // Created by 29108 on 2025/6/29.
 //
 #include "net/inet_address.h"
+#include <string>
 #include "logger/logger.h"
 #include <arpa/inet.h>
 #include <cstring>

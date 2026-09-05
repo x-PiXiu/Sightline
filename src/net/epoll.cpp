@@ -2,6 +2,7 @@
 // Created by 29108 on 2025/6/30.
 //
 #include "net/epoll.h"
+#include <string>
 
 #include <cassert>
 #include <cstring>
