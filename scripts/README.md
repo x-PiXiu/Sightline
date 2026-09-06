@@ -12,8 +12,8 @@
 ```bash
 wsl bash scripts/build/build_and_test.sh
 ```
-- 做什么：`cmake + make -j`（Release）→ `ctest` 三套单测（hitscan / room / room_service）
-- 期望：`100% tests passed, 0 tests failed out of 3`
+- 做什么：`cmake + make -j`（Release）→ `ctest` 四套单测（hitscan / room / room_service / logger）
+- 期望：`100% tests passed, 0 tests failed out of 4`
 
 ### `build/check_dependencies.sh` —— 架构依赖守护（三红线）
 ```bash

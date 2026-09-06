@@ -9,7 +9,7 @@ C++17 手写 epoll 的 FPS 对战游戏服务器（Linux）。由毕设网络库
 > → 见 [`docs/架构设计文档.md`](docs/架构设计文档.md)（面试讲解的完整底稿）
 >
 > **字节协议详解**：帧格式逐字节解剖（含真实抓包）、粘包半包、ET 读写路径、协议演进
-> → 见 [`docs/字节协议与传输详解.md`](docs/字节协议与传输详解.md)（配 `scripts/run_demo.sh` 交互演示）
+> → 见 [`docs/字节协议与传输详解.md`](docs/字节协议与传输详解.md)（配 `scripts/verify/run_demo.sh` 交互演示）
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -43,7 +43,7 @@ mkdir build && cd build
 cmake .. && make -j
 ./sightline [port]           # 默认 8888
 ctest                        # 跑全部单测（无需网络环境）
-bash ../scripts/check_dependencies.sh   # 依赖方向守护（三条红线）
+bash ../scripts/build/check_dependencies.sh   # 依赖方向守护（三条红线）
 ```
 
 ## 协议
