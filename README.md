@@ -73,8 +73,18 @@ bash ../scripts/build/check_dependencies.sh   # 依赖方向守护（三条红�
 5. **Channel 补了 tie() 生命周期守卫**（muduo 标配，毕设版缺失）：防止事件回调中
    连接销毁导致 Channel 悬空——新写的 TcpConnection 依赖它保证安全销毁。
 
-## Roadmap（对应学习路线 W1~W6）
+## Roadmap
 
-- [ ] W4：UE 蓝图客户端联调（薄封装代码见知识库通讯指南）
-- [ ] W5：断线重连（session 恢复）、AOI 九宫格、压测（ulimit 调优故事）
-- [ ] W6：KCP 传输层、protobuf 序列化、架构文档与录像
+> 详细演进规划（每阶段的业务触发/服务端变化/客户端变化/契约面变更/验收标准）见 [`docs/演进路线图.md`](docs/演进路线图.md)。
+
+- [x] P0：服务器基线（整洁架构 + 自研 Reactor + M1~M3 协议 + 压测）
+- [ ] P1：蓝图从零搭建 + UE 客户端联调（手册见 `docs/client/05`）
+- [ ] P2：道具系统（NetID/TypeID + 数据驱动练兵）
+- [ ] P3：HUD/表现打磨（UMG）
+- [ ] P4：夺旗战（IRoomMode 多模式抽取）
+- [ ] P5：断线重连
+- [ ] P6：客户端预测与服务器校正
+- [ ] P7：KCP 传输层
+- [ ] P8：protobuf + 数据驱动武器
+- [ ] P9：武器配件系统
+- [ ] P10：Soak 长跑压测
