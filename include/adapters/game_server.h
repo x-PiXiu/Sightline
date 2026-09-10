@@ -195,6 +195,11 @@ private:
         auto pid = sessions_.playerIdOf(conn->id());
         if (pid != 0) sessions_.onActivity(pid);   // 任意消息喂心跳狗
 
+        LOG_DEBUG("conn#" + std::to_string(conn->id()) +
+                  " msgid=" + std::to_string(msg_id) +
+                  " payload=" + std::to_string(n) + "B" +
+                  (pid != 0 ? " pid=" + std::to_string(pid) : ""));
+
         std::visit([this, conn, pid](const auto& c) { handle(conn, pid, c); }, *cmd);
     }
 

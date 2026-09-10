@@ -27,7 +27,7 @@ struct RoomRules {
     int max_hp = 100;
     int damage_per_hit = 25;    // 4 枪击杀（含击杀节奏的最简数值）
     int kills_to_win = 3;
-    float max_fire_range = 200.f;   // 射程上限（超出判 miss）
+    float max_fire_range = 10000.f;   // 射程上限(客户端坐标系=UE厘米,100m;超出判 miss)
 };
 
 class Room {
