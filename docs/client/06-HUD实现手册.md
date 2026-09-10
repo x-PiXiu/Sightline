@@ -196,6 +196,49 @@ HudRef → SetRttText("RTT: " + ToString + "ms")
 > WBP_HUD 里为每个可更新元素写一个 **Set 函数**（如 SetPlayerIdText/SetRttText/SetHP）——
 > 蓝图钩子只调函数，不直接摸控件内部（控件层级变了钩子不用改）。
 
+**WBP_HUD 侧详解——用"函数"，不用自定义事件；三个默认节点只用 Tick：**
+
+打开 WBP_HUD 设计器 → 左侧 **My Blueprint（我的蓝图）** 面板 → **函数（Functions）** 分类 → **+** 新建。每个函数：
+
+1. 命名（如 `SetPlayerIdText`）
+2. 选中函数节点 → Details → **输入** → **+** 加参数（如 `NewId`，类型 Integer）
+3. 函数图里：从层级树拖对应控件 → 找到 **Set Text** 节点 → 参数经 ToString 拼接后连入
+
+以 `SetPlayerIdText` 为例的函数图：
+
+```
+函数入口(输入 NewId:int32)
+    │
+    ▼
+PlayerIdText → Set Text
+    ▲
+In Text = "Player " + ToString(NewId)
+```
+
+**三个默认节点**（WBP_HUD 事件图自带的）：
+
+| 节点 | 执行时机 | 本项目用法 |
+|---|---|---|
+| 事件预构造（PreConstruct） | **编辑器里**每次改动都跑（设计器预览用） | ❌ 不需要 |
+| 事件构造（Construct） | 控件被创建时跑一次（控件的 BeginPlay） | ⚠️ 可选——初始状态已在设计器设好（血条 1.0/遮罩折叠），v1 用不上 |
+| 事件 Tick（Tick） | 每帧执行 | ✅ **M4.3 弹药轮询 + M4.5 流量差分**在这里跑 |
+
+**函数 vs 自定义事件**：Set 类接口全是同步的"给输入→立即完成"→ **一律用函数**；自定义事件留给图内异步流程（如要接 Delay 节点的场合——函数里禁止 Delay）。
+
+**WBP_HUD 完整函数清单**（随 M4.x 逐个建）：
+
+| 函数 | 输入 | 做什么 | 所属阶段 |
+|---|---|---|---|
+| SetPlayerIdText | NewId:int32 | PlayerIdText = "Player {NewId}" | M4.1 |
+| SetRttText | RttMs:int64 | RTTText = "RTT: {RttMs}ms" | M4.1 |
+| SetHP | NewHp:int32 | HPBar 百分比 = NewHp/100；HPText = "{NewHp} / 100" | M4.2 |
+| ShowDeath | bShow:bool | DeathOverlay 可见性切换 | M4.2 |
+| AddKillFeed | VictimId:int32 | KillFeed 加一条子项，3 秒后移除 | M4.4 |
+| ToggleNetPanel | （无） | NetPanel 可见性切换 | M4.5 |
+| SetNetTraffic | Sent/Recv:int64 | 差分算 KB/s → SentText/RecvText | M4.5 |
+
+（HUD 内部还需几个缓存变量：MaxHp=100、LastAmmo/LastReserve、LastSent/LastRecv、Tick 累积计时——到对应阶段创建。）
+
 **验证**：PIE → 屏幕常显 PlayerId + RTT 滚动 + 中央准星；Output Log 不再出现对应 Print。
 
 ### M4.2 HP 条 + 死亡遮罩（30 分钟）
