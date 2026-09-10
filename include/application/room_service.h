@@ -57,11 +57,12 @@ public:
     }
 
     // ---- 开火：domain 权威判定 → 结果广播；击杀触发重生/胜负调度 ----
-    void handleFire(PlayerId pid, const FireCommand& cmd) {
+    // 返回判定结果供适配层记录诊断(application 不接触日志,红线 2)
+    domain::Room::FireResult handleFire(PlayerId pid, const FireCommand& cmd) {
         domain::Room* room = roomOf(pid);
-        if (!room) return;
+        if (!room) return {};
         auto r = room->applyFire(pid, cmd.origin, cmd.dir);
-        if (!r.valid) return;
+        if (!r.valid) return r;
 
         // 命中与未中都广播（客户端用 miss 画弹道/弹孔）
         channel_.sendToAll(room->playerIds(),
@@ -75,6 +76,7 @@ public:
             channel_.sendToAll(room->playerIds(), GameOverEvent{r.winner});
             scheduleRematch(room->id());
         }
+        return r;
     }
 
     // 结算 N 秒后自动重开：玩家保留、状态复位、人够即再战（协议复用 RoomStart，零改动）

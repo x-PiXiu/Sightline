@@ -214,7 +214,16 @@ private:
         if (pid) rooms_.handleMove(pid, c);
     }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::FireCommand& c) {
-        if (pid) rooms_.handleFire(pid, c);
+        if (!pid) return;
+        auto r = rooms_.handleFire(pid, c);
+        // 每枪判定诊断(debug 模式可见):脱靶/命中/击杀一目了然
+        LOG_DEBUG("fire pid=" + std::to_string(pid) +
+                  " valid=" + std::to_string(r.valid) +
+                  " hit=" + std::to_string(r.hit) +
+                  " victim=" + std::to_string(r.victim) +
+                  " dmg=" + std::to_string(r.damage) +
+                  (r.victim_dead ? " [KILL]" : "") +
+                  (r.game_over ? " [GAME_OVER]" : ""));
     }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::PingCommand& c) {
         if (pid) sessions_.handlePing(pid, c);
