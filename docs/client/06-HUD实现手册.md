@@ -345,22 +345,87 @@ BP_Player 的 `BP_OnKillConfirmed(Victim)` → `HudRef → AddKillFeed(Victim)`�
 
 ### M4.5 Tab 网络面板（30 分钟）
 
-**输入**：可复用现有 IMC 加一个 IA_NetworkPanel（Tab 键，Pressed 显示 / Released 隐藏——按住查看模式），或最简做法：BP_Player 里 `Event BeginPlay` 后用 `Input` 节点绑定 Tab。
+#### 4.5.1 职责划分（谁算速率？）
 
-**WBP_HUD 加函数**：
+**计算在 HUD 的 SetNetTraffic 内部做，BP_Player 不参与**：
+
+```
+Subsystem（C++）      ：只提供原始累计字节（GetBytesSent/GetBytesReceived）
+BP_Player             ：透传通道（GetNet 拿到 Subsystem）——不存缓存、不算速率
+WBP_HUD（SetNetTraffic）：差分计算 + 文本更新——速率是"展示概念"，归 UI 层
+```
+
+理由：差分需要的上次值缓存 + 0.5s 节拍是**展示节奏的私有物**——放 BP_Player 会让角色类混进 UI 的缓存和计时，破坏各层自己的干净边界。**参数传原始累计值，HUD 内部差分**。
+
+#### 4.5.2 HUD 需要的变量（三类，别混）
+
+| 变量 | 类型 | 用途 |
+|---|---|---|
+| `SentText` / `RecvText` | 控件引用（勾"是否为变量"） | Set Text 的目标 |
+| `LastSent` / `LastRecv` | **int64 普通变量（新建）** | 差分的"上次值"缓存 |
+| `TrafficAccum` | **float 普通变量（新建）** | 0.5s 节拍累积器 |
+
+#### 4.5.3 输入（Tab 键显示/隐藏）
+
+复用现有 IMC 加一个 `IA_NetworkPanel`（Tab 键，触发类型：按下/松开各一次），或最简做法：BP_Player 里用 `Input` 节点直接绑 Tab。
+
+接线：`IA_NetworkPanel`（Started）→ `HudRef → ToggleNetPanel()`。
+
+#### 4.5.4 WBP_HUD 的 ToggleNetPanel 函数
 
 ```
 ToggleNetPanel():
-    NetPanel 可见性切换 (Visible ↔ Collapsed)
-
-SetNetTraffic(Sent:int64, Recv:int64):   ← 由 HUD Tick 每 0.5s 调用
-    SentText → "↑ " + (Sent - LastSent)/0.5/1024 + " KB/s"   ← 差分算速率
-    RecvText → 同理
+    Branch (NetPanel → Get Visibility == 已折叠/Hidden)
+        │True                     │False
+        ▼                         ▼
+    NetPanel → Set Visibility   NetPanel → Set Visibility
+    (可视)                       (已折叠)
 ```
 
-**数据源**：`GetNet() → GetBytesSent / GetBytesReceived`（C++ 刚加的，累计字节数；HUD 差分算 KB/s）。
+#### 4.5.5 WBP_HUD 的 SetNetTraffic 函数（差分计算在此函数体内）
 
-**验证**：按住 Tab → 面板显示，速率数字稳定在合理范围（双方 10Hz Move ≈ 下行 ~1.6KB/s 上行 ~0.8KB/s 每实例，参考服务端 stats）。
+```
+SetNetTraffic (Sent:int64, Recv:int64):
+    │
+    ├─► RateSent = (Sent - LastSent) / 0.5 / 1024     ← 字节/0.5s ÷ 0.5s ÷ 1024 = KB/s
+    ├─► RateRecv = (Recv - LastRecv) / 0.5 / 1024
+    │
+    ├─► SentText → Set Text ("↑ " + ToString(取整RateSent) + " KB/s")
+    ├─► RecvText → Set Text ("↓ " + ToString(取整RateRecv) + " KB/s")
+    │
+    └─► LastSent = Sent ; LastRecv = Recv              ← 更新缓存供下次差分
+```
+
+#### 4.5.6 HUD Tick 的节拍驱动（每帧累积，满 0.5s 才调一次）
+
+```
+Event Tick (DeltaTime)
+    │
+    ▼
+TrafficAccum += DeltaTime
+    │
+    ▼
+Branch (TrafficAccum >= 0.5)
+    │True
+    ▼
+Get Owning Player Pawn → Cast BP_Player → GetNet()
+    → GetBytesSent / GetBytesReceived（原始累计值）
+    │
+    ▼
+SetNetTraffic(Sent, Recv)
+    │
+    ▼
+TrafficAccum = 0
+```
+
+> 每帧都读计数器没问题（纯读 int64），但 **Set Text 有重绘成本——必须节流**：
+> 0.5s 才调一次 SetNetTraffic，Tick 里其余帧只做累加。
+
+#### 4.5.7 验证
+
+按住 Tab → 面板显示：双方 10Hz Move 时每个实例约 上行 0.8KB/s / 下行 1.6KB/s（参考服务端 stats 的 bytes 差分），数字稳定小幅波动即正常；持续为 0 → 检查 Cast 是否失败或变量没提升。
+
+**参考数值**：服务端日志 `[stats] bytes(in/out)` 增速 ÷ 2 ≈ 单实例速率，可与 HUD 显示互相印证。
 
 ---
 
