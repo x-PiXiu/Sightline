@@ -216,14 +216,20 @@ private:
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::FireCommand& c) {
         if (!pid) return;
         auto r = rooms_.handleFire(pid, c);
-        // 每枪判定诊断(debug 模式可见):脱靶/命中/击杀一目了然
+        // 每枪判定诊断(debug 模式可见):几何数值齐全,可手工验算射线×盒
+        auto v3 = [](const app::Vec3& v) {
+            return "(" + std::to_string(v.x).substr(0, 8) + "," +
+                         std::to_string(v.y).substr(0, 8) + "," +
+                         std::to_string(v.z).substr(0, 8) + ")";
+        };
         LOG_DEBUG("fire pid=" + std::to_string(pid) +
-                  " valid=" + std::to_string(r.valid) +
+                  " origin=" + v3(c.origin) +
+                  " dir=" + v3(c.dir) +
+                  " targets=" + std::to_string(r.target_count) +
+                  " tpos=" + v3(r.target_pos) +
                   " hit=" + std::to_string(r.hit) +
                   " victim=" + std::to_string(r.victim) +
-                  " dmg=" + std::to_string(r.damage) +
-                  (r.victim_dead ? " [KILL]" : "") +
-                  (r.game_over ? " [GAME_OVER]" : ""));
+                  (r.victim_dead ? " [KILL]" : ""));
     }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::PingCommand& c) {
         if (pid) sessions_.handlePing(pid, c);

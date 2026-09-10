@@ -145,6 +145,9 @@ public:
         PlayerId killer = 0;
         bool game_over = false;
         PlayerId winner = 0;
+        // 诊断字段（判定瞬间的几何快照,适配层记录用）
+        Vec3 target_pos;            // 候选目标位置(2人房即对手;判定时服务器所见)
+        int  target_count = 0;      // 候选数量
     };
 
     FireResult applyFire(PlayerId shooter_id, const Vec3& origin, const Vec3& dir) {
@@ -160,6 +163,9 @@ public:
             if (pid == shooter_id || !p.alive) continue;
             boxes.push_back({pid, p.position, combat::TargetBox{}.half});
         }
+        r.target_count = static_cast<int>(boxes.size());
+        if (!boxes.empty()) r.target_pos = boxes[0].center;
+
         combat::RayHit hit = combat::pickNearestTarget(origin, dir, boxes);
         if (!hit.hit || hit.distance > rules_.max_fire_range) return r;   // miss
 
