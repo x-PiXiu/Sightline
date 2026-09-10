@@ -12,10 +12,11 @@
 namespace sightline::domain::combat {
 
 // 候选目标：一个玩家抽象成一个 AABB（中心 + 半尺寸）
+// 单位与坐标系一致 = UE 厘米（中心由客户端上报,即 UE 坐标）
 struct TargetBox {
     PlayerId id = 0;
     Vec3 center;
-    Vec3 half{0.4f, 0.9f, 0.4f};   // 人形近似：宽0.8 高1.8（中心在腰部）
+    Vec3 half{40.f, 90.f, 40.f};   // 人形近似：宽80 高180 深80（厘米,中心在腰部）
 };
 
 struct RayHit {
