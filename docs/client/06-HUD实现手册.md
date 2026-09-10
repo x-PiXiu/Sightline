@@ -295,19 +295,51 @@ Ammo = Weapon → Ammo In Mag ；Reserve = Weapon → Reserve Ammo
 
 **验证**：开火弹匣递减、空仓自动换弹后回满——数字与服务器行为一致。
 
-### M4.4 击杀播报（20 分钟）
+### M4.4 击杀播报（30 分钟）
 
-**WBP_HUD 加函数** `AddKillFeed(VictimId:int32)`：
+播报 = 往 KillFeed 里动态塞"条目控件"。条目是**新建的控件蓝图 WBP_KillEntry**，它**自我管理生命周期**（创建 3 秒后自毁）——这样 WBP_HUD 的函数不需要定时器，也不存在"删除指定条目"的传参难题。
+
+#### 4.4.1 新建 WBP_KillEntry（条目控件）
+
+1. Content/Code/UI/ 右键 → 用户界面 → 控件蓝图 → UserWidget → 命名 `WBP_KillEntry`
+2. 打开设计器 → **根控件直接用文本**：Palette 搜 `文本` → 拖到设计器空白根上作为根控件 → 改名 `KillText` → 内容 `你击杀了 Player ?` → 字体 16 → 勾选 **行为 → 是否为变量**
+   （UserWidget 的根可以是任意控件——条目不需要画布）
+
+#### 4.4.2 WBP_KillEntry 内部（函数 + 事件构造）
+
+| 项 | 内容 |
+|---|---|
+| 函数 `SetEntryText(VictimId:int32)` | KillText → Set Text = "你击杀了 Player " + ToString(VictimId) |
+| **事件 Construct**（三个默认节点终于用上了） | **Set Timer by Function Name**：Time=3.0、Function Name=`RemoveSelf`、Looping=false |
+| 函数 `RemoveSelf`（无参数） | Remove From Parent（把自己从 KillFeed 移除） |
+
+> **为什么条目自毁而不是 WBP_HUD 定时删**：按函数名绑定的定时器**不能传参**——
+> WBP_HUD 无法告诉定时器"删哪一条"。让条目自己 3 秒后 RemoveFromParent，
+> 职责归位（条目管自己的生死），WBP_HUD 的 AddKillFeed 就只剩三步。
+> 这也是"事件 Construct"的实际用武之地——之前 v1 用不上它。
+
+#### 4.4.3 WBP_HUD 的 AddKillFeed 函数
 
 ```
-Create Widget (WBP_KillEntry)     ← 一条小文本控件："你击杀了 Player {VictimId}"
+AddKillFeed (VictimId:int32):
     │
     ▼
-KillFeed(Vertical Box) → Add Child
+Create Widget (Class = WBP_KillEntry)
     │
     ▼
-Set Timer by Function (3 秒后 Remove From Parent)   ← 播报 3 秒消失
+Call SetEntryText on 返回值 (VictimId)     ← 拖返回值 → 搜 SetEntryText
+    │
+    ▼
+KillFeed → Add Child to Vertical Box (返回值)
 ```
+
+不再需要 Set Timer——条目自己会消失。
+
+#### 4.4.4 接线与验证
+
+BP_Player 的 `BP_OnKillConfirmed(Victim)` → `HudRef → AddKillFeed(Victim)`。
+
+**验证**：双开对射出一条真实击杀 → 击杀者屏幕右上角出现"你击杀了 Player X"→ 3 秒自动消失 → 连续击杀多条排队不重叠。
 
 **BP_Player 的 `BP_OnKillConfirmed(Victim)`** → `HudRef → AddKillFeed(Victim)`。
 
