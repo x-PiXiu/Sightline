@@ -275,22 +275,36 @@ BP_OnRespawned   → HudRef → SetHP(Hp) + ShowDeath(false)
 
 ### M4.3 弹药显示（30 分钟，唯一轮询项）
 
-**WBP_HUD Event Tick**（低频处理：累积 0.1s 才刷一次，避免每帧 SetText）：
+**前置：WBP_HUD 新建 2 个缓存变量**——`LastAmmo`（int32，初值 **-1**）、`LastReserve`（int32，初值 **-1**；初值 -1 保证第一帧必然触发一次显示）。
+
+> **变量澄清**：伪代码里的 `Ammo = Weapon → Ammo In Mag` **不需要建变量**——
+> `Ammo In Mag / Reserve Ammo` 是 C++ 武器类的 BlueprintReadOnly 属性，从
+> `Get Current Weapon` 的返回值拖出即有现成 Get 节点（读别人的状态 → 拖 Get 节点；
+> 记自己的历史 → 才建变量，即 LastAmmo/LastReserve 这两个）。
+
+**WBP_HUD Event Tick**（数值变化才 SetText，避免每帧重绘）：
 
 ```
 Event Tick
     │
     ▼
-Get Owning Player Pawn → Cast BP_Player
+Get Owning Player Pawn → Cast To BP_Player
     │
     ▼
-Get Current Weapon → 有效？
+Get Current Weapon → IsValid ?
     │True
     ▼
-Ammo = Weapon → Ammo In Mag ；Reserve = Weapon → Reserve Ammo
+Get Ammo In Mag   → (A)     ← 拖武器引用，C++ 属性直读
+Get Reserve Ammo  → (B)     ← 同上
     │
     ▼
-与上次缓存值不同才 Set Text ("{Ammo} / {Reserve}")   ← 缓存避免每帧重绘
+Branch: (A) ≠ LastAmmo 或 (B) ≠ LastReserve ?
+    │True
+    ▼
+AmmoText → Set Text ("{A} / {B}")      ← Format Text 节点拼字符串
+    │
+    ▼
+Set LastAmmo = (A) ；Set LastReserve = (B)
 ```
 
 **验证**：开火弹匣递减、空仓自动换弹后回满——数字与服务器行为一致。
