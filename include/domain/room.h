@@ -158,10 +158,13 @@ public:
         r.killer = shooter_id;
 
         // 把所有存活敌人抽象为 AABB 候选
+        // ★ 中心 = 脚底位置 + 半高（p.position 是脚底，盒中心应在角色中部）
         std::vector<combat::TargetBox> boxes;
         for (auto& [pid, p] : players_) {
             if (pid == shooter_id || !p.alive) continue;
-            boxes.push_back({pid, p.position, combat::TargetBox{}.half});
+            Vec3 center = p.position;
+            center.y += combat::TargetBox{}.half.y;   // 脚底 → 角色中部
+            boxes.push_back({pid, center, combat::TargetBox{}.half});
         }
         r.target_count = static_cast<int>(boxes.size());
         if (!boxes.empty()) r.target_pos = boxes[0].center;
