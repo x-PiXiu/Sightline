@@ -79,8 +79,8 @@ bash ../scripts/build/check_dependencies.sh   # 依赖方向守护（三条红�
 
 - [x] P0：服务器基线（整洁架构 + 自研 Reactor + M1~M3 协议 + 压测）
 - [x] P1：蓝图从零搭建 + UE 客户端联调（手册见 `docs/client/05`；M1/M2/M3 + 断线全部回归通过）
-- [ ] P2：道具系统（NetID/TypeID + 数据驱动练兵）
-- [ ] **P3：HUD/表现打磨（UMG）← 当前阶段**（手册见 `docs/client/06`）
+- [x] P3：HUD/表现打磨（UMG）（手册见 `docs/client/06`；四项视觉验证通过，2026-09-11）
+- [ ] **P2：道具系统（NetID/TypeID + 数据驱动练兵）← 当前阶段**（落点分析见 `docs/P2-道具系统落点分析.md`）
 - [ ] P4：夺旗战（IRoomMode 多模式抽取）
 - [ ] P5：断线重连
 - [ ] P6：客户端预测与服务器校正
