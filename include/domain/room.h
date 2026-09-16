@@ -8,8 +8,10 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <optional>
 #include "domain/types.h"
 #include "domain/player.h"
+#include "domain/item.h"
 #include "domain/combat/hitscan.h"
 #include "domain/combat/damage.h"
 
@@ -28,6 +30,10 @@ struct RoomRules {
     int damage_per_hit = 25;    // 4 枪击杀（含击杀节奏的最简数值）
     int kills_to_win = 3;
     float max_fire_range = 10000.f;   // 射程上限(客户端坐标系=UE厘米,100m;超出判 miss)
+    // ---- 道具规则（P2）----
+    int item_heal_amount = 50;          // 血包回复量
+    float item_pickup_radius = 150.f;   // 拾取半径（厘米，水平距离判定）
+    double item_respawn_ms = 15000.0;   // 拾取后重生冷却（毫秒）
 };
 
 class Room {
@@ -204,11 +210,75 @@ public:
         return true;
     }
 
-    // 出生点：围绕场地一圈均匀分布（MVP 场地 40x40）
+    // 出生点：围绕场地一圈均匀分布（场地约 40x40 米 = ±2000cm）
     Vec3 spawnPoint(int index) const {
-        static const float radius = 18.f;
+        // radius=1800（18 米）——遗留修复：曾是 18（=18cm，重生挤在原点附近）
+        static const float radius = 1800.f;
         float angle = (index % 8) * (3.14159265f * 2.f / 8.f);
         return {radius * std::cos(angle), 0.f, radius * std::sin(angle)};
+    }
+
+    // ---- 道具（P2）：服务端权威的布点/拾取/惰性重生 ----
+
+    // 开局/重开时布点（幂等：清空旧道具重摆，NetID 重新计数）
+    void spawnItems() {
+        items_.clear();
+        next_item_id_ = 1;
+        auto add = [&](ItemTypeId t, float x, float z) {
+            items_.push_back(Item{next_item_id_++, t, {x, 0.f, z}, false, 0.0});
+        };
+        // MVP 固定布点：十字对称——东西血包、南北弹药箱（对称即公平）
+        add(ItemTypeId::HealthPack, -kItemFieldRadius_, 0.f);
+        add(ItemTypeId::HealthPack,  kItemFieldRadius_, 0.f);
+        add(ItemTypeId::AmmoBox,    0.f, -kItemFieldRadius_);
+        add(ItemTypeId::AmmoBox,    0.f,  kItemFieldRadius_);
+    }
+
+    const std::vector<Item>& items() const { return items_; }
+
+    // 惰性重生：冷却到点的道具重置为可拾取，返回重置列表（application 广播 ItemSpawn）
+    // 由 applyMove 的调用方顺带触发——不需要独立定时器，也不需要 C2S_Pickup 消息
+    std::vector<Item> tickItems(double now_ms) {
+        std::vector<Item> respawned;
+        for (auto& item : items_) {
+            if (item.taken && now_ms - item.taken_at_ms >= rules_.item_respawn_ms) {
+                item.taken = false;
+                item.taken_at_ms = 0.0;
+                respawned.push_back(item);
+            }
+        }
+        return respawned;
+    }
+
+    // 拾取判定：水平距离 < 拾取半径 且未被拿走 → 标记 taken + 结算效果
+    // 每次只捡一个（同帧踩到多个时取布点顺序靠前的，天然稀有）
+    struct PickupResult {
+        uint32_t net_id = 0;
+        ItemTypeId type_id = ItemTypeId::HealthPack;
+        PlayerId picker = 0;
+        int picker_hp = 0;    // 拾取后血量（客户端据此回填权威值）
+    };
+    std::optional<PickupResult> tryPickup(PlayerId pid, const Vec3& pos, double now_ms) {
+        if (state_ != RoomState::Playing) return std::nullopt;
+        Player* p = findPlayer(pid);
+        if (!p || !p->alive) return std::nullopt;
+
+        const float r2 = rules_.item_pickup_radius * rules_.item_pickup_radius;
+        for (auto& item : items_) {
+            if (item.taken) continue;
+            const float dx = pos.x - item.pos.x;
+            const float dz = pos.z - item.pos.z;   // 只看水平距离（道具贴地，忽略身高差）
+            if (dx * dx + dz * dz > r2) continue;
+
+            item.taken = true;
+            item.taken_at_ms = now_ms;
+            if (item.type_id == ItemTypeId::HealthPack) {
+                p->hp = std::min(rules_.max_hp, p->hp + rules_.item_heal_amount);
+            }
+            // AmmoBox：弹药是客户端本地演出（协议不校验），服务端只标记冷却
+            return PickupResult{item.net_id, item.type_id, pid, p->hp};
+        }
+        return std::nullopt;
     }
 
 private:
@@ -216,6 +286,11 @@ private:
     RoomState state_ = RoomState::Waiting;
     RoomRules rules_;
     std::unordered_map<PlayerId, Player> players_;
+
+    // ---- 道具状态 ----
+    static constexpr float kItemFieldRadius_ = 800.f;   // 布点半径：十字臂 8 米（出生圈 18 米之内）
+    std::vector<Item> items_;
+    uint32_t next_item_id_ = 1;
 };
 
 } // namespace sightline::domain

@@ -30,6 +30,8 @@ enum class MsgId : uint16_t {
     S2C_Kick      = 12,
     S2C_PlayerLeft= 13,
     S2C_Respawn   = 14,
+    S2C_ItemSpawn = 15,   // P2：[4B netId][1B typeId][12B pos] 共 17B
+    S2C_ItemTaken = 16,   // P2：[4B netId][4B pid][1B typeId][4B newHp] 共 13B
 };
 
 class ProtocolCodec {
@@ -184,6 +186,15 @@ private:
     static void encodeEvent(const app::KickEvent& e, std::string& wire) {
         Writer w; w.u8(e.reason);
         finish(MsgId::S2C_Kick, w, wire);
+    }
+    static void encodeEvent(const app::ItemSpawnEvent& e, std::string& wire) {
+        Writer w; w.u32(e.net_id); w.u8(e.type_id); w.vec3(e.pos);
+        finish(MsgId::S2C_ItemSpawn, w, wire);
+    }
+    static void encodeEvent(const app::ItemTakenEvent& e, std::string& wire) {
+        Writer w; w.u32(e.net_id); w.u32(e.picker); w.u8(e.type_id);
+        w.u32(static_cast<uint32_t>(e.picker_new_hp));
+        finish(MsgId::S2C_ItemTaken, w, wire);
     }
 
     static void finish(MsgId id, const Writer& w, std::string& wire) {

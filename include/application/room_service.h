@@ -3,6 +3,7 @@
 // 规则全部委托 domain::Room，本类只做编排（取房间→调实体→翻译结果为事件→选收件人广播）。
 
 #pragma once
+#include <chrono>
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "application/ports/i_timer_scheduler.h"
 #include "domain/room.h"
 #include "domain/player.h"
+#include "domain/item.h"
 
 namespace sightline::app {
 
@@ -43,17 +45,29 @@ public:
 
         player_room_[pid] = room->id();
         if (room->tryStart()) {
-            channel_.sendToAll(room->playerIds(), RoomStartEvent{room->playerIds()});
+            startRoundFor(room);
         }
     }
 
-    // ---- 移动：采纳 + 转播给房间其他人 ----
+    // ---- 移动：采纳 + 转播给房间其他人；顺带道具惰性检查（重生/拾取，P2）----
     void handleMove(PlayerId pid, const MoveCommand& cmd) {
         domain::Room* room = roomOf(pid);
         if (!room) return;
         if (!room->applyMove(pid, cmd.pos, cmd.yaw)) return;
         channel_.sendToAll(room->othersOf(pid),
                            MoveEvent{pid, cmd.pos, cmd.yaw});
+
+        // 惰性驱动：道具重生检查 + 拾取判定与位置上报同频（10Hz），
+        // 不需要独立定时器，也不需要 C2S_Pickup 消息
+        const double now_ms = nowMs();
+        for (const auto& item : room->tickItems(now_ms)) {
+            broadcastItemSpawn(room, item);
+        }
+        if (auto pickup = room->tryPickup(pid, cmd.pos, now_ms)) {
+            channel_.sendToAll(room->playerIds(), ItemTakenEvent{
+                pickup->net_id, pickup->picker,
+                static_cast<uint8_t>(pickup->type_id), pickup->picker_hp});
+        }
     }
 
     // ---- 开火：domain 权威判定 → 结果广播；击杀触发重生/胜负调度 ----
@@ -86,7 +100,7 @@ public:
             if (it == rooms_.end()) return;         // 房间已回收（全走光）
             auto& room = it->second;
             if (room.rematch()) {
-                channel_.sendToAll(room.playerIds(), RoomStartEvent{room.playerIds()});
+                startRoundFor(&room);
             }
             // 人不够（有玩家离开）：留在 Waiting 等新加入者补位
         });
@@ -115,6 +129,27 @@ private:
         if (it == player_room_.end()) return nullptr;
         auto rit = rooms_.find(it->second);
         return rit == rooms_.end() ? nullptr : &rit->second;
+    }
+
+    // 一局的统一入口：广播开局 + 道具布点（开局与重开共用，保证每局道具状态全新）
+    void startRoundFor(domain::Room* room) {
+        room->spawnItems();
+        channel_.sendToAll(room->playerIds(), RoomStartEvent{room->playerIds()});
+        for (const auto& item : room->items()) {
+            broadcastItemSpawn(room, item);
+        }
+    }
+
+    void broadcastItemSpawn(domain::Room* room, const domain::Item& item) {
+        channel_.sendToAll(room->playerIds(), ItemSpawnEvent{
+            item.net_id, static_cast<uint8_t>(item.type_id), item.pos});
+    }
+
+    // 单调钟毫秒——道具冷却的时基（application 管时间，domain 只接收 now）
+    static double nowMs() {
+        return std::chrono::duration<double, std::milli>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
     }
 
     domain::Room* findJoinableRoom() {

@@ -42,9 +42,20 @@ struct PlayerLeftEvent{ PlayerId player_id; };
 struct GameOverEvent  { PlayerId winner; };
 struct PongEvent      { uint64_t client_time; };
 struct KickEvent      { uint8_t reason; };   // 1=心跳超时
+struct ItemSpawnEvent {                       // P2：道具出现（开局布点/冷却重生）
+    uint32_t net_id;
+    uint8_t type_id;    // domain::ItemTypeId 的数值（两端契约）
+    Vec3 pos;
+};
+struct ItemTakenEvent {                       // P2：道具被拾取（服务端权威判定后广播）
+    uint32_t net_id;
+    PlayerId picker;
+    uint8_t type_id;
+    int picker_new_hp;
+};
 
 using GameEvent = std::variant<LoginAckEvent, RoomStartEvent, MoveEvent, HitEvent,
                                RespawnEvent, PlayerLeftEvent, GameOverEvent,
-                               PongEvent, KickEvent>;
+                               PongEvent, KickEvent, ItemSpawnEvent, ItemTakenEvent>;
 
 } // namespace sightline::app
