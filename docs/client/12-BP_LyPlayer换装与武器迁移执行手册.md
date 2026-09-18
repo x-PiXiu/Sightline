@@ -175,6 +175,9 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 >
 > **资产放置规范**：所有新建文件进 `Content/Code/` 对应子目录，
 > **Lyra 迁移目录（Content/Weapons、Content/Characters）只存资产本体，不新建文件**。
+> **同步策略**：6 个 Lyra 目录（Audio/Characters/Effects/GameplayEffects/
+> PhysicsMaterials/Weapons）已退出 git 跟踪（gitignore + rm --cached），
+> 磁盘文件保留，机器间靠**整项目拷贝**同步——换机器后记得连同这些目录一起拷。
 
 | 新文件 | 位置 |
 |---|---|
