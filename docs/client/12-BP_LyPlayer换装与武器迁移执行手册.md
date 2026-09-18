@@ -83,7 +83,8 @@ GameMode 已指向 BP_LyPlayer，Manny 已显示但没动画。按清单逐项�
 | 属性 | 值 | 验证 |
 |---|---|---|
 | 骨骼网格体资产 | `SKM_Manny`（Content/Characters/... Lyra 版） | 视口可见模型 |
-| 动画类 | `ABP_Manny`（**引擎自带** Engine Content，过渡用） | 视口里模型摆出 Idle 姿势 |
+| 动画类 | `ABP_Player_Manny`（角色最小 ABP，**模块 D0 建造**） | 视口里模型摆出**持枪待机姿势**（不是 T-pose/A-pose） |
+  > ⚠️ 不要用引擎自带 ABP_Manny：其目标骨架与 Lyra 版 SKM_Manny 的骨架资产不一致，赋值会警告且动画不播（角色停在参考姿势——正是"看不到手、枪悬空"的根因） |
 | 位置 | `X:0, Y:0, Z:-90` | 脚底贴胶囊底 |
 | 旋转 | `Yaw = -90`（进游戏横着走改 +90） | 箭头朝向与模型面朝一致 |
 | First Person Primitive Type | `First Person`（有此属性就设） | — |
@@ -181,10 +182,31 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 
 | 新文件 | 位置 |
 |---|---|
+| `ABP_Player_Manny`（角色最小 ABP，D0 建） | `Content/Code/Player/Animation/Player/` |
 | `ABP_Weapon_Rifle`（武器动画蓝图） | `Content/Code/Player/Animation/Weapon/` |
 | `DA_Weapon_Rifle`（Definition 实例） | `Content/Code/DataAssets/Weapon/`（增殖类别独立子目录） |
 | `BP_Weapon_Base`（翻新：清旧默认值 + 写两个通用事件） | `Content/Code/Weapon/Base/`（原地） |
 | `BP_Weapon_Rifle`（武器蓝图，父类 = BP_Weapon_Base） | `Content/Code/Weapon/` |
+
+### D0. 建角色最小 ABP（ABP_Player_Manny——角色持枪待机 + 手臂蒙太奇宿主）
+
+> 背景：引擎自带 ABP_Manny 的目标骨架与 Lyra 版 SKM_Manny 不一致（动画不播）；
+> Lyra 自家的 ABP 又是断链蓝图。正确做法：**从 Lyra 骨架创建一个最小 ABP**，
+> 持枪待机为常驻姿势，Slot 供手臂蒙太奇插播。
+
+1. 内容浏览器进入 `Content/Characters/Heroes/Mannequin/Meshes/` →
+   右键 **`SK_Mannequin`（骨架资产）** → **创建 → 动画蓝图** →
+   命名 `ABP_Player_Manny` → 移动到 `Content/Code/Player/Animation/Player/`；
+2. 打开 → **AnimGraph** → 右键 → 添加 **播放动画序列（Play Animation Sequence）** 节点 →
+   序列选 **`MM_Rifle_Idle_Hipfire`**（站立持枪战备姿势，`Content/Characters/.../Locomotion/Rifle/`）；
+3. 右键 → 添加 **插槽 "DefaultSlot"（Slot 'DefaultSlot'）** 节点 →
+   连线：**序列节点 → Slot 的 Source → Slot 输出 → Output Pose**
+   （无蒙太奇时 Slot 直通待机序列；手臂蒙太奇播放时经 Slot 覆盖——一图两用）；
+4. 编译保存 → BP_LyPlayer 的 CharacterMesh0 → 动画类 = `ABP_Player_Manny`。
+
+> 姿势说明：MM_Rifle_Idle_Hipfire 是 Lyra 的战备待机（微前倾、枪端胸前偏下），
+> 与普通站直不同——那是动画设计，不是错误。若想要"东张西望"的生活化待机，
+> 换 IdleBreak 系列序列即可。
 
 ### D1. 建武器动画蓝图 ABP_Weapon_Rifle
 
@@ -329,6 +351,12 @@ Event BP_OnReloadStarted（角色事件）
 
 ⚠️ **两个前置条件**（缺一动画不可见）：
 
+1. 角色的 AnimClass = **D0 建的 `ABP_Player_Manny`**（其 AnimGraph 已含
+   Slot 'DefaultSlot'，骨架即 Lyra SK_Mannequin——两条件天然满足）；
+2. Definition 的 **Arm Reload Montage = `AM_MM_Rifle_Reload`**（Montage 类型，
+   不是同名 Sequence）。
+
+
 1. 角色的 AnimClass（临时 ABP_Manny 副本 / 未来共用 ABP）的 AnimGraph 里
    **必须有 Slot 'DefaultSlot' 节点连到 Output Pose**——5.7 新版模板的
    ABP_Manny 已自带该节点（实测链路：Main States → 插槽 DefaultSlot → 输出姿势），
@@ -463,6 +491,8 @@ git commit Content 资产。
 | 日期 | 修订 |
 |---|---|
 | 2026-09-19 | 初版：跨机器拷贝后的换装迁移执行手册——七模块依赖图、逐模块点击级步骤、验证清单、回退路径 |
+| 2026-09-19 | 新增 **D0 角色最小 ABP（ABP_Player_Manny）**：从 Lyra SK_Mannequin 创建，常驻序列 MM_Rifle_Idle_Hipfire + Slot DefaultSlot（待机直通/蒙太奇覆盖一图两用）；澄清引擎 ABP_Manny 与 Lyra 骨架资产不一致是"看不到手、枪悬空"的根因，B1/D5.3 同步指向 D0；执行进度表 B 行备注更新 |
+
 | 2026-09-19 | 增加执行进度追踪表（A/B 完成，D/E 未开始）；模块 A 理由补 Definition 合入；B5 标注 DefaultWeaponClass 切换时机（D4 后）；D4 补 Definition 外武器槽（枪口火焰/弹壳/贴画配置）；模块 F 并入 D5；模块 H 补 804 提交带入的 Lyra 断链残留（AN_Reload/PhysMat_Player/GameplayEffects） |
 | 2026-09-19 | 模块 D 升级为终态：C++ 新增 `USightlineWeaponDefinition` + `ASightlineWeapon.Definition`（BeginPlay 回填资产槽/枪身蒙太奇自动播/GetArm*Montage），蓝图事件需求压到 2 个并入 BP_Weapon_Base 写一次；模块 D 改为 D1 ABP → D2 DA → D3 翻新 Base → D4 零节点子类 → D5 角色接入 |
 | 2026-09-19 | 模块 D 重写：原地改 BP_Weapon_VIRTUS → **新建 BP_Weapon_Rifle**（逻辑从旧蓝图按"抄/不抄"清单复制，贴画接线不丢）；新增资产放置规范（新文件一律进 Code/ 对应子目录，Lyra 目录不新建文件）；模块 H 补 BP_Weapon_VIRTUS / BS_VIRTUS / MS_VIRTUS 退役 |
