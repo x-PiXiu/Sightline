@@ -330,9 +330,10 @@ Event BP_OnReloadStarted（角色事件）
 ⚠️ **两个前置条件**（缺一动画不可见）：
 
 1. 角色的 AnimClass（临时 ABP_Manny 副本 / 未来共用 ABP）的 AnimGraph 里
-   **必须有 Slot 'DefaultSlot' 节点连到 Output Pose**——引擎原版 ABP_Manny
-   没有该节点，直接挂上去手臂蒙太奇会"播了但看不见"；
-   临时处理：复制引擎 ABP_Manny 到 `Code/Player/Animation/Player/` 加 Slot。
+   **必须有 Slot 'DefaultSlot' 节点连到 Output Pose**——5.7 新版模板的
+   ABP_Manny 已自带该节点（实测链路：Main States → 插槽 DefaultSlot → 输出姿势），
+   复制副本后打开确认一眼即可，有就**零修改**；
+   ⚠️ 若某份 ABP 打开发现没有 Slot（旧版模板），按上面 Slot 节点补法添加。
 2. Definition 的 **Arm Reload Montage = AM_MM_Rifle_Reload**（Montage 类型，
    不是同名 Sequence）。
 
