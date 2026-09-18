@@ -233,6 +233,7 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 | 外观 | Mesh | `SK_Rifle` |
 | 外观 | Anim Class | `ABP_Weapon_Rifle`（D1 建的） |
 | 外观 | Muzzle Offset | 先 0，D6 调 |
+| 外观 | Casing Offset | 先 0（抛壳口位置，枪口火焰调完后微调，弹壳从此弹出） |
 | 音效 | Fire Sound | 旧枪声可用则沿用 |
 | 音效 | Reload Sound | `Rifle_Load01` |
 | 蒙太奇 | Gun Reload Montage | `AM_Weap_Rifle_Reload`（枪身弹匣抽插，C++ 自动播） |
