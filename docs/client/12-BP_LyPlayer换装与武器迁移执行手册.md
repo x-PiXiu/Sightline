@@ -197,8 +197,10 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 1. 内容浏览器进入 `Content/Characters/Heroes/Mannequin/Meshes/` →
    右键 **`SK_Mannequin`（骨架资产）** → **创建 → 动画蓝图** →
    命名 `ABP_Player_Manny` → 移动到 `Content/Code/Player/Animation/Player/`；
-2. 打开 → **AnimGraph** → 右键 → 添加 **播放动画序列（Play Animation Sequence）** 节点 →
-   序列选 **`MM_Rifle_Idle_Hipfire`**（站立持枪战备姿势，`Content/Characters/.../Locomotion/Rifle/`）；
+2. 打开 → **AnimGraph** → 添加待机序列（三法任选）：
+   **① 直接把 `MM_Rifle_Idle_Hipfire` 资产从内容浏览器拖进图表**（自动生成播放节点）；
+   ② 右键搜资产名 `MM_Rifle_Idle_Hipfire`；③ 右键加"序列播放器"节点后在细节面板选序列；
+   ⚠️ 搜不到该动画 = ABP 目标骨架不是 Lyra 的 SK_Mannequin（骨架过滤），按 D0 第 1 步重建；
 3. 右键 → 添加 **插槽 "DefaultSlot"（Slot 'DefaultSlot'）** 节点 →
    连线：**序列节点 → Slot 的 Source → Slot 输出 → Output Pose**
    （无蒙太奇时 Slot 直通待机序列；手臂蒙太奇播放时经 Slot 覆盖——一图两用）；
