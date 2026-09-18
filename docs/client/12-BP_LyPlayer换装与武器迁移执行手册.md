@@ -153,6 +153,15 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 > **决策**：新建而非原地改。理由：① 名实一致（武器已是 Lyra 步枪，叫 VIRTUS 误导）；
 > ② 旧图带着 Cast to BP_Player 断链逻辑，新建 = 天然干净；
 > ③ 旧蓝图保留原地不动，作为"复制逻辑的参考源"，联调全绿后才退役。
+>
+> **继承审计（2026-09-19 字节串实锤）**：旧继承链为
+> `ASightlineWeapon → BP_Weapon_Base → BP_Weapon_VIRTUS`，但解剖发现
+> BP_Weapon_Base 只是音效默认值容器（装的还是旧 VIRTUS 音效），无任何事件实现；
+> 有效逻辑（BP_OnShotImpact 贴画接线 + BP_OnReloadStarted 蒙太奇）全在 VIRTUS 自己图表里。
+> **故 BP_Weapon_Rifle 直接继承 C++ 基类 `SightlineWeapon`**——继承 BP_Weapon_Base 只会
+> 带来需覆盖的旧音效默认值和一层无意义间接。BP_Weapon_Base 随模块 H 退役。
+> 另：BP_OnAmmoChanged 在两级蓝图均未实现——HUD 弹药刷新实为 WBP_HUD 轮询式函数绑定
+> （知识库 1.5 的"每帧 Binding 税"活例），新武器蓝图应亲手实现该事件改为推模式。
 > **代价与对策**：贴画接线（BP_OnShotImpact 三件套）等图表逻辑需手动复制——D3 给了"抄什么/不抄什么"清单。
 >
 > **资产放置规范**：所有新建文件进 `Content/Code/` 对应子目录，
