@@ -129,4 +129,4 @@ A：方向是 Definition 优先、蓝图默认值兜底——只有 Definition �
 - `SightlineWeaponDefinition.h`（DataAsset：9 字段）
 - `SightlineWeapon.h/.cpp`（Definition 属性 + BeginPlay 回填 + 枪身蒙太奇自动播 +
   GetArm*Montage getters）
-- 架构全文：[13-武器系统模块协作与数据流](../13-武器系统模块协作与数据流.md)
+- 架构全文：[13-武器系统模块协作与数据流](../架构设计/13-武器系统模块协作与数据流.md)

@@ -99,7 +99,7 @@ GameMode 已指向 BP_LyPlayer，Manny 已显示但没动画。按清单逐项�
 | 属性 | 值 |
 |---|---|
 | Player Name | 旧值（如 UEPlayer） |
-| Default Weapon Class | `BP_Weapon_VIRTUS`（模块 D 换皮） |
+| Default Weapon Class | `BP_Weapon_Rifle`（模块 D 新建，Definition 驱动） |
 | Auto Login | ✅ |
 | Conn Config | 旧值（默认 127.0.0.1:8888） |
 | Move Report Interval / Ping Interval | 默认 0.1 / 2 |
@@ -148,102 +148,94 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 
 ---
 
-## 模块 D：新建 BP_Weapon_Rifle（放弃原地改 BP_Weapon_VIRTUS）
+## 模块 D：新建 BP_Weapon_Rifle（Definition 数据驱动终态）
 
-> **决策**：新建而非原地改。理由：① 名实一致（武器已是 Lyra 步枪，叫 VIRTUS 误导）；
-> ② 旧图带着 Cast to BP_Player 断链逻辑，新建 = 天然干净；
-> ③ 旧蓝图保留原地不动，作为"复制逻辑的参考源"，联调全绿后才退役。
->
-> **继承审计（2026-09-19 字节串实锤）**：旧继承链为
-> `ASightlineWeapon → BP_Weapon_Base → BP_Weapon_VIRTUS`，但解剖发现
-> BP_Weapon_Base 只是音效默认值容器（装的还是旧 VIRTUS 音效），无任何事件实现；
-> 有效逻辑（BP_OnShotImpact 贴画接线 + BP_OnReloadStarted 蒙太奇）全在 VIRTUS 自己图表里。
-> **故 BP_Weapon_Rifle 直接继承 C++ 基类 `SightlineWeapon`**——继承 BP_Weapon_Base 只会
-> 带来需覆盖的旧音效默认值和一层无意义间接。BP_Weapon_Base 随模块 H 退役。
-> 另：BP_OnAmmoChanged 在两级蓝图均未实现——HUD 弹药刷新实为 WBP_HUD 轮询式函数绑定
-> （知识库 1.5 的"每帧 Binding 税"活例），新武器蓝图应亲手实现该事件改为推模式。
-> **代价与对策**：贴画接线（BP_OnShotImpact 三件套）等图表逻辑需手动复制——D3 给了"抄什么/不抄什么"清单。
+> **架构升级（2026-09-19）**：本模块按"一步到位"方案执行——C++ 已新增
+> `USightlineWeaponDefinition`（数据资产类）与 `ASightlineWeapon.Definition` 属性，
+> 枪身蒙太奇由 C++ 自动播放，蓝图事件需求被压到只剩 2 个（贴画+HUD），
+> 且都实现在 BP_Weapon_Base 里写一次、子类永久继承。
+> 继承审计结论：旧 BP_Weapon_Base 只是音效默认值容器（无事件逻辑），已原地翻新为通用事件宿主；
+> BP_OnAmmoChanged 在旧蓝图两级均未实现——HUD 弹药刷新实为 WBP_HUD 轮询式函数绑定。
+> 数据流与协作时序详见 [`架构设计/13-武器系统模块协作与数据流.md`](架构设计/13-武器系统模块协作与数据流.md)。
 >
 > **资产放置规范**：所有新建文件进 `Content/Code/` 对应子目录，
-> **Lyra 迁移目录（Content/Weapons、Content/Characters）只存资产本体，不新建文件**：
+> **Lyra 迁移目录（Content/Weapons、Content/Characters）只存资产本体，不新建文件**。
 
 | 新文件 | 位置 |
 |---|---|
-| `ABP_Weapon_Rifle`（武器动画蓝图） | `Content/Code/Player/Animation/Weapon/`（与 ABP_VIRTUS 同级） |
-| `BP_Weapon_Rifle`（武器蓝图） | `Content/Code/Weapon/`（与 BP_Weapon_VIRTUS 同级） |
-| `DA_SightlineItemConfig`（模块 E） | `Content/Code/DataAssets/`（与 DA_SightlineImpactFX 同级） |
+| `ABP_Weapon_Rifle`（武器动画蓝图） | `Content/Code/Player/Animation/Weapon/` |
+| `DA_Weapon_Rifle`（Definition 实例） | `Content/Code/DataAssets/` |
+| `BP_Weapon_Base`（翻新：清旧默认值 + 写两个通用事件） | `Content/Code/Weapon/Base/`（原地） |
+| `BP_Weapon_Rifle`（武器蓝图，父类 = BP_Weapon_Base） | `Content/Code/Weapon/` |
 
 ### D1. 建武器动画蓝图 ABP_Weapon_Rifle
 
 1. 内容浏览器进入 `Content/Weapons/Rifle/Mesh/` → 右键 `SK_Rifle_Skeleton` →
    **创建 → 动画蓝图** → 命名 `ABP_Weapon_Rifle`；
-2. ⚠️ 创建后**默认落在 Lyra 目录**——在内容浏览器里**拖到 `Content/Code/Player/Animation/Weapon/`**
-   （编辑器内移动自动更新引用，安全；禁止在文件资源管理器里剪切 .uasset）；
-3. 打开 ABP → **AnimGraph** → ⚠️ **关键坑**：默认 Output Pose 是空的，
-   蒙太奇播了也看不见。右键空白处 → 搜 `Slot` → 添加 **"Slot 'DefaultSlot'"** 节点 →
-   **Slot 输出连到 Output Pose** → 编译保存。
+2. ⚠️ 创建后默认落在 Lyra 目录——**拖到 `Content/Code/Player/Animation/Weapon/`**
+   （编辑器内移动自动更新引用；禁止文件资源管理器剪切 .uasset）；
+3. 打开 ABP → **AnimGraph** → ⚠️ **关键坑**：右键空白处 → 搜 `Slot` →
+   添加 **"Slot 'DefaultSlot'"** 节点 → **Slot 输出连到 Output Pose** → 编译保存。
 
 > 没有 Slot 节点 = `Montage Play` 播放的姿势没有出口 = 枪身动画"播了个寂寞"。
 
-### D2. 建武器蓝图 BP_Weapon_Rifle
+### D2. 建 DA_Weapon_Rifle（数据实例）
 
-1. 内容浏览器进入 `Content/Code/Weapon/` → 右键 → **创建蓝图类** →
-   父类搜索 **`SightlineWeapon`**（C++ 基类，继承关系这一步建立）→ 命名 `BP_Weapon_Rifle`；
-2. Class Defaults 配置：
+1. `Content/Code/DataAssets/` → 右键 → 杂项 → Data Asset → 选 **SightlineWeaponDefinition** →
+   命名 `DA_Weapon_Rifle`；
+2. 填字段：
 
-| 属性 | 值 |
-|---|---|
-| Default Skeletal Mesh | `SK_Rifle` |
-| Default Anim Class | `ABP_Weapon_Rifle`（D1 建的） |
-| Reload Sound | `Rifle_Load01`（Lyra 上膛音） |
-| Fire Sound | 旧枪声能用就沿用，不能则留空后补 |
-| Muzzle Offset | 先 0，D6 进游戏调 |
-
-3. 编译保存。
-
-### D3. 从 BP_Weapon_VIRTUS 复制逻辑（抄什么/不抄什么）
-
-打开旧 `BP_Weapon_VIRTUS` 事件图表（作为参考源，**不改它**），按下表逐段处理：
-
-| 逻辑块 | 处理 | 说明 |
+| 分组 | 字段 | 值 |
 |---|---|---|
-| `Event BP_OnShotImpact` 贴画三件套（Spawn Decal / Play Sound / Spawn System） | ✅ **复制** | 贴画系统接线，丢失要重连一遍 |
-| `Event BP_OnAmmoChanged` → HUD 弹药刷新 | ✅ **复制** | 弹药 UI 链 |
-| `Event BP_OnFireEffects` 里的音效/附加表现 | ✅ **复制**（剔除旧动画节点） | |
-| **`Cast to BP_Player → Get ArmsMesh → Play Anim Montage`** | ❌ **不复制** | 旧手臂体系已退役，职责移交模块 F（角色侧） |
-| 其它引用旧 VIRTUS 网格/动画的节点 | ❌ 不复制 | 断链源 |
+| 外观 | Mesh | `SK_Rifle` |
+| 外观 | Anim Class | `ABP_Weapon_Rifle`（D1 建的） |
+| 外观 | Muzzle Offset | 先 0，D6 调 |
+| 音效 | Fire Sound | 旧枪声可用则沿用 |
+| 音效 | Reload Sound | `Rifle_Load01` |
+| 蒙太奇 | Gun Reload Montage | `AM_Weap_Rifle_Reload`（枪身弹匣抽插，C++ 自动播） |
+| 蒙太奇 | Gun Fire Montage | 可空（枪机动画） |
+| 蒙太奇 | Arm Reload Montage | `AM_MM_Rifle_Reload`（手臂换弹，角色侧读） |
+| 蒙太奇 | Arm Fire Montage | 可空 |
 
-操作：旧图里框选要复制的节点 → Ctrl+C → 打开 BP_Weapon_Rifle 事件图表 → Ctrl+V →
-补齐断裂的引用（同名变量/组件会自动恢复，红线的重新拉）→ 编译。
+### D3. 翻新 BP_Weapon_Base（清壳 + 写两个通用事件）
 
-### D4. 武器自身动画（枪身蒙太奇）
+打开 `Content/Code/Weapon/Base/BP_Weapon_Base`：
 
-BP_Weapon_Rifle 的 `Event BP_OnReloadStarted`（C++ 钩子，加节点即可）追加：
+1. **清掉旧音效默认值**（FireSound/ReloadSound 指向 VIRTUS 音的清空——子类 Definition 会给）；
+2. 从 `BP_Weapon_VIRTUS` **复制** `Event BP_OnShotImpact` 的贴画三件套
+   （GetSubsystem + TryGetImpactFX + Spawn Decal / Play Sound / Spawn System）粘贴进来；
+3. `Event BP_OnAmmoChanged`：可选接线（HUD 现为轮询绑定仍工作；迁推送时在此实现）；
+4. 编译保存。
 
-```
-Get Mesh（武器自己的 SkeletalMeshComponent，C++ 变量 WeaponMesh）
-  → Get Anim Instance → Montage Play（AM_Weap_Rifle_Reload）
-```
+> Base 从此有灵魂：贴画/HUD 两个通用事件写一次，所有武器子类永久继承。
 
-效果：换弹时**枪身弹匣抽插动画**在武器上播，与角色无关。
-（音效不用加节点——C++ `Reload()` 已用 ReloadSound 属性自动播。）
+### D4. 建 BP_Weapon_Rifle（零事件节点）
 
-### D5. 挂点与枪口（在 BP_LyPlayer 里）
+1. `Content/Code/Weapon/` → 右键 → 蓝图类 → 父类选 **BP_Weapon_Base** → 命名 `BP_Weapon_Rifle`；
+2. Class Defaults → **Definition** = `DA_Weapon_Rifle`（唯一必填项）；
+3. 编译保存。四个事件全部继承 Base，**一个节点都不用加**——这就是数据驱动生效的标志。
 
-1. BP_LyPlayer → Class Defaults → **Default Weapon Class** 改为 **`BP_Weapon_Rifle`**；
-2. Event `BP_OnWeaponEquipped` → 武器 Attach 目标 = `Get Mesh`（CharacterMesh0），
-   插槽 = **`hand_r`**，Snap to Target；
-3. 双击 `SK_Rifle` 检查骨架有无枪口插槽（骨架树搜 muzzle/socket）；
-   有 → 武器蓝图 MuzzleOffset 对准；无 → 游戏里看枪口火焰位置，调 MuzzleOffset 至枪管前端。
+### D5. 接入角色（在 BP_LyPlayer 里）
+
+1. Class Defaults → **Default Weapon Class** = `BP_Weapon_Rifle`；
+2. Event `BP_OnWeaponEquipped` → 武器 Attach = `Get Mesh`（CharacterMesh0）、
+   插槽 **`hand_r`**、Snap to Target；
+3. Event `BP_OnReloadStarted`（GameState 钩子）→ 手臂蒙太奇：
+   `GetCurrentWeapon → GetArmReloadMontage → CharacterMesh0.PlayAnimMontage`（可空判断）。
+
+### D6. 进游戏微调
+
+1. 枪贴合右手：D5 Attach 节点接 Transform 引脚微调；
+2. 枪口火焰位置：DA 里的 Muzzle Offset 调至枪管前端。
 
 ### D 验证（PIE）
 
-- [ ] 第一人称能看到手里的枪（贴合右手，不穿模不悬浮）
-- [ ] 开火：枪口火焰位置正确、有枪声
-- [ ] 按 R 换弹：枪身弹匣动画播放（Slot 生效）+ 上膛音效
-- [ ] HUD 弹药数正常增减（复制的 BP_OnAmmoChanged 链生效）
-- [ ] 打墙：弹孔/音效/碎屑正常（复制的 BP_OnShotImpact 链生效）
-- [ ] BP_Weapon_Rifle 事件图表里搜不到任何 `BP_Player` 引用
+- [ ] 第一人称看得到枪、贴合右手
+- [ ] 开火：枪声 + 枪口火焰正确 + 枪机动画（若配 GunFireMontage）
+- [ ] 按 R：**枪身弹匣动画（C++ 自动播）+ 手臂换弹动画（角色读 Definition）同时发生**
+- [ ] HUD 弹药正常增减
+- [ ] 打墙弹孔/音效/碎屑正常
+- [ ] BP_Weapon_Rifle 事件图表应为**空的**（全继承）——数据驱动生效的标志
 
 ---
 
@@ -346,4 +338,5 @@ git commit Content 资产。
 | 日期 | 修订 |
 |---|---|
 | 2026-09-19 | 初版：跨机器拷贝后的换装迁移执行手册——七模块依赖图、逐模块点击级步骤、验证清单、回退路径 |
+| 2026-09-19 | 模块 D 升级为终态：C++ 新增 `USightlineWeaponDefinition` + `ASightlineWeapon.Definition`（BeginPlay 回填资产槽/枪身蒙太奇自动播/GetArm*Montage），蓝图事件需求压到 2 个并入 BP_Weapon_Base 写一次；模块 D 改为 D1 ABP → D2 DA → D3 翻新 Base → D4 零节点子类 → D5 角色接入 |
 | 2026-09-19 | 模块 D 重写：原地改 BP_Weapon_VIRTUS → **新建 BP_Weapon_Rifle**（逻辑从旧蓝图按"抄/不抄"清单复制，贴画接线不丢）；新增资产放置规范（新文件一律进 Code/ 对应子目录，Lyra 目录不新建文件）；模块 H 补 BP_Weapon_VIRTUS / BS_VIRTUS / MS_VIRTUS 退役 |
