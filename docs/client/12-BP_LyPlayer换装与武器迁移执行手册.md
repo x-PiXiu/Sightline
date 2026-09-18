@@ -311,7 +311,19 @@ HUD 推送的干净做法是加一跳角色转播，避免武器直接找 HUD：
 
 ### D5. 接入角色（在 BP_LyPlayer 里）
 
-#### D5.1 默认武器切换
+#### D5.0 前置清理：删除 Tick 旋转链（旧视模型遗产，必做）
+
+BP_LyPlayer 事件图表里若存在
+**`事件 Tick → 获取控制旋转 → 设置世界旋转（目标=网格体）`** 链——**整段删除**
+（`Sync Weapon Visual State` 可一并删除，新武器 ABP 已不消费 MoveX/MoveY）。
+
+来历与危害：这是旧"第一人称手臂视模型"体系的写法（手臂网格每帧跟随相机旋转）；
+复制到全身 Manny 蓝图后，**鼠标 Pitch 会直接驱动全身俯仰**——表现即
+"视线向下、整个身体向前倒"。全身方案的朝向只由 `bUseControllerRotationYaw`（水平）负责；
+"视线向下 → 头向下看"由 Phase 1 共用 ABP 的 AimOffset（Pitch 输入）实现，
+身体永远不参与俯仰。
+
+####  默认武器切换
 
 Class Defaults → **Default Weapon Class** = `BP_Weapon_Rifle`
 （B5 阶段暂填的 BP_Weapon_VIRTUS 在此替换）。
