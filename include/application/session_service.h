@@ -20,7 +20,8 @@ namespace sightline::app {
 class SessionService {
 public:
     struct Config {
-        int heartbeat_timeout_ms = 8000;   // 超过此时长无任何消息即踢出
+        // 开发期临时值 15000（编辑器冻结常见 8~10s，8s 会被误踢）；上线前调回 8000
+        int heartbeat_timeout_ms = 15000;   // 超过此时长无任何消息即踢出
         int scan_interval_ms = 1000;       // 心跳扫描周期（踢人精度粒度）
     };
 
