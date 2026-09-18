@@ -24,7 +24,7 @@ A. C++ 重编译 ──▶ B. BP_LyPlayer 角色成立 ──▶ D. 武器换皮
 | A | DLL 与源码不一致（P2 道具 C++ 没编进去） | 5 分钟 |
 | B | 角色无动画 / 组件缺失 / 相机 | 30 分钟 |
 | C | HUD 铸造旧玩家类 → 换新 Pawn 后运行时失效 | 15 分钟 |
-| D | VIRTUS 不可见 / 动画不配套 | 45 分钟 |
+| D | VIRTUS 不可见 / 动画不配套——**新建 BP_Weapon_Rifle**（逻辑从旧蓝图复制） | 60 分钟 |
 | E | P2 道具 DA 缺失 | 15 分钟 |
 | F | 换弹只有枪动没有手臂动 | 10 分钟 |
 | G | 全链路验收 | 30 分钟 |
@@ -148,54 +148,93 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 
 ---
 
-## 模块 D：武器换皮 SK_Rifle
+## 模块 D：新建 BP_Weapon_Rifle（放弃原地改 BP_Weapon_VIRTUS）
 
-### D1. 最小武器 ABP（武器网格体的动画宿主）
+> **决策**：新建而非原地改。理由：① 名实一致（武器已是 Lyra 步枪，叫 VIRTUS 误导）；
+> ② 旧图带着 Cast to BP_Player 断链逻辑，新建 = 天然干净；
+> ③ 旧蓝图保留原地不动，作为"复制逻辑的参考源"，联调全绿后才退役。
+> **代价与对策**：贴画接线（BP_OnShotImpact 三件套）等图表逻辑需手动复制——D3 给了"抄什么/不抄什么"清单。
+>
+> **资产放置规范**：所有新建文件进 `Content/Code/` 对应子目录，
+> **Lyra 迁移目录（Content/Weapons、Content/Characters）只存资产本体，不新建文件**：
 
-内容浏览器 → 右键 `SK_Rifle_Skeleton` → Create → Animation Blueprint →
-命名 `ABP_Weapon_Rifle_New` → 打开 → **Output Pose 什么都不接** → 编译保存。
-（作用：给武器网格体一个 AnimInstance，蒙太奇才有地方播。）
+| 新文件 | 位置 |
+|---|---|
+| `ABP_Weapon_Rifle`（武器动画蓝图） | `Content/Code/Player/Animation/Weapon/`（与 ABP_VIRTUS 同级） |
+| `BP_Weapon_Rifle`（武器蓝图） | `Content/Code/Weapon/`（与 BP_Weapon_VIRTUS 同级） |
+| `DA_SightlineItemConfig`（模块 E） | `Content/Code/DataAssets/`（与 DA_SightlineImpactFX 同级） |
 
-### D2. 武器蓝图换皮
+### D1. 建武器动画蓝图 ABP_Weapon_Rifle
 
-打开 `BP_Weapon_VIRTUS`：
+1. 内容浏览器进入 `Content/Weapons/Rifle/Mesh/` → 右键 `SK_Rifle_Skeleton` →
+   **创建 → 动画蓝图** → 命名 `ABP_Weapon_Rifle`；
+2. ⚠️ 创建后**默认落在 Lyra 目录**——在内容浏览器里**拖到 `Content/Code/Player/Animation/Weapon/`**
+   （编辑器内移动自动更新引用，安全；禁止在文件资源管理器里剪切 .uasset）；
+3. 打开 ABP → **AnimGraph** → ⚠️ **关键坑**：默认 Output Pose 是空的，
+   蒙太奇播了也看不见。右键空白处 → 搜 `Slot` → 添加 **"Slot 'DefaultSlot'"** 节点 →
+   **Slot 输出连到 Output Pose** → 编译保存。
 
-| 属性 | 旧 | 新 |
+> 没有 Slot 节点 = `Montage Play` 播放的姿势没有出口 = 枪身动画"播了个寂寞"。
+
+### D2. 建武器蓝图 BP_Weapon_Rifle
+
+1. 内容浏览器进入 `Content/Code/Weapon/` → 右键 → **创建蓝图类** →
+   父类搜索 **`SightlineWeapon`**（C++ 基类，继承关系这一步建立）→ 命名 `BP_Weapon_Rifle`；
+2. Class Defaults 配置：
+
+| 属性 | 值 |
+|---|---|
+| Default Skeletal Mesh | `SK_Rifle` |
+| Default Anim Class | `ABP_Weapon_Rifle`（D1 建的） |
+| Reload Sound | `Rifle_Load01`（Lyra 上膛音） |
+| Fire Sound | 旧枪声能用就沿用，不能则留空后补 |
+| Muzzle Offset | 先 0，D6 进游戏调 |
+
+3. 编译保存。
+
+### D3. 从 BP_Weapon_VIRTUS 复制逻辑（抄什么/不抄什么）
+
+打开旧 `BP_Weapon_VIRTUS` 事件图表（作为参考源，**不改它**），按下表逐段处理：
+
+| 逻辑块 | 处理 | 说明 |
 |---|---|---|
-| Default Skeletal Mesh | VIRTUS 模型（断链） | `SK_Rifle` |
-| Default Anim Class | 旧武器 ABP | `ABP_Weapon_Rifle_New` |
-| Reload Sound | 旧 | `Rifle_Load01`（Lyra 迁来的上膛音） |
+| `Event BP_OnShotImpact` 贴画三件套（Spawn Decal / Play Sound / Spawn System） | ✅ **复制** | 贴画系统接线，丢失要重连一遍 |
+| `Event BP_OnAmmoChanged` → HUD 弹药刷新 | ✅ **复制** | 弹药 UI 链 |
+| `Event BP_OnFireEffects` 里的音效/附加表现 | ✅ **复制**（剔除旧动画节点） | |
+| **`Cast to BP_Player → Get ArmsMesh → Play Anim Montage`** | ❌ **不复制** | 旧手臂体系已退役，职责移交模块 F（角色侧） |
+| 其它引用旧 VIRTUS 网格/动画的节点 | ❌ 不复制 | 断链源 |
 
-其余（弹药/射速/冷却）不动。
-
-### D3. 删除 Cast to BP_Player 链（武器解耦）
-
-事件图表里 `Cast to BP_Player → Get ArmsMesh → Play Anim Montage` 整段**删除**——
-武器不再碰角色网格体（职责契约：角色动画角色播）。空出的职责在模块 F 由角色侧接管。
+操作：旧图里框选要复制的节点 → Ctrl+C → 打开 BP_Weapon_Rifle 事件图表 → Ctrl+V →
+补齐断裂的引用（同名变量/组件会自动恢复，红线的重新拉）→ 编译。
 
 ### D4. 武器自身动画（枪身蒙太奇）
 
-事件 `BP_OnReloadStarted`（武器自己的，已存在）追加：
+BP_Weapon_Rifle 的 `Event BP_OnReloadStarted`（C++ 钩子，加节点即可）追加：
 
 ```
-Get Mesh（武器自己的 SkeletalMeshComponent）
+Get Mesh（武器自己的 SkeletalMeshComponent，C++ 变量 WeaponMesh）
   → Get Anim Instance → Montage Play（AM_Weap_Rifle_Reload）
 ```
 
 效果：换弹时**枪身弹匣抽插动画**在武器上播，与角色无关。
+（音效不用加节点——C++ `Reload()` 已用 ReloadSound 属性自动播。）
 
 ### D5. 挂点与枪口（在 BP_LyPlayer 里）
 
-1. Event `BP_OnWeaponEquipped` → 武器 Attach 目标 = `Get Mesh`（CharacterMesh0），
+1. BP_LyPlayer → Class Defaults → **Default Weapon Class** 改为 **`BP_Weapon_Rifle`**；
+2. Event `BP_OnWeaponEquipped` → 武器 Attach 目标 = `Get Mesh`（CharacterMesh0），
    插槽 = **`hand_r`**，Snap to Target；
-2. 双击 `SK_Rifle` 检查骨架有无枪口插槽（骨架树搜 muzzle/socket）；
+3. 双击 `SK_Rifle` 检查骨架有无枪口插槽（骨架树搜 muzzle/socket）；
    有 → 武器蓝图 MuzzleOffset 对准；无 → 游戏里看枪口火焰位置，调 MuzzleOffset 至枪管前端。
 
 ### D 验证（PIE）
 
 - [ ] 第一人称能看到手里的枪（贴合右手，不穿模不悬浮）
 - [ ] 开火：枪口火焰位置正确、有枪声
-- [ ] 按 R 换弹：枪身弹匣动画播放 + 上膛音效
+- [ ] 按 R 换弹：枪身弹匣动画播放（Slot 生效）+ 上膛音效
+- [ ] HUD 弹药数正常增减（复制的 BP_OnAmmoChanged 链生效）
+- [ ] 打墙：弹孔/音效/碎屑正常（复制的 BP_OnShotImpact 链生效）
+- [ ] BP_Weapon_Rifle 事件图表里搜不到任何 `BP_Player` 引用
 
 ---
 
@@ -269,7 +308,9 @@ Get Mesh（CharacterMesh0）→ Play Anim Montage（AM_MM_Rifle_Reload）
 | 删除 | 原因 |
 |---|---|
 | `BP_Player` + `BP_Player_broken` + 备份文件 | 已被 BP_LyPlayer 取代 |
-| `ABP_Player` / `ABP_VIRTUS` | 旧手臂/旧武器骨架的 ABP |
+| `ABP_Player` / `ABP_VIRTUS` / `BS_VIRTUS` / `BS_FPSPlayer` | 旧手臂/旧武器骨架的 ABP 与混合空间 |
+| **`BP_Weapon_VIRTUS`** | 已被 BP_Weapon_Rifle 取代（G 全绿确认后删） |
+| `MS_VIRTUS`（Code/Weapon/MetaSound/） | 旧武器音效，无引用即删 |
 | `AnimModifiers/` | 制作期工具，断链（强制删除安全，引用者是动画的编辑器历史） |
 | `AnimNotifies/`（AN_ 开头） | GAS 通知，断链 |
 | VIRTUS 残留引用（XL_FPSPack 武器网格/动画引用） | 已被 SK_Rifle 取代 |
@@ -296,3 +337,4 @@ git commit Content 资产。
 | 日期 | 修订 |
 |---|---|
 | 2026-09-19 | 初版：跨机器拷贝后的换装迁移执行手册——七模块依赖图、逐模块点击级步骤、验证清单、回退路径 |
+| 2026-09-19 | 模块 D 重写：原地改 BP_Weapon_VIRTUS → **新建 BP_Weapon_Rifle**（逻辑从旧蓝图按"抄/不抄"清单复制，贴画接线不丢）；新增资产放置规范（新文件一律进 Code/ 对应子目录，Lyra 目录不新建文件）；模块 H 补 BP_Weapon_VIRTUS / BS_VIRTUS / MS_VIRTUS 退役 |
