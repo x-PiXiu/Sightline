@@ -287,13 +287,72 @@ HUD 推送的干净做法是加一跳角色转播，避免武器直接找 HUD：
 
 ### D5. 接入角色（在 BP_LyPlayer 里）
 
-1. Class Defaults → **Default Weapon Class** = `BP_Weapon_Rifle`；
-2. Event `BP_OnWeaponEquipped` → 武器 Attach = `Get Mesh`（CharacterMesh0）、
-   插槽 **`hand_r`**、Snap to Target；
-3. Event `BP_OnReloadStarted`（GameState 钩子）→ 手臂蒙太奇：
-   `GetCurrentWeapon → GetArmReloadMontage → CharacterMesh0.PlayAnimMontage`（可空判断）。
+#### D5.1 默认武器切换
 
-### D6. 进游戏微调
+Class Defaults → **Default Weapon Class** = `BP_Weapon_Rifle`
+（B5 阶段暂填的 BP_Weapon_VIRTUS 在此替换）。
+
+#### D5.2 挂到右手
+
+Event `BP_OnWeaponEquipped` → 武器 Attach = `Get Mesh`（CharacterMesh0）、
+插槽 **`hand_r`**、Snap to Target；进游戏后用 Attach 的 Transform 引脚微调贴合。
+
+#### D5.3 手臂换弹蒙太奇（事件链 + 蓝图实现）
+
+**先理解事件链**（谁在什么时候触发这个事件）：
+
+```
+按 R → IA_Reload 事件（BP_LyPlayer 图表）→ GetCurrentWeapon.Reload()  [C++]
+  → 条件检查（未在换弹/弹匣未满/有备弹）                    [C++]
+  → 播 ReloadSound（Definition）                          [C++ 自动]
+  → 播 GunReloadMontage（枪身弹匣抽插，Definition）         [C++ 自动]
+  → ▶ BP_OnReloadStarted（武器钩子，留空即可）              [C++→蓝图]
+  → ★ 调用 Owner.OnWeaponReloadStarted(this)               [C++ 桥，已实现]
+       → ▶ BP_OnReloadStarted（★ 角色事件，本步要接的就是它）
+```
+
+⚠️ **认准是角色的事件**：BP_LyPlayer 里添加事件时，列表里有**两个同名事件**
+（武器上 / 角色上）——添加时看事件的类归属，角色的那个在 SightlineCharacter 分类下。
+（GameState 组件**没有**这个事件，只有 NotifyReloading 状态位。）
+
+**蓝图接线**（BP_LyPlayer 事件图表）：
+
+```
+Event BP_OnReloadStarted（角色事件）
+ → GetCurrentWeapon（自身函数）
+    → Get Arm Reload Montage（武器 C++ BlueprintPure）
+ → Is Valid（对象有效？——Definition 未配 ArmReloadMontage 时为空）
+    VALID → Mesh（CharacterMesh0 组件变量）
+              → Play Anim Montage（Montage to Play = 上面的 ArmReloadMontage）
+    IS NOT VALID → 什么都不做（静默跳过）
+```
+
+⚠️ **两个前置条件**（缺一动画不可见）：
+
+1. 角色的 AnimClass（临时 ABP_Manny 副本 / 未来共用 ABP）的 AnimGraph 里
+   **必须有 Slot 'DefaultSlot' 节点连到 Output Pose**——引擎原版 ABP_Manny
+   没有该节点，直接挂上去手臂蒙太奇会"播了但看不见"；
+   临时处理：复制引擎 ABP_Manny 到 `Code/Player/Animation/Player/` 加 Slot。
+2. Definition 的 **Arm Reload Montage = AM_MM_Rifle_Reload**（Montage 类型，
+   不是同名 Sequence）。
+
+#### D5.4 进游戏微调
+
+1. 枪贴合右手：D5.2 Attach 节点接 Transform 引脚微调；
+2. 枪口火焰位置：DA 里的 Muzzle Offset 调至枪管前端。
+
+### D 验证（PIE）
+
+- [ ] 第一人称看得到枪、贴合右手
+- [ ] 开火：枪声 + 枪口火焰正确 + 枪机动画（若配 GunFireMontage）
+- [ ] 按 R：**枪身弹匣动画（C++ 自动播）+ 手臂换弹动画（角色读 Definition）同时发生**
+- [ ] HUD 弹药正常增减
+- [ ] 打墙弹孔/音效/碎屑正常
+- [ ] BP_Weapon_Rifle 事件图表应为**空的**（全继承）——数据驱动生效的标志
+
+---
+
+## 模块 E：道具系统补完（P2 最后一公里）### D6. 进游戏微调
 
 1. 枪贴合右手：D5 Attach 节点接 Transform 引脚微调；
 2. 枪口火焰位置：DA 里的 Muzzle Offset 调至枪管前端。
