@@ -182,7 +182,7 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 | 新文件 | 位置 |
 |---|---|
 | `ABP_Weapon_Rifle`（武器动画蓝图） | `Content/Code/Player/Animation/Weapon/` |
-| `DA_Weapon_Rifle`（Definition 实例） | `Content/Code/DataAssets/` |
+| `DA_Weapon_Rifle`（Definition 实例） | `Content/Code/DataAssets/Weapon/`（增殖类别独立子目录） |
 | `BP_Weapon_Base`（翻新：清旧默认值 + 写两个通用事件） | `Content/Code/Weapon/Base/`（原地） |
 | `BP_Weapon_Rifle`（武器蓝图，父类 = BP_Weapon_Base） | `Content/Code/Weapon/` |
 
@@ -199,8 +199,9 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 
 ### D2. 建 DA_Weapon_Rifle（数据实例）
 
-1. `Content/Code/DataAssets/` → 右键 → 杂项 → Data Asset → 选 **SightlineWeaponDefinition** →
-   命名 `DA_Weapon_Rifle`；
+1. `Content/Code/DataAssets/` → 右键新建子目录 **Weapon**（武器 DA 会随枪种增殖，
+   独立成目录；贴画/道具单例配置留根目录）→ 进入 `Weapon/` → 右键 → 杂项 → Data Asset →
+   选 **SightlineWeaponDefinition** → 命名 `DA_Weapon_Rifle`；
 2. 填字段：
 
 | 分组 | 字段 | 值 |
