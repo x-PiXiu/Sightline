@@ -18,7 +18,9 @@ using domain::Vec3;
 
 struct LoginCommand { std::string name; };
 struct JoinRoomCommand {};
-struct MoveCommand  { Vec3 pos; float yaw; };                 // 发送者身份由会话上下文提供
+struct MoveCommand  { Vec3 pos; float yaw;                    // 发送者身份由会话上下文提供
+                      uint8_t flags = 0;                      // Phase1 动画同步：bit0=端枪中
+                      float aim_pitch = 0.f; };               // 视线俯仰角（度）
 struct FireCommand  { Vec3 origin; Vec3 dir; };               // dir 已归一化
 struct PingCommand  { uint64_t client_time; };
 
@@ -29,7 +31,8 @@ using GameCommand = std::variant<LoginCommand, JoinRoomCommand,
 
 struct LoginAckEvent  { PlayerId player_id; };
 struct RoomStartEvent { std::vector<PlayerId> players; };
-struct MoveEvent      { PlayerId player_id; Vec3 pos; float yaw; };
+struct MoveEvent      { PlayerId player_id; Vec3 pos; float yaw;
+                        uint8_t flags = 0; float aim_pitch = 0.f; };
 struct HitEvent {                 // 命中/未中统一事件：victim=0 表示 miss（用于弹孔/音效表现）
     PlayerId shooter;
     PlayerId victim;

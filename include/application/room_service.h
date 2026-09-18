@@ -53,9 +53,9 @@ public:
     void handleMove(PlayerId pid, const MoveCommand& cmd) {
         domain::Room* room = roomOf(pid);
         if (!room) return;
-        if (!room->applyMove(pid, cmd.pos, cmd.yaw)) return;
+        if (!room->applyMove(pid, cmd.pos, cmd.yaw, cmd.flags, cmd.aim_pitch)) return;
         channel_.sendToAll(room->othersOf(pid),
-                           MoveEvent{pid, cmd.pos, cmd.yaw});
+                           MoveEvent{pid, cmd.pos, cmd.yaw, cmd.flags, cmd.aim_pitch});
 
         // 惰性驱动：道具重生检查 + 拾取判定与位置上报同频（10Hz），
         // 不需要独立定时器，也不需要 C2S_Pickup 消息

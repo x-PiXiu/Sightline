@@ -14,6 +14,8 @@ struct Player {
     bool alive = true;
     Vec3 position;      // 服务器权威位置（客户端上报、服务器采纳的"半权威"模型）
     float yaw = 0.f;    // 朝向（弧度）
+    uint8_t flags = 0;  // Phase1 动画同步状态位（bit0=端枪中）
+    float aim_pitch = 0.f;  // 视线俯仰角（度）
 
     void resetHp(int max_hp) { hp = max_hp; alive = true; }
 };

@@ -132,11 +132,14 @@ public:
     }
 
     // ---- 移动（客户端上报 → 服务器采纳的简化权威模型）----
-    bool applyMove(PlayerId pid, const Vec3& pos, float yaw) {
+    bool applyMove(PlayerId pid, const Vec3& pos, float yaw,
+                   uint8_t flags = 0, float aim_pitch = 0.f) {
         Player* p = findPlayer(pid);
         if (!p || state_ != RoomState::Playing || !p->alive) return false;
         p->position = pos;    // MVP 不做速度校验；反外挂的速度/碰撞校验是它自然的进化位
         p->yaw = yaw;
+        p->flags = flags;         // Phase1 动画同步状态（纯透传，不做判定）
+        p->aim_pitch = aim_pitch;
         return true;
     }
 

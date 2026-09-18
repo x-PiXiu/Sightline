@@ -91,7 +91,13 @@ public:
                 return JoinRoomCommand{};
             case MsgId::C2S_Move: {
                 if (n < 16) return std::nullopt;
-                return MoveCommand{rdVec3(p), rdF32(p + 12)};
+                MoveCommand c{rdVec3(p), rdF32(p + 12)};
+                if (n >= 19) {   // Phase1 动画同步扩展（加尾不改头）：旧客户端回退零值
+                    c.flags = p[16];
+                    const uint16_t raw = static_cast<uint16_t>(p[17]) | (static_cast<uint16_t>(p[18]) << 8);
+                    c.aim_pitch = static_cast<float>(static_cast<int16_t>(raw)) * 0.01f;
+                }
+                return c;
             }
             case MsgId::C2S_Fire: {
                 if (n < 24) return std::nullopt;
@@ -160,6 +166,10 @@ private:
     }
     static void encodeEvent(const app::MoveEvent& e, std::string& wire) {
         Writer w; w.u32(e.player_id); w.vec3(e.pos); w.f32(e.yaw);
+        w.u8(e.flags);                        // Phase1 动画同步状态位
+        const uint16_t q = static_cast<uint16_t>(static_cast<int16_t>(e.aim_pitch * 100.f));
+        w.u8(static_cast<uint8_t>(q & 0xFF));
+        w.u8(static_cast<uint8_t>(q >> 8));   // pitch × 100 量化（int16 小端）
         finish(MsgId::S2C_Move, w, wire);
     }
     static void encodeEvent(const app::HitEvent& e, std::string& wire) {
