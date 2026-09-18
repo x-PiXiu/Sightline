@@ -434,6 +434,33 @@ Event BP_OnReloadStarted（角色事件）
 - 武器事件图表 → `Event BP_OnShotImpact` 已接 Spawn Decal / Play Sound / Spawn System 三件套；
 - 可选：`BP_OnItemSpawned / BP_OnItemTaken` 钩子接线（拾取特效音效）。
 
+#### E4. 治疗与弹药的表现事件（数字刷新不需要这些）
+
+**第一层（数字刷新，零实现）**：WBP_HUD 的血条/弹药为**轮询绑定**（每帧读
+`Cast to SightlineCharacter → GetHP / GetAmmo`）——模块 C 的 Cast 修复后已自动恢复，
+拾取/开火/换弹的数字变化无需任何事件接线。先 PIE 验证这一层。
+
+**第二层（表现增强，可选）**：
+
+| 事件 | 声明位置 | BP_LyPlayer 能否直接实现 | 用途 |
+|---|---|---|---|
+| `BP_OnHealed(NewHp)` | **ASightlineCharacter**（C++ 桥已加） | ✅ 角色事件，直接实现 | 治疗瞬间血条闪绿 / "+50"飘字 / 治疗音 |
+| `BP_OnAmmoChanged(InMag,Reserve)` | **ASightlineWeapon**（武器 BP 实现更合适） | ✅ BP_Weapon_Rifle 实现 | 弹药变化反馈 |
+
+实现示例（BP_LyPlayer 的 Event BP_OnHealed）：
+
+```
+Event BP_OnHealed (NewHp)
+ → HudRef 血条控件 → Set Color and Opacity（绿色闪烁）→ Delay 0.15 → 恢复
+ → 飘字/治疗音按需追加
+```
+
+⚠️ 注意：**GameState 组件的 BP_OnHealed 无法被 BP_LyPlayer 直接实现**
+（BP 事件只能由声明类的蓝图子类实现）——已由 C++ 桥
+`HandleItemTaken → BP_OnHealed(PickerNewHp)` 转发为角色级事件（UE 仓库 `5544aff`）。
+
+**优先级**：第一层（数字）必须工作；第二层（特效）联调全绿后做。
+
 ### E 验证（PIE，服务器须为 P2 版）
 
 - [ ] 开枪打墙：弹孔 + 音效 + 碎屑出现（打不同材质表现不同）
