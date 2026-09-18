@@ -216,17 +216,64 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 | 蒙太奇 | Arm Reload Montage | `AM_MM_Rifle_Reload`（手臂换弹，角色侧读） |
 | 蒙太奇 | Arm Fire Montage | 可空 |
 
-### D3. 翻新 BP_Weapon_Base（清壳 + 写两个通用事件）
+### D3. 翻新 BP_Weapon_Base（清壳 + 通用事件宿主）
 
-打开 `Content/Code/Weapon/Base/BP_Weapon_Base`：
+打开 `Content/Code/Weapon/Base/BP_Weapon_Base`。
 
-1. **清掉旧音效默认值**（FireSound/ReloadSound 指向 VIRTUS 音的清空——子类 Definition 会给）；
-2. 从 `BP_Weapon_VIRTUS` **复制** `Event BP_OnShotImpact` 的贴画三件套
-   （GetSubsystem + TryGetImpactFX + Spawn Decal / Play Sound / Spawn System）粘贴进来；
-3. `Event BP_OnAmmoChanged`：可选接线（HUD 现为轮询绑定仍工作；迁推送时在此实现）；
-4. 编译保存。
+#### D3.1 清掉旧音效默认值
 
-> Base 从此有灵魂：贴画/HUD 两个通用事件写一次，所有武器子类永久继承。
+FireSound / ReloadSound 指向 VIRTUS 音的清空——子类 Definition 会给新值。
+
+#### D3.2 四事件的归宿（先看清再动手——不是全部都要实现）
+
+| 事件 | 在 Base 实现？ | 原因 |
+|---|---|---|
+| `BP_OnShotImpact` | ✅ **实现** | 内容与具体武器无关（查贴画 DA 按表面分流），写一次全继承 |
+| `BP_OnAmmoChanged` | ⏸ **暂缓** | 内容需要"武器如何找到 HUD"的访问路径决策；HUD 现为轮询绑定仍正常工作 |
+| `BP_OnReloadStarted` | ❌ **留空** | ⚠️ **双重播放陷阱**：枪身蒙太奇已由 C++ 自动播放（`Reload()` 内查 `Definition.GunReloadMontage` → Montage_Play）——Base 再实现 = 换弹动画播两遍 |
+| `BP_OnFireEffects` | ❌ 留空 | 标准表现（枪声/火焰/弹壳/枪机蒙太奇）C++ 已全部自动播；此事件仅留给未来子类专属特效（曳光/烟） |
+
+#### D3.3 实现 BP_OnShotImpact（两种方式任选）
+
+**方式 A（推荐，30 秒）——从 BP_Weapon_VIRTUS 复制**（继承审计实锤它已有完整实现）：
+
+打开 VIRTUS → 全选 `Event BP_OnShotImpact` 整条链
+（GetSubsystem + TryGetImpactFX + BreakStruct + Spawn Decal / Play Sound / Spawn System）
+→ Ctrl+C → 打开 BP_Weapon_Base → Ctrl+V → 编译。
+粘贴节点引用的 `ImpactFXConfig` 是 C++ 基类属性，两边都有，应无红线（有就重拉引用）。
+
+**方式 B——手写节点图**：
+
+```
+Event BP_OnShotImpact (Hit, SurfaceType)
+ → Get ImpactFXConfig（自身 C++ 属性）
+ → TryGetImpactFX（Target = ImpactFXConfig, Surface = SurfaceType）
+    → Return Value(bool) + Out FX(结构体)
+ → Branch（Condition = Return Value）
+    TRUE → Break SightlineImpactFX（Out FX 拆包）
+      ① Decal Material 有效？
+         → Get Game Instance → Get Subsystem(SightlineDecalPoolSubsystem)
+         → Spawn Decal（DecalMaterial, Hit 的 Impact Point,
+                        Impact Normal, Decal Size）
+      ② Impact Sound 有效？ → Play Sound at Location（ImpactSound, Impact Point）
+      ③ Impact System 有效？ → Spawn System at Location（ImpactSystem, Impact Point）
+```
+
+每个分支前加 **Is Valid** 判空（DA 字段留空时跳过该表现，如 Enemy 行不贴弹孔）。
+弹着点一律用 Hit 的 **Impact Point / Impact Normal**（见案例 05 的引脚规则）。
+
+#### D3.4 BP_OnAmmoChanged 的未来实现路径（暂缓记录）
+
+HUD 推送的干净做法是加一跳角色转播，避免武器直接找 HUD：
+`Weapon.ConsumeAmmo → GetOwningCharacter().NotifyAmmoChanged(Mag,Reserve)
+→ Character 转播 BP_OnAmmoChanged → HUD 监听自己 Pawn 的事件`。
+需要加少量 C++（角色侧 Notify 转发），留到 HUD 专项时一起做。
+
+#### D3.5 编译保存
+
+> Base 从此有灵魂：**通用且与具体武器无关的事件写一次全继承**；
+> 有规则的表现（音效/蒙太奇/火焰/弹壳）永远由 C++ 从 Definition 自动播放——
+> Base 里绝不出现"再播一遍"的节点。
 
 ### D4. 建 BP_Weapon_Rifle（零事件节点）
 
