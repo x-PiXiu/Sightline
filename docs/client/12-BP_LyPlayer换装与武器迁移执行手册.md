@@ -5,7 +5,20 @@
 > **性质**：执行手册——每个模块含操作步骤、验证标准、回退说明，按依赖关系严格排序。
 > **前置状态**：GameMode 已指向 BP_LyPlayer；Lyra 人物/武器资产已迁移；物理材质 5 个齐全；
 > DA_SightlineImpactFX 存在；**DLL 过期（早于 P2 客户端代码）；DA_SightlineItemConfig 缺失**。
-> **对应代码**：C++ 已全部就位（P2 道具 + 贴画系统），本手册只动蓝图/资产/配置。
+> **对应代码**：C++ 已全部就位（P2 道具 + 贴画系统 + USightlineWeaponDefinition），本手册只动蓝图/资产/配置。
+
+### 执行进度追踪（随执行更新）
+
+| 模块 | 状态 | 备注 |
+|---|---|---|
+| A C++ 重编译 | ✅ 已完成 | 含 `USightlineWeaponDefinition`（2026-09-19 编译通过） |
+| B 角色成立 | ✅ 主体完成 | BP_LyPlayer 已建、GameMode 已指向；B5 的 Default Weapon Class 待 D4 后切换 |
+| C HUD 解耦 | ⚠️ 待核对 | WBP_HUD 等的 Cast 目标逐个确认 |
+| D 武器新建 | ❌ 未开始 | ABP_Weapon_Rifle / DA_Weapon_Rifle / BP_Weapon_Rifle 均未创建 |
+| E 道具补完 | ❌ 未开始 | `DA_SightlineItemConfig` 确认仍缺失 |
+| F 蒙太奇 | ❌ 未开始 | 已并入 D5 第 3 步 |
+| G 双开联调 | ❌ | 依赖 D/E |
+| H 清场 | ❌ | G 全绿后 |
 
 ---
 
@@ -38,9 +51,11 @@ A. C++ 重编译 ──▶ B. BP_LyPlayer 角色成立 ──▶ D. 武器换皮
 
 ### 为什么必须最先做
 
-`Binaries/Win64/UnrealEditor-FPS_Game.dll` 日期为 9月16 19:57，**早于 P2 道具系统的客户端代码**
-（SightlineItemActor / DA 配置类 / Character 路由分支）。DLL 与源码不一致时打开编辑器，
-引用这些类的资产（即将创建的 DA_SightlineItemConfig）会报"类不存在"或更糟的静默错乱。
+DLL 此前落后于源码两代：先是 P2 道具系统（SightlineItemActor / Character 路由分支），
+现在是**武器数据驱动**（`USightlineWeaponDefinition` / `ASightlineWeapon.Definition`，
+2026-09-19 已编译通过）。DLL 与源码不一致时打开编辑器，引用这些类的资产
+（模块 D/E 即将创建的 DA_Weapon_Rifle、DA_SightlineItemConfig）会报"类不存在"
+或更糟的静默错乱。**每次 C++ 合入后、开编辑器前，都重跑本模块。**
 
 ### 操作
 
@@ -99,7 +114,7 @@ GameMode 已指向 BP_LyPlayer，Manny 已显示但没动画。按清单逐项�
 | 属性 | 值 |
 |---|---|
 | Player Name | 旧值（如 UEPlayer） |
-| Default Weapon Class | `BP_Weapon_Rifle`（模块 D 新建，Definition 驱动） |
+| Default Weapon Class | 暂维持 `BP_Weapon_VIRTUS`，**模块 D4 建成后**再切 `BP_Weapon_Rifle`（D4 之前它还不存在） |
 | Auto Login | ✅ |
 | Conn Config | 旧值（默认 127.0.0.1:8888） |
 | Move Report Interval / Ping Interval | 默认 0.1 / 2 |
@@ -212,8 +227,12 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 ### D4. 建 BP_Weapon_Rifle（零事件节点）
 
 1. `Content/Code/Weapon/` → 右键 → 蓝图类 → 父类选 **BP_Weapon_Base** → 命名 `BP_Weapon_Rifle`；
-2. Class Defaults → **Definition** = `DA_Weapon_Rifle`（唯一必填项）；
-3. 编译保存。四个事件全部继承 Base，**一个节点都不用加**——这就是数据驱动生效的标志。
+2. Class Defaults → **Definition** = `DA_Weapon_Rifle`（核心必填项——网格/动画/音效/蒙太奇全部由它提供）；
+3. **Definition 之外的武器槽也要配**（这些不在 Definition 里）：
+   - **Muzzle Flash Template** = 枪口火焰 Niagara（可沿用 `VIRTUS_MuzzleFlash`，或 Lyra 枪口特效）；
+   - **Casing Class** = `BP_Casing`（弹壳池，不配则无弹壳）；
+   - **Impact FX Config** = `DA_SightlineImpactFX`（贴画查表 + 预热，Base 的 BP_OnShotImpact 靠它查表）；
+4. 编译保存。四个事件全部继承 Base，**一个节点都不用加**——这就是数据驱动生效的标志。
 
 ### D5. 接入角色（在 BP_LyPlayer 里）
 
@@ -269,20 +288,11 @@ GameMode 的 Pawn 已换成 BP_LyPlayer。所有 `Cast to BP_Player` 的蓝图
 
 ---
 
-## 模块 F：角色侧蒙太奇（手臂动画）
+## 模块 F：角色侧蒙太奇（已并入模块 D5 第 3 步）
 
-原"Cast 拿 ArmsMesh 播蒙太奇"的职责移交角色蓝图：
-
-BP_LyPlayer 事件图表 → 添加 **Event BP_OnReloadStarted**（GameState 组件的事件）：
-
-```
-Get Mesh（CharacterMesh0）→ Play Anim Montage（AM_MM_Rifle_Reload）
-```
-
-### F 验证
-
-- [ ] 按 R：**手臂抬枪（角色播）+ 弹匣抽插（武器播）同时发生**
-- [ ] GameMode 换任意玩家蓝图，武器行为不变（解耦成功的标志）
+> 原内容（BP_LyPlayer 的 `BP_OnReloadStarted` → `GetCurrentWeapon → GetArmReloadMontage`
+> → `CharacterMesh0.PlayAnimMontage`）已作为 **D5 第 3 步** 执行，本模块仅保留编号
+> 以维持引用稳定。验证标准不变：按 R 时**手臂换弹（角色播）+ 枪身弹匣（C++ 自动播）同时发生**。
 
 ---
 
@@ -315,6 +325,10 @@ Get Mesh（CharacterMesh0）→ Play Anim Montage（AM_MM_Rifle_Reload）
 | `AnimModifiers/` | 制作期工具，断链（强制删除安全，引用者是动画的编辑器历史） |
 | `AnimNotifies/`（AN_ 开头） | GAS 通知，断链 |
 | VIRTUS 残留引用（XL_FPSPack 武器网格/动画引用） | 已被 SK_Rifle 取代 |
+| `Content/Characters/Heroes/Abilities/AN_Reload` | Lyra GAS 通知，断链（随 804 提交入库） |
+| `Content/Characters/Heroes/PhysMat_Player` + `_WeakSpot` | Lyra 部位伤害物理材质，本项目用不上 |
+| `Content/GameplayEffects/`（GE_Damage_Basic_Instant 等） | GAS 效果资产，断链 |
+| `Content/Effects/AnimationNotifies/AN_FootPlant_*` | 先开文件验证是否断链再决定（可能是引擎通知可用） |
 
 删除顺序：先解除引用（模块 C/D 已做）→ 普通删除（被拦就查引用者）→ Save All →
 git commit Content 资产。
@@ -338,5 +352,6 @@ git commit Content 资产。
 | 日期 | 修订 |
 |---|---|
 | 2026-09-19 | 初版：跨机器拷贝后的换装迁移执行手册——七模块依赖图、逐模块点击级步骤、验证清单、回退路径 |
+| 2026-09-19 | 增加执行进度追踪表（A/B 完成，D/E 未开始）；模块 A 理由补 Definition 合入；B5 标注 DefaultWeaponClass 切换时机（D4 后）；D4 补 Definition 外武器槽（枪口火焰/弹壳/贴画配置）；模块 F 并入 D5；模块 H 补 804 提交带入的 Lyra 断链残留（AN_Reload/PhysMat_Player/GameplayEffects） |
 | 2026-09-19 | 模块 D 升级为终态：C++ 新增 `USightlineWeaponDefinition` + `ASightlineWeapon.Definition`（BeginPlay 回填资产槽/枪身蒙太奇自动播/GetArm*Montage），蓝图事件需求压到 2 个并入 BP_Weapon_Base 写一次；模块 D 改为 D1 ABP → D2 DA → D3 翻新 Base → D4 零节点子类 → D5 角色接入 |
 | 2026-09-19 | 模块 D 重写：原地改 BP_Weapon_VIRTUS → **新建 BP_Weapon_Rifle**（逻辑从旧蓝图按"抄/不抄"清单复制，贴画接线不丢）；新增资产放置规范（新文件一律进 Code/ 对应子目录，Lyra 目录不新建文件）；模块 H 补 BP_Weapon_VIRTUS / BS_VIRTUS / MS_VIRTUS 退役 |
