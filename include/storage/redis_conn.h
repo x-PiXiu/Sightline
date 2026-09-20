@@ -36,10 +36,17 @@ public:
     }
 
     bool valid() const { return r_ != nullptr; }
+    bool isArray() const { return r_ && r_->type == REDIS_REPLY_ARRAY; }
     bool isString() const { return r_ && r_->type == REDIS_REPLY_STRING; }
     bool isInteger() const { return r_ && r_->type == REDIS_REPLY_INTEGER; }
     long long asInteger() const { return r_ ? r_->integer : 0; }
     std::string asString() const { return r_ ? std::string(r_->str, r_->len) : std::string(); }
+    size_t elements() const { return r_ ? r_->elements : 0; }
+    redisReply* element(size_t i) const { return (r_ && i < r_->elements) ? r_->element[i] : nullptr; }
+    redisReply* raw() const { return r_; }
+
+private:
+    redisReply* r_ = nullptr;
 };
 
 /** 连接 RAII + AUTH + 语义化命令 */
@@ -113,7 +120,7 @@ private:
         if (!c_ || c_->err) { if (c_) { redisFree(c_); c_ = nullptr; } return false; }
         if (!cfg_.password.empty())
         {
-            auto r = static_cast<redisReply*>(redisvCommand(c_, "AUTH %s", cfg_.password.c_str()));
+            auto r = static_cast<redisReply*>(redisCommand(c_, "AUTH %s", cfg_.password.c_str()));
             const bool ok = r && r->type != REDIS_REPLY_ERROR;
             if (r) freeReplyObject(r);
             if (!ok) { redisFree(c_); c_ = nullptr; return false; }

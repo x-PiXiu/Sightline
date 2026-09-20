@@ -12,6 +12,7 @@
 #include "application/ports/i_game_channel.h"
 #include "application/ports/i_timer_scheduler.h"
 #include "application/ports/i_match_repository.h"
+#include "storage/redis_conn.h"
 #include "domain/room.h"
 #include "domain/player.h"
 #include "domain/item.h"
@@ -129,12 +130,26 @@ public:
     // ---- 供查询 ----
     size_t roomCount() const { return rooms_.size(); }
 
-    // ---- D3 战绩落库管线（main 经 attachMatchPersistence 注入；可空 = 不落库）----
     void attachMatchPersistence(std::shared_ptr<IMatchRepository> repo,
                                 std::function<void(std::function<void()>)> postToStorage)
     {
         match_repo_  = std::move(repo);
         post_to_storage_ = std::move(postToStorage);
+    }
+
+    /** D4 排行榜：注入 Redis 连接（结算后 ZINCRBY 写入 lb:kills） */
+    void attachRanking(std::shared_ptr<storage::RedisConnection> redis) { ranking_redis_ = std::move(redis); }
+
+    /** 排行榜 TopN 查询 */
+    std::vector<std::pair<std::uint64_t, std::uint16_t>> topKills(int topN = 10)
+    {
+        std::vector<std::pair<std::uint64_t, std::uint16_t>> out;
+        if (!ranking_redis_) return out;
+        auto r = ranking_redis_->zrevrange("lb:kills", 0, topN - 1);
+        for (const auto& [member, score] : r)
+            out.emplace_back(std::strtoull(member.c_str(), nullptr, 10),
+                             static_cast<std::uint16_t>(score));
+        return out;
     }
 
     // ---- 对局结算（D3 战绩）：MatchEnd 广播 + 异步落库 ----
@@ -234,6 +249,19 @@ private:
     std::function<void(std::function<void()>)> post_to_storage_;
     std::function<std::uint64_t(PlayerId)> account_lookup_;
     std::uint64_t match_seq_ = 0;
+
+    // ---- D4 排行榜（结算后 ZINCRBY 写入 Redis ZSET；查询走 ZREVRANGE）----
+    std::shared_ptr<storage::RedisConnection> ranking_redis_;
+
+    /** 结算后写排行榜：每个有 account_id 的玩家 ZINCRBY kills */
+    void recordRanking(const std::vector<MatchScoreRow>& scores) {
+        if (!ranking_redis_) return;
+        for (const auto& s : scores) {
+            if (s.account_id)
+                ranking_redis_->zincrby("lb:kills", static_cast<double>(s.kills),
+                                        std::to_string(s.account_id));
+        }
+    }
 };
 
 } // namespace sightline::app
