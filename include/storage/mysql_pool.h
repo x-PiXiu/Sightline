@@ -45,6 +45,9 @@ public:
     bool       valid() const { return res_ != nullptr; }
     my_ulonglong rowCount() const { return res_ ? mysql_num_rows(res_) : 0; }
     MYSQL_ROW  fetchRow() { return res_ ? mysql_fetch_row(res_) : nullptr; }
+
+private:
+    MYSQL_RES* res_ = nullptr;
 };
 
 /** 连接 RAII：构造连接、析构关闭；ensureConnected 防 MySQL 8 小时空闲断连 */
@@ -58,6 +61,9 @@ public:
     MysqlConnection& operator=(const MysqlConnection&) = delete;
 
     bool connected() const { return conn_ != nullptr; }
+
+    /** 最近一次 MySQL 错误文本（诊断用） */
+    std::string lastError() const { return conn_ ? mysql_error(conn_) : "no connection"; }
 
     bool ensureConnected()
     {

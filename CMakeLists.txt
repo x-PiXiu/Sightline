@@ -79,6 +79,9 @@ target_link_libraries(sightline_net PUBLIC Threads::Threads lua)
 # ---------- 可执行（domain/application/adapters 均为 header-only） ----------
 add_executable(sightline main.cpp)
 target_link_libraries(sightline PRIVATE sightline_net)
+if(MYSQL_CLIENT_LIB)
+    target_link_libraries(sightline PRIVATE ${MYSQL_CLIENT_LIB})
+endif()
 
 # ---------- 单元测试（domain/application 零网络依赖，直接编译即可；logger 链接 net 库） ----------
 add_executable(test_hitscan       tests/domain/test_hitscan.cpp)
@@ -88,10 +91,12 @@ add_executable(test_logger        tests/logger/test_logger.cpp)
 add_executable(test_lua           tests/lua/test_lua.cpp)
 add_executable(test_storage       tests/storage/test_storage_io.cpp)
 add_executable(test_account_repo  tests/storage/test_account_repo.cpp)
+add_executable(test_mysql_live    tests/storage/test_mysql_live.cpp)
 target_link_libraries(test_logger   PRIVATE sightline_net)
 target_link_libraries(test_lua      PRIVATE sightline_net)
 target_link_libraries(test_storage  PRIVATE sightline_net)
 target_link_libraries(test_account_repo PRIVATE ${MYSQL_CLIENT_LIB})
+target_link_libraries(test_mysql_live PRIVATE ${MYSQL_CLIENT_LIB})
 
 enable_testing()
 add_test(NAME hitscan      COMMAND test_hitscan)

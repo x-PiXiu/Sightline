@@ -207,6 +207,18 @@ private:
     void handle(const TcpConnectionPtr& conn, app::PlayerId, const app::LoginCommand& c) {
         sessions_.handleLogin(conn->id(), c);
     }
+    void handle(const TcpConnectionPtr& conn, app::PlayerId, const app::RegisterCommand& c) {
+        // 注册在登录前（连接级，无 pid）——结果经回调直发该连接
+        sessions_.handleRegister(conn->id(), c,
+            [this, conn](const app::RegisterResultEvent& ev) {
+                if (auto cit = findConn(conn->id())) {
+                    const std::string wire = ev_wire(ev);
+                    stats_.msgs_out.fetch_add(1, std::memory_order_relaxed);
+                    stats_.bytes_out.fetch_add(wire.size(), std::memory_order_relaxed);
+                    cit->send(wire);
+                }
+            });
+    }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::JoinRoomCommand&) {
         if (pid) rooms_.handleJoin(pid, sessions_.name(pid));
     }

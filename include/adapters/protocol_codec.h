@@ -32,6 +32,16 @@ enum class MsgId : uint16_t {
     S2C_Respawn   = 14,
     S2C_ItemSpawn = 15,   // P2：[4B netId][1B typeId][12B pos] 共 17B
     S2C_ItemTaken = 16,   // P2：[4B netId][4B pid][1B typeId][4B newHp] 共 13B
+    // ---- D2 账号体系（契约：docs/server/02 第二节）----
+    C2S_Register        = 17,  // [2B accountLen][account][32B passHash]
+    S2C_RegisterResult  = 18,  // [1B ok][1B errCode]
+    S2C_MatchEnd        = 19,  // [8B matchId][8B winnerAccountId][2B durationSec][2B count]×N{[8B accountId][2B kills][2B deaths]}
+    C2S_QueryRecord     = 20,  // [8B accountId]
+    S2C_RecordList      = 21,  // [2B count]×N{[8B matchId][1B mode][1B win][2B kills][2B deaths]}
+    C2S_ListRooms       = 22,  // 空
+    S2C_RoomList        = 23,  // [2B count]×N{[4B roomId][1B mode][1B cur][1B max]}
+    C2S_CreateRoom      = 24,  // [1B mode]
+    S2C_JoinAck         = 25,  // [4B roomId][1B ok][1B mode]
 };
 
 class ProtocolCodec {
@@ -85,6 +95,18 @@ public:
                 if (n < 2 + len) return std::nullopt;
                 LoginCommand c;
                 c.name.assign(reinterpret_cast<const char*>(p + 2), len);
+                // D2 账号登录（加尾）：name 后随 64B 口令哈希；无尾 = 游客/旧客户端
+                if (n >= 2 + len + 64)
+                    c.pass_hash.assign(reinterpret_cast<const char*>(p + 2 + len), 64);
+                return c;
+            }
+            case MsgId::C2S_Register: {   // D2：[2B accountLen][account][64B passHash]
+                if (n < 2) return std::nullopt;
+                uint16_t alen = rd16(p);
+                if (n < 2 + static_cast<size_t>(alen) + 64) return std::nullopt;
+                RegisterCommand c;
+                c.account.assign(reinterpret_cast<const char*>(p + 2), alen);
+                c.pass_hash.assign(reinterpret_cast<const char*>(p + 2 + alen), 64);
                 return c;
             }
             case MsgId::C2S_JoinRoom:
@@ -152,12 +174,25 @@ private:
         void u8(uint8_t v) { buf.push_back(v); }
         void f32(float v) { uint32_t bits; std::memcpy(&bits, &v, 4); u32(bits); }
         void vec3(const app::Vec3& v) { f32(v.x); f32(v.y); f32(v.z); }
+        void str16(const std::string& s) { u16(static_cast<uint16_t>(s.size()));
+                                           buf.insert(buf.end(), s.begin(), s.end()); }
     };
 
     // ---------- 事件编码 ----------
     static void encodeEvent(const app::LoginAckEvent& e, std::string& wire) {
-        Writer w; w.u32(e.player_id);
+        Writer w; w.u32(static_cast<uint32_t>(e.player_id));
+        // D2 加尾（旧客户端只读头部 playerId）：登录结果 + 账号身份 + 战绩摘要 + token
+        w.u8(e.ok);
+        w.u8(e.is_guest ? 1 : 0);
+        w.u64(e.account_id);
+        w.str16(e.nickname);
+        w.u16(e.wins); w.u16(e.losses); w.u16(e.kills); w.u16(e.deaths);
+        w.str16(e.token);
         finish(MsgId::S2C_LoginAck, w, wire);
+    }
+    static void encodeEvent(const app::RegisterResultEvent& e, std::string& wire) {
+        Writer w; w.u8(e.ok); w.u8(e.err_code);
+        finish(MsgId::S2C_RegisterResult, w, wire);
     }
     static void encodeEvent(const app::RoomStartEvent& e, std::string& wire) {
         Writer w; w.u32(static_cast<uint32_t>(e.players.size()));

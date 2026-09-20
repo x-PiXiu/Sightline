@@ -19,12 +19,19 @@ return {
         max_players = 8,
     },
 
-    -- D2 起由存储模块消费（文档：docs/server/01）
+    -- D2 起由存储模块消费（文档：docs/server/01）——扁平键（main.cpp getString("database", key) 直读）
     -- ⚠️ 凭据为开发期临时值；正式部署时改由环境变量注入，不入库不入 git
     database = {
-        mysql = { host = "172.17.153.223", port = 3306, user = "root",
-                  password = "123456", database = "sightline", pool_size = 4 },
-        redis = { host = "172.17.153.223", port = 6379, password = "123456" },
-        mongo = { uri = "mongodb://root:123456@172.17.153.223:27017", database = "sightline" },
+        mysql_host     = "172.17.153.223",
+        mysql_port     = 3306,
+        mysql_user     = "root",
+        mysql_password = "123456",
+        mysql_database = "sightline",
+        mysql_pool     = 4,
+        redis_host     = "172.17.153.223",
+        redis_port     = 6379,
+        redis_password = "123456",
+        mongo_uri      = "mongodb://root:123456@172.17.153.223:27017",
+        mongo_database = "sightline",
     },
 }

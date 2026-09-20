@@ -93,6 +93,8 @@ int main(int argc, char* argv[]) {
         mc.database = vm.getString("database", "mysql_database", mc.database);
         mysqlPool   = std::make_shared<sightline::storage::MysqlPool>(mc, 4);
         accountRepo = std::make_shared<sightline::app::MySqlAccountRepository>(mysqlPool);
+        logger.info("[StorageIO] MySQL " + mc.host + ":" + std::to_string(mc.port) +
+                    " db=" + mc.database + " user=" + mc.user, __FILE__, __LINE__);
     }
 
     ChannelProxy proxy;                                 // Port#1 占位
@@ -103,6 +105,7 @@ int main(int argc, char* argv[]) {
         cfg.session);
     sessions.attachAccountPipeline(                     // 账号管线：登录/注册走存储线程
         [&storageIO](std::function<void()> job) { storageIO.post(std::move(job)); },
+        [&loop](std::function<void()> cb) { loop.queueInLoop(std::move(cb)); },
         accountRepo);
 
     // 适配层 + Port#1 实现：主从 Reactor（IO 多线程，逻辑单线程跳回主 loop）

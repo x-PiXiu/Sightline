@@ -7,6 +7,7 @@
 
 #include "application/ports/i_account_repository.h"
 #include "storage/mysql_pool.h"
+#include "logger/logger.h"
 
 namespace sightline::app {
 
@@ -46,9 +47,11 @@ public:
         const std::string escAcc  = conn->escape(record.account);
         const std::string escNick = conn->escape(record.nickname);
         const std::string escHash = conn->escape(record.passHash);
-        return conn->execute(
+        const bool ok = conn->execute(
             "INSERT INTO account (account, pass_hash, nickname) VALUES ('" +
             escAcc + "', '" + escHash + "', '" + escNick + "')");
+        if (!ok) LOG_ERROR(std::string("[AccountRepo] create 失败: ") + conn->lastError());
+        return ok;
     }
 
     void addStats(std::uint64_t accountId, int wins, int losses, int kills, int deaths) override

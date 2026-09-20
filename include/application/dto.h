@@ -16,20 +16,36 @@ using domain::Vec3;
 
 // ============ 客户端 → 服务器（命令）============
 
-struct LoginCommand { std::string name; };
+struct LoginCommand {
+    std::string name;           // 游客=昵称；账号登录=登录名
+    std::string pass_hash;      // 口令哈希（空 = 游客/旧客户端兼容路径）
+};
+struct RegisterCommand {        // D2：账号注册（存储线程异步处理，15 号 02 文档）
+    std::string account;
+    std::string pass_hash;
+};
 struct JoinRoomCommand {};
 struct MoveCommand  { Vec3 pos; float yaw;                    // 发送者身份由会话上下文提供
-                      uint8_t flags = 0;                      // Phase1 动画同步：bit0=端枪中
+                      uint8_t flags = 0;                      // 动画同步：bit0=端枪 bit1=下蹲 bit2=跳跃
                       float aim_pitch = 0.f; };               // 视线俯仰角（度）
 struct FireCommand  { Vec3 origin; Vec3 dir; };               // dir 已归一化
 struct PingCommand  { uint64_t client_time; };
 
-using GameCommand = std::variant<LoginCommand, JoinRoomCommand,
+using GameCommand = std::variant<LoginCommand, RegisterCommand, JoinRoomCommand,
                                  MoveCommand, FireCommand, PingCommand>;
 
 // ============ 服务器 → 客户端（事件）============
 
-struct LoginAckEvent  { PlayerId player_id; };
+struct LoginAckEvent  {
+    PlayerId player_id = 0;
+    // ---- D2 加尾（旧客户端只读头部 playerId，不受影响）----
+    uint8_t  ok       = 1;          // 1=登录成功 0=失败
+    bool     is_guest = true;
+    std::uint64_t account_id = 0;
+    std::string nickname;
+    std::uint16_t wins = 0, losses = 0, kills = 0, deaths = 0;
+    std::string token;              // 断线重连凭据（W7）
+};
 struct RoomStartEvent { std::vector<PlayerId> players; };
 struct MoveEvent      { PlayerId player_id; Vec3 pos; float yaw;
                         uint8_t flags = 0; float aim_pitch = 0.f; };
@@ -45,6 +61,10 @@ struct PlayerLeftEvent{ PlayerId player_id; };
 struct GameOverEvent  { PlayerId winner; };
 struct PongEvent      { uint64_t client_time; };
 struct KickEvent      { uint8_t reason; };   // 1=心跳超时
+struct RegisterResultEvent {                   // D2：注册结果（连接级，登录前下发）
+    uint8_t ok = 0;
+    uint8_t err_code = 0;       // 0=成功 1=重名 2=非法 3=内部错误
+};
 struct ItemSpawnEvent {                       // P2：道具出现（开局布点/冷却重生）
     uint32_t net_id;
     uint8_t type_id;    // domain::ItemTypeId 的数值（两端契约）
@@ -59,6 +79,7 @@ struct ItemTakenEvent {                       // P2：道具被拾取（服务�
 
 using GameEvent = std::variant<LoginAckEvent, RoomStartEvent, MoveEvent, HitEvent,
                                RespawnEvent, PlayerLeftEvent, GameOverEvent,
-                               PongEvent, KickEvent, ItemSpawnEvent, ItemTakenEvent>;
+                               PongEvent, KickEvent, RegisterResultEvent,
+                               ItemSpawnEvent, ItemTakenEvent>;
 
 } // namespace sightline::app
