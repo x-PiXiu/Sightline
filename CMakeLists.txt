@@ -12,6 +12,18 @@ add_compile_options(-Wall -Wextra)
 find_package(Threads REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# ---------- 数据库客户端库（服务端 D2：MySQL/hiredis） ----------
+find_path(MYSQL_INCLUDE_DIR mysql.h PATH_SUFFIXES mysql)
+find_library(MYSQL_CLIENT_LIB NAMES mysqlclient libmysql)
+find_path(HIREDIS_INCLUDE_DIR hiredis/hiredis.h PATH_SUFFIXES hiredis)
+find_library(HIREDIS_LIB NAMES hiredis)
+if(MYSQL_INCLUDE_DIR)
+    include_directories(${MYSQL_INCLUDE_DIR})
+endif()
+if(HIREDIS_INCLUDE_DIR)
+    include_directories(${HIREDIS_INCLUDE_DIR})
+endif()
+
 # ---------- Lua 5.4（配置热更脚本机：vendor 源码编译静态库，不含独立解释器 lua/luac） ----------
 add_library(lua STATIC
     third_party/lua/lapi.c
@@ -75,9 +87,11 @@ add_executable(test_room_service  tests/application/test_room_service.cpp)
 add_executable(test_logger        tests/logger/test_logger.cpp)
 add_executable(test_lua           tests/lua/test_lua.cpp)
 add_executable(test_storage       tests/storage/test_storage_io.cpp)
+add_executable(test_account_repo  tests/storage/test_account_repo.cpp)
 target_link_libraries(test_logger   PRIVATE sightline_net)
 target_link_libraries(test_lua      PRIVATE sightline_net)
 target_link_libraries(test_storage  PRIVATE sightline_net)
+target_link_libraries(test_account_repo PRIVATE ${MYSQL_CLIENT_LIB})
 
 enable_testing()
 add_test(NAME hitscan      COMMAND test_hitscan)
