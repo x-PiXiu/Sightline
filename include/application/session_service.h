@@ -39,6 +39,9 @@ public:
         timers_.runEvery(config_.scan_interval_ms, [this] { scanHeartbeats(); });
     }
 
+    /** Lua 热更入口：心跳参数即时生效（下一次扫描按新值，15 号 01 文档 reload） */
+    void updateConfig(const Config& c) { config_ = c; }
+
     // ---- 连接生命周期（由 adapters 的连接回调驱动）----
 
     void onConnected(uint64_t conn_id) {

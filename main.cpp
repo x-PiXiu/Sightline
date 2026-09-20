@@ -3,12 +3,16 @@
 
 #include <csignal>
 #include <filesystem>
+#include <iostream>
 #include <memory>
+#include <thread>
 #include "sightline_config.h"
 #include "adapters/game_server.h"
 #include "adapters/timer_wheel_adapter.h"
 #include "application/session_service.h"
 #include "application/room_service.h"
+#include "storage/storage_io.h"
+#include "lua/lua_vm.h"
 #include "logger/logger.h"
 
 namespace {
@@ -44,7 +48,11 @@ private:
 int main(int argc, char* argv[]) {
     using namespace sightline;
 
-    const auto cfg = SightlineConfig::fromArgs(argc, argv);
+    // ---- 配置装配（优先级：命令行 > config.lua > 内置默认；15 号 01 文档 D1）----
+    LuaVM vm;
+    const bool luaOk = vm.loadFile("config.lua");
+    auto cfg = SightlineConfig::fromArgs(argc, argv);
+    if (luaOk) cfg.applyLua(vm);   // Lua 键存在才覆盖；命令行参数此后仍可覆盖 port
 
     // 日志：异步 + 限频（热路径零同步 IO；风暴期按调用点限流防日志风暴）
     auto& logger = common::logger::Logger::getInstance();
@@ -58,6 +66,8 @@ int main(int argc, char* argv[]) {
         logger.addSink(std::make_unique<common::logger::FileSink>(
             cfg.log_dir + "/sightline.log", 8 * 1024 * 1024, 5));
     }
+    if (!luaOk)
+        logger.warn("config.lua 未加载成功——全部使用内置默认配置");
 
     // ---- 装配线 ----
     common::network::EventLoop loop(cfg.loop);          // 主 loop：acceptor + 定时器 + 游戏逻辑
@@ -82,6 +92,44 @@ int main(int argc, char* argv[]) {
     // 可观测性：周期上报（走时间轮的周期定时器）
     loop.runEvery(cfg.stats_interval_s * 1000, [&server] { server.logStats(); });
 
+    // ---- 存储线程池骨架（15 号 01 文档 D1：投递→执行→回投闭环；D2 起挂载 MySQL/Redis/Mongo）----
+    sightline::StorageIO storageIO;
+    storageIO.start(&loop);
+    storageIO.post([&logger] {
+        // 此段运行在存储线程——D2 起这里将执行 SQL/Redis/Mongo 任务
+        logger.info("[StorageIO] 存储线程就绪（骨架）", __FILE__, __LINE__);
+    });
+    storageIO.postBackToMain([&logger] {
+        logger.info("[StorageIO] 回投主 EventLoop 正常", __FILE__, __LINE__);
+    });
+
+    // ---- 控制台管理线程（reload = 热载 config.lua；quit = 退出）----
+    std::thread consoleThread([&] {
+        std::string line;
+        while (std::getline(std::cin, line))
+        {
+            if (line == "reload")
+            {
+                g_loop->queueInLoop([&] {
+                    if (vm.hotReload("config.lua"))
+                    {
+                        cfg.applyLua(vm);
+                        rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
+                        sessions.updateConfig(cfg.session);
+                        logger.info("config reloaded: win_kills=" +
+                                    std::to_string(cfg.room.room_rules.kills_to_win) +
+                                    " (新开局生效)", __FILE__, __LINE__);
+                    }
+                });
+            }
+            else if (line == "quit")
+            {
+                if (g_loop) g_loop->quit();
+                break;
+            }
+        }
+    });
+
     // ---- 上电 ----
     g_loop = &loop;
     std::signal(SIGINT, onSignal);
@@ -92,6 +140,10 @@ int main(int argc, char* argv[]) {
     logger.info("Sightline FPS server listening on port " + std::to_string(cfg.port),
                 __FILE__, __LINE__);
     loop.loop();
+
+    // ---- 退场 ----
+    if (consoleThread.joinable()) consoleThread.join();
+    storageIO.stop();
     logger.info("Sightline stopped", __FILE__, __LINE__);
     return 0;
 }

@@ -1,9 +1,11 @@
 // sightline_config.h —— 全局配置（组装层，main 填充；对应 01 文档"10 行结构体替代 280 行 networkConfig"）
+// 15 号 01 文档 D1：新增 applyLua——config.lua 为热更单一来源，命令行优先级最高
 
 #pragma once
 #include <cstdint>
 #include <string>
 #include "net/event_loop.h"
+#include "lua/lua_vm.h"
 #include "application/session_service.h"
 #include "application/room_service.h"
 
@@ -35,6 +37,23 @@ struct SightlineConfig {
         return c;
     }
     bool debug_log = false;
+
+    /** Lua 配置应用（键存在才覆盖——当前值作缺省，未配置键保持原值）。
+     *  优先级：命令行参数 > config.lua > 内置默认 */
+    void applyLua(sightline::LuaVM& vm)
+    {
+        port                = vm.getInt("network", "port", port);
+        session.heartbeat_timeout_ms = vm.getInt("network", "heartbeat_timeout_ms",
+                                                session.heartbeat_timeout_ms);
+        session.scan_interval_ms     = vm.getInt("network", "scan_interval_ms",
+                                                session.scan_interval_ms);
+        room.room_rules.kills_to_win = vm.getInt("game", "win_kills",
+                                                room.room_rules.kills_to_win);
+        room.room_rules.max_players  = vm.getInt("game", "max_players",
+                                                room.room_rules.max_players);
+        room.respawn_delay_ms        = vm.getInt("game", "respawn_ms",
+                                                room.respawn_delay_ms);
+    }
 };
 
 } // namespace sightline

@@ -30,6 +30,9 @@ public:
     RoomService(IGameChannel& channel, ITimerScheduler& timers, const Config& config)
         : channel_(channel), timers_(timers), config_(config) {}
 
+    /** Lua 热更入口：新开局按新规则（进行中对局不受影响，15 号 01 文档 reload） */
+    void updateConfig(const Config& c) { config_ = c; }
+
     // ---- 进房/匹配：找一间能进的 WAITING 房，否则开新房；人齐自动开战 ----
     void handleJoin(PlayerId pid, const std::string& name) {
         domain::Room* room = findJoinableRoom();
