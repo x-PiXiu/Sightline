@@ -20,10 +20,11 @@ return {
     },
 
     -- D2 起由存储模块消费（文档：docs/server/01）
+    -- ⚠️ 凭据为开发期临时值；正式部署时改由环境变量注入，不入库不入 git
     database = {
-        mysql = { host = "127.0.0.1", port = 3306, user = "sightline",
-                  password = "sightline", database = "sightline", pool_size = 4 },
-        redis = { host = "127.0.0.1", port = 6379 },
-        mongo = { uri = "mongodb://127.0.0.1:27017", database = "sightline" },
+        mysql = { host = "172.17.153.223", port = 3306, user = "root",
+                  password = "123456", database = "sightline", pool_size = 4 },
+        redis = { host = "172.17.153.223", port = 6379, password = "123456" },
+        mongo = { uri = "mongodb://root:123456@172.17.153.223:27017", database = "sightline" },
     },
 }
