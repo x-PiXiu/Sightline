@@ -167,7 +167,9 @@ int main(int argc, char* argv[]) {
     loop.loop();
 
     // ---- 退场 ----
-    if (consoleThread.joinable()) consoleThread.join();
+    // 控制台线程阻塞在 getline(stdin)——join 会永远等待。
+    // detach 让它随进程退出自然消亡（daemon 线程不需要 join）。
+    if (consoleThread.joinable()) consoleThread.detach();
     storageIO.stop();
     logger.info("Sightline stopped", __FILE__, __LINE__);
     return 0;
