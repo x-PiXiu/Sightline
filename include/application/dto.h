@@ -65,6 +65,17 @@ struct RegisterResultEvent {                   // D2：注册结果（连接级�
     uint8_t ok = 0;
     uint8_t err_code = 0;       // 0=成功 1=重名 2=非法 3=内部错误
 };
+struct MatchScoreRow {                         // D3：结算面板单行（账号维度，游客=0）
+    std::uint64_t account_id = 0;
+    std::uint16_t kills = 0;
+    std::uint16_t deaths = 0;
+};
+struct MatchEndEvent {                         // D3：对局结算（判胜统一出口广播）
+    std::uint64_t match_seq = 0;               // 进程内对局序号
+    std::uint64_t winner_account_id = 0;       // 0 = 无胜者（全员离开）
+    std::uint16_t duration_sec = 0;
+    std::vector<MatchScoreRow> scores;
+};
 struct ItemSpawnEvent {                       // P2：道具出现（开局布点/冷却重生）
     uint32_t net_id;
     uint8_t type_id;    // domain::ItemTypeId 的数值（两端契约）
@@ -80,6 +91,6 @@ struct ItemTakenEvent {                       // P2：道具被拾取（服务�
 using GameEvent = std::variant<LoginAckEvent, RoomStartEvent, MoveEvent, HitEvent,
                                RespawnEvent, PlayerLeftEvent, GameOverEvent,
                                PongEvent, KickEvent, RegisterResultEvent,
-                               ItemSpawnEvent, ItemTakenEvent>;
+                               MatchEndEvent, ItemSpawnEvent, ItemTakenEvent>;
 
 } // namespace sightline::app

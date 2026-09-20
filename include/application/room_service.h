@@ -7,9 +7,11 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <functional>
 #include "application/dto.h"
 #include "application/ports/i_game_channel.h"
 #include "application/ports/i_timer_scheduler.h"
+#include "application/ports/i_match_repository.h"
 #include "domain/room.h"
 #include "domain/player.h"
 #include "domain/item.h"
@@ -34,7 +36,7 @@ public:
     void updateConfig(const Config& c) { config_ = c; }
 
     // ---- 进房/匹配：找一间能进的 WAITING 房，否则开新房；人齐自动开战 ----
-    void handleJoin(PlayerId pid, const std::string& name) {
+    void handleJoin(PlayerId pid, const std::string& name, std::uint64_t account_id = 0) {
         domain::Room* room = findJoinableRoom();
         if (!room) {
             rooms_[next_room_id_] = domain::Room(next_room_id_, config_.room_rules);
@@ -44,6 +46,7 @@ public:
         domain::Player p;
         p.id = pid;
         p.name = name;
+        p.account_id = account_id;            // D2：战绩落库的身份键（游客=0）
         if (!room->addPlayer(p)) return;      // 满员竞态，忽略（MVP 客户端可重试）
 
         player_room_[pid] = room->id();
@@ -126,6 +129,47 @@ public:
     // ---- 供查询 ----
     size_t roomCount() const { return rooms_.size(); }
 
+    // ---- D3 战绩落库管线（main 经 attachMatchPersistence 注入；可空 = 不落库）----
+    void attachMatchPersistence(std::shared_ptr<IMatchRepository> repo,
+                                std::function<void(std::function<void()>)> postToStorage)
+    {
+        match_repo_  = std::move(repo);
+        post_to_storage_ = std::move(postToStorage);
+    }
+
+    // ---- 对局结算（D3 战绩）：MatchEnd 广播 + 异步落库 ----
+
+    /** 判胜统一出口：GameOver 广播 + MatchEnd 广播 + 战绩落库（经存储线程，可空降级）。
+     *  winner_pid = 0 表示无胜者（全员离开）。 */
+    void settleAndBroadcast(domain::Room* room, PlayerId winner_pid) {
+        channel_.sendToAll(room->playerIds(), GameOverEvent{winner_pid});
+
+        const std::uint64_t seq = ++match_seq_;
+        MatchEndEvent ev;
+        ev.match_seq          = seq;
+        ev.winner_account_id  = winner_pid ? account_lookup_(winner_pid) : 0;
+        ev.duration_sec       = static_cast<std::uint16_t>(room->elapsedSec());
+        for (const auto& row : room->scoreBoard())
+            ev.scores.push_back(MatchScoreRow{ row.account_id,
+                static_cast<std::uint16_t>(row.kills),
+                static_cast<std::uint16_t>(row.deaths) });
+        channel_.sendToAll(room->playerIds(), ev);
+
+        if (match_repo_ && !ev.scores.empty())
+        {
+            MatchRecordDb rec;
+            rec.match_seq          = seq;
+            rec.mode               = 1;   // DM（模式参数化 D4 后由房间携带）
+            rec.winner_account_id  = ev.winner_account_id;
+            rec.duration_sec       = ev.duration_sec;
+            rec.players.reserve(ev.scores.size());
+            for (const auto& s : ev.scores)
+                rec.players.push_back({s.account_id, s.kills, s.deaths});
+            post_to_storage_([repo = match_repo_, rec] { repo->save(rec); });
+        }
+        scheduleRematch(room->id());
+    }
+
 private:
     domain::Room* roomOf(PlayerId pid) {
         auto it = player_room_.find(pid);
@@ -184,6 +228,12 @@ private:
     std::unordered_map<domain::RoomId, domain::Room> rooms_;
     std::unordered_map<PlayerId, domain::RoomId> player_room_;
     domain::RoomId next_room_id_ = 1;
+
+    // ---- D3 战绩落库管线（main 经 attachMatchPersistence 注入；可空 = 不落库）----
+    std::shared_ptr<IMatchRepository> match_repo_;
+    std::function<void(std::function<void()>)> post_to_storage_;
+    std::function<std::uint64_t(PlayerId)> account_lookup_;
+    std::uint64_t match_seq_ = 0;
 };
 
 } // namespace sightline::app

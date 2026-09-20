@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <chrono>
 #include <optional>
 #include "domain/types.h"
 #include "domain/player.h"
@@ -85,14 +86,22 @@ public:
     bool tryStart() {
         if (state_ == RoomState::Waiting && playerCount() >= rules_.min_players) {
             state_ = RoomState::Playing;
+            started_at_ms_ = nowMs();   // D3 结算用：本局开战时刻
             return true;
         }
         return false;
     }
 
+    /** 本局时长（秒，D3 结算采集用；从未开战 = 0） */
+    int elapsedSec() const {
+        return started_at_ms_ == 0.0
+                   ? 0
+                   : static_cast<int>((nowMs() - started_at_ms_) / 1000.0);
+    }
+
     void finish() { state_ = RoomState::Finished; }
 
-    // 重开一局：结算后复位状态并保留玩家（ kills/hp/位置全部重置），
+    // 重开一局：结算后复位状态并保留玩家（ kills/deaths/hp/位置全部重置），
     // 人够则立即再开战。业务缺口修复：此前 Finished 房间永久滞留，玩家只能断线重连
     bool rematch() {
         if (state_ != RoomState::Finished) return false;
@@ -100,6 +109,7 @@ public:
         int index = 0;
         for (auto& [id, p] : players_) {
             p.kills = 0;
+            p.deaths = 0;
             p.resetHp(rules_.max_hp);
             p.alive = true;
             p.position = spawnPoint(index++);
@@ -122,6 +132,20 @@ public:
         ids.reserve(players_.size());
         for (auto& [id, _] : players_) ids.push_back(id);
         return ids;
+    }
+
+    /** 结算快照：全员(账户,击杀,死亡)——MatchEnd 广播与落库的数据源 */
+    struct ScoreRow { PlayerId pid; std::uint64_t account_id; int kills; int deaths; };
+    std::vector<ScoreRow> scoreBoard() const {
+        std::vector<ScoreRow> out;
+        out.reserve(players_.size());
+        for (const auto& [id, p] : players_)
+            out.push_back({id, p.account_id, p.kills, p.deaths});
+        return out;
+    }
+    std::uint64_t accountOf(PlayerId pid) const {
+        auto it = players_.find(pid);
+        return it != players_.end() ? it->second.account_id : 0;
     }
 
     // 除某人外的其他玩家（广播移动时排除自己，省流量）
@@ -194,6 +218,7 @@ public:
 
         if (outcome.dead) {
             victim->alive = false;
+            victim->deaths += 1;      // D3 战绩：被击杀数（结算面板/落库）
             shooter->kills += 1;
             if (shooter->kills >= rules_.kills_to_win) {
                 r.game_over = true;
@@ -289,6 +314,14 @@ private:
     RoomState state_ = RoomState::Waiting;
     RoomRules rules_;
     std::unordered_map<PlayerId, Player> players_;
+
+    // ---- 对局计时（D3 结算：本局时长）----
+    double started_at_ms_ = 0.0;   // tryStart 时刻（单调钟毫秒）；0 = 从未开战
+
+    static double nowMs() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
 
     // ---- 道具状态 ----
     static constexpr float kItemFieldRadius_ = 800.f;   // 布点半径：十字臂 8 米（出生圈 18 米之内）

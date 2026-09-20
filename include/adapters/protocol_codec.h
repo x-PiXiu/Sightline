@@ -194,6 +194,15 @@ private:
         Writer w; w.u8(e.ok); w.u8(e.err_code);
         finish(MsgId::S2C_RegisterResult, w, wire);
     }
+    static void encodeEvent(const app::MatchEndEvent& e, std::string& wire) {
+        Writer w;
+        w.u64(e.match_seq); w.u64(e.winner_account_id); w.u16(e.duration_sec);
+        w.u16(static_cast<uint16_t>(e.scores.size()));
+        for (const auto& s : e.scores) {
+            w.u64(s.account_id); w.u16(s.kills); w.u16(s.deaths);
+        }
+        finish(MsgId::S2C_MatchEnd, w, wire);
+    }
     static void encodeEvent(const app::RoomStartEvent& e, std::string& wire) {
         Writer w; w.u32(static_cast<uint32_t>(e.players.size()));
         for (auto pid : e.players) w.u32(pid);

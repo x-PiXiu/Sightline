@@ -138,6 +138,12 @@ public:
         auto it = conn_to_player_.find(conn_id);
         return it == conn_to_player_.end() ? 0 : it->second;
     }
+
+    /** 账号查询（战绩落库的身份键；游客/未登录 = 0） */
+    std::uint64_t accountIdOf(PlayerId pid) const {
+        auto it = sessions_.find(pid);
+        return it == sessions_.end() ? 0 : it->second.account_id;
+    }
     // 反查：连接 id ←→ 玩家 id 的映射真源在本服务（适配层发送时反查）
     uint64_t connIdOf(PlayerId pid) const {
         auto it = sessions_.find(pid);

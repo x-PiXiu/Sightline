@@ -220,7 +220,7 @@ private:
             });
     }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::JoinRoomCommand&) {
-        if (pid) rooms_.handleJoin(pid, sessions_.name(pid));
+        if (pid) rooms_.handleJoin(pid, sessions_.name(pid), sessions_.accountIdOf(pid));
     }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::MoveCommand& c) {
         if (pid) rooms_.handleMove(pid, c);
