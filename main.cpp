@@ -159,6 +159,7 @@ int main(int argc, char* argv[]) {
     g_loop = &loop;
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
+    std::signal(SIGHUP, onSignal);   // CLion Stop/终端关闭会发 SIGHUP——同走 quit 避免非零退出码
     // 压测第一课：不忽略 SIGPIPE，向已 RST 的连接 write 会直接杀死进程（无日志暴毙）
     std::signal(SIGPIPE, SIG_IGN);
 
