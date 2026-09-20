@@ -9,9 +9,12 @@
 #include "sightline_config.h"
 #include "adapters/game_server.h"
 #include "adapters/timer_wheel_adapter.h"
+#include "adapters/mysql_account_repository.h"
 #include "application/session_service.h"
 #include "application/room_service.h"
+#include "application/ports/i_account_repository.h"
 #include "storage/storage_io.h"
+#include "storage/mysql_pool.h"
 #include "lua/lua_vm.h"
 #include "logger/logger.h"
 
@@ -51,8 +54,10 @@ int main(int argc, char* argv[]) {
     // ---- 配置装配（优先级：命令行 > config.lua > 内置默认；15 号 01 文档 D1）----
     LuaVM vm;
     const bool luaOk = vm.loadFile("config.lua");
-    auto cfg = SightlineConfig::fromArgs(argc, argv);
-    if (luaOk) cfg.applyLua(vm);   // Lua 键存在才覆盖；命令行参数此后仍可覆盖 port
+    SightlineConfig cfg;
+    if (luaOk) cfg.applyLua(vm);                                                // Lua 覆盖内置默认
+    if (argc > 1) cfg.port = static_cast<uint16_t>(std::stoi(argv[1]));         // 命令行最高优先
+    if (argc > 2 && std::string(argv[2]) == "debug") cfg.debug_log = true;
 
     // 日志：异步 + 限频（热路径零同步 IO；风暴期按调用点限流防日志风暴）
     auto& logger = common::logger::Logger::getInstance();
@@ -73,12 +78,32 @@ int main(int argc, char* argv[]) {
     common::network::EventLoop loop(cfg.loop);          // 主 loop：acceptor + 定时器 + 游戏逻辑
     adapters::TimerWheelAdapter timers(loop);           // Port#2 实现
 
+    // ---- 存储线程池 + 账号管线（15 号 01 文档 D1 / D2；须在 server.start 前装配）----
+    sightline::StorageIO storageIO;
+    storageIO.start(&loop);
+    std::shared_ptr<sightline::storage::MysqlPool> mysqlPool;
+    std::shared_ptr<sightline::app::IAccountRepository> accountRepo;
+    if (luaOk)
+    {
+        sightline::storage::MysqlConfig mc;
+        mc.host     = vm.getString("database", "mysql_host", mc.host);
+        mc.port     = static_cast<int>(vm.getNumber("database", "mysql_port", mc.port));
+        mc.user     = vm.getString("database", "mysql_user", mc.user);
+        mc.password = vm.getString("database", "mysql_password", mc.password);
+        mc.database = vm.getString("database", "mysql_database", mc.database);
+        mysqlPool   = std::make_shared<sightline::storage::MysqlPool>(mc, 4);
+        accountRepo = std::make_shared<sightline::app::MySqlAccountRepository>(mysqlPool);
+    }
+
     ChannelProxy proxy;                                 // Port#1 占位
     app::RoomService rooms(proxy, timers, cfg.room);    // 用例层
     app::SessionService sessions(
         proxy, timers,
         [&rooms](app::PlayerId pid) { rooms.handlePlayerGone(pid); },
         cfg.session);
+    sessions.attachAccountPipeline(                     // 账号管线：登录/注册走存储线程
+        [&storageIO](std::function<void()> job) { storageIO.post(std::move(job)); },
+        accountRepo);
 
     // 适配层 + Port#1 实现：主从 Reactor（IO 多线程，逻辑单线程跳回主 loop）
     adapters::GameServer::Options net_opts;
@@ -92,9 +117,6 @@ int main(int argc, char* argv[]) {
     // 可观测性：周期上报（走时间轮的周期定时器）
     loop.runEvery(cfg.stats_interval_s * 1000, [&server] { server.logStats(); });
 
-    // ---- 存储线程池骨架（15 号 01 文档 D1：投递→执行→回投闭环；D2 起挂载 MySQL/Redis/Mongo）----
-    sightline::StorageIO storageIO;
-    storageIO.start(&loop);
     storageIO.post([&logger] {
         // 此段运行在存储线程——D2 起这里将执行 SQL/Redis/Mongo 任务
         logger.info("[StorageIO] 存储线程就绪（骨架）", __FILE__, __LINE__);
