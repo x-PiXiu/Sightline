@@ -10,6 +10,7 @@
 #include "adapters/game_server.h"
 #include "adapters/timer_wheel_adapter.h"
 #include "adapters/mysql_account_repository.h"
+#include "adapters/mysql_match_repository.h"
 #include "application/session_service.h"
 #include "application/room_service.h"
 #include "application/ports/i_account_repository.h"
@@ -83,6 +84,8 @@ int main(int argc, char* argv[]) {
     storageIO.start(&loop);
     std::shared_ptr<sightline::storage::MysqlPool> mysqlPool;
     std::shared_ptr<sightline::app::IAccountRepository> accountRepo;
+    std::shared_ptr<sightline::app::MySqlMatchRepository> matchRepo;
+    std::shared_ptr<sightline::storage::RedisConnection> rankingRedis;
     if (luaOk)
     {
         sightline::storage::MysqlConfig mc;
@@ -93,8 +96,17 @@ int main(int argc, char* argv[]) {
         mc.database = vm.getString("database", "mysql_database", mc.database);
         mysqlPool   = std::make_shared<sightline::storage::MysqlPool>(mc, 4);
         accountRepo = std::make_shared<sightline::app::MySqlAccountRepository>(mysqlPool);
+        matchRepo   = std::make_shared<sightline::app::MySqlMatchRepository>(mysqlPool);
         logger.info("[StorageIO] MySQL " + mc.host + ":" + std::to_string(mc.port) +
                     " db=" + mc.database + " user=" + mc.user, __FILE__, __LINE__);
+    }
+    if (luaOk)
+    {
+        sightline::storage::RedisConfig rc;
+        rc.host     = vm.getString("database", "redis_host", rc.host);
+        rc.port     = static_cast<int>(vm.getNumber("database", "redis_port", rc.port));
+        rc.password = vm.getString("database", "redis_password", rc.password);
+        rankingRedis = std::make_shared<sightline::storage::RedisConnection>(rc);
     }
 
     ChannelProxy proxy;                                 // Port#1 占位
@@ -107,6 +119,10 @@ int main(int argc, char* argv[]) {
         [&storageIO](std::function<void()> job) { storageIO.post(std::move(job)); },
         [&loop](std::function<void()> cb) { loop.queueInLoop(std::move(cb)); },
         accountRepo);
+    rooms.attachMatchPersistence(matchRepo,             // 战绩落库管线
+        [&storageIO](std::function<void()> job) { storageIO.post(std::move(job)); },
+        [&sessions](app::PlayerId pid) { return sessions.accountIdOf(pid); });
+    rooms.attachRanking(rankingRedis);                   // D4 排行榜
 
     // 适配层 + Port#1 实现：主从 Reactor（IO 多线程，逻辑单线程跳回主 loop）
     adapters::GameServer::Options net_opts;

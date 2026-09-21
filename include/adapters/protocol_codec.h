@@ -42,6 +42,8 @@ enum class MsgId : uint16_t {
     S2C_RoomList        = 23,  // [2B count]×N{[4B roomId][1B mode][1B cur][1B max]}
     C2S_CreateRoom      = 24,  // [1B mode]
     S2C_JoinAck         = 25,  // [4B roomId][1B ok][1B mode]
+    C2S_TopKills        = 26,  // 空
+    S2C_TopKills        = 27,  // [2B count]×N{[8B accountId][2B kills]}
 };
 
 class ProtocolCodec {
@@ -131,6 +133,21 @@ public:
                 std::memcpy(&t, p, 8);
                 return PingCommand{t};
             }
+            case MsgId::C2S_QueryRecord: {   // [8B accountId]
+                if (n < 8) return std::nullopt;
+                QueryRecordCommand c;
+                c.account_id = rdU64(p);
+                return c;
+            }
+            case MsgId::C2S_ListRooms:
+                return ListRoomsCommand{};
+            case MsgId::C2S_CreateRoom: {   // [1B mode]
+                if (n < 1) return std::nullopt;
+                CreateRoomCommand c; c.mode = p[0];
+                return c;
+            }
+            case MsgId::C2S_TopKills:
+                return TopKillsCommand{};
             default:
                 return std::nullopt;
         }
@@ -152,6 +169,11 @@ private:
         uint32_t v = 0;
         std::memcpy(&v, p, 4);
         return v;
+    }
+    static uint64_t rdU64(const uint8_t* p) {
+        uint64_t v = 0;
+        std::memcpy(&v, p, 8);
+        return v;   // x86 天然小端
     }
     static uint64_t rd64(const uint8_t* p) {
         uint64_t v = 0;
@@ -202,6 +224,34 @@ private:
             w.u64(s.account_id); w.u16(s.kills); w.u16(s.deaths);
         }
         finish(MsgId::S2C_MatchEnd, w, wire);
+    }
+    static void encodeEvent(const app::RoomListEvent& e, std::string& wire) {
+        Writer w; w.u16(static_cast<uint16_t>(e.rooms.size()));
+        for (const auto& r : e.rooms) {
+            w.u32(r.room_id); w.u8(r.mode);
+            w.u8(static_cast<uint8_t>(r.cur_players));
+            w.u8(static_cast<uint8_t>(r.max_players));
+        }
+        finish(MsgId::S2C_RoomList, w, wire);
+    }
+    static void encodeEvent(const app::RecordListEvent& e, std::string& wire) {
+        Writer w; w.u16(static_cast<uint16_t>(e.records.size()));
+        for (const auto& r : e.records) {
+            w.u64(r.match_id); w.u8(r.mode);
+            w.u8(r.win ? 1 : 0); w.u16(r.kills); w.u16(r.deaths);
+        }
+        finish(MsgId::S2C_RecordList, w, wire);
+    }
+    static void encodeEvent(const app::TopKillsEvent& e, std::string& wire) {
+        Writer w; w.u16(static_cast<uint16_t>(e.rows.size()));
+        for (const auto& r : e.rows) {
+            w.u64(r.account_id); w.u16(r.kills);
+        }
+        finish(MsgId::S2C_TopKills, w, wire);
+    }
+    static void encodeEvent(const app::JoinAckEvent& e, std::string& wire) {
+        Writer w; w.u32(e.room_id); w.u8(e.ok); w.u8(e.mode);
+        finish(MsgId::S2C_JoinAck, w, wire);
     }
     static void encodeEvent(const app::RoomStartEvent& e, std::string& wire) {
         Writer w; w.u32(static_cast<uint32_t>(e.players.size()));

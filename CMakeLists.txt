@@ -82,6 +82,9 @@ target_link_libraries(sightline PRIVATE sightline_net)
 if(MYSQL_CLIENT_LIB)
     target_link_libraries(sightline PRIVATE ${MYSQL_CLIENT_LIB})
 endif()
+if(HIREDIS_LIB)
+    target_link_libraries(sightline PRIVATE ${HIREDIS_LIB})
+endif()
 
 # ---------- 单元测试（domain/application 零网络依赖，直接编译即可；logger 链接 net 库） ----------
 add_executable(test_hitscan       tests/domain/test_hitscan.cpp)

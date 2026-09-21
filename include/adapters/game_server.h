@@ -222,6 +222,46 @@ private:
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::JoinRoomCommand&) {
         if (pid) rooms_.handleJoin(pid, sessions_.name(pid), sessions_.accountIdOf(pid));
     }
+
+    // ---- D4 大厅：房间列表 / 建房 / 排行榜 / 战绩查询 ----
+
+    void handle(const TcpConnectionPtr& conn, app::PlayerId, const app::ListRoomsCommand&) {
+        auto briefs = rooms_.listRooms();
+        app::RoomListEvent ev;
+        for (const auto& b : briefs)
+            ev.rooms.push_back({static_cast<uint32_t>(b.room_id), b.mode,
+                                b.cur_players, b.max_players});
+        const std::string wire = ProtocolCodec::encode(ev);
+        conn->send(wire);
+    }
+
+    void handle(const TcpConnectionPtr& conn, app::PlayerId, const app::CreateRoomCommand& c) {
+        auto room_id = rooms_.createRoom();
+        app::JoinAckEvent ack;
+        ack.room_id = static_cast<uint32_t>(room_id);
+        ack.ok = 1; ack.mode = c.mode;
+        const std::string wire = ProtocolCodec::encode(ack);
+        conn->send(wire);
+    }
+
+    void handle(const TcpConnectionPtr& conn, app::PlayerId, const app::TopKillsCommand&) {
+        auto rows = rooms_.topKills(10);
+        app::TopKillsEvent ev;
+        for (const auto& r : rows)
+            ev.rows.push_back({r.first, static_cast<uint16_t>(r.second)});
+        const std::string wire = ProtocolCodec::encode(ev);
+        conn->send(wire);
+    }
+
+    void handle(const TcpConnectionPtr& conn, app::PlayerId pid, const app::QueryRecordCommand& c) {
+        if (!pid) return;
+        auto records = rooms_.queryRecords(sessions_.accountIdOf(pid), 10);
+        app::RecordListEvent ev;
+        for (const auto& r : records)
+            ev.records.push_back({r.match_id, r.mode, r.win, r.kills, r.deaths});
+        const std::string wire = ProtocolCodec::encode(ev);
+        conn->send(wire);
+    }
     void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::MoveCommand& c) {
         if (pid) rooms_.handleMove(pid, c);
     }

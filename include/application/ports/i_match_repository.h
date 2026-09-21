@@ -27,6 +27,15 @@ struct MatchRecordDb
     std::vector<MatchPlayerRow> players;
 };
 
+struct MatchRecordRow
+{
+    std::uint64_t match_id = 0;
+    std::uint8_t  mode = 1;
+    bool          win = false;
+    std::uint16_t kills = 0;
+    std::uint16_t deaths = 0;
+};
+
 class IMatchRepository
 {
 public:
@@ -34,6 +43,9 @@ public:
 
     /** 落库一局（match_record + match_player + player_stats 累加），返回 DB 自增 match_id */
     virtual std::uint64_t save(const MatchRecordDb& rec) = 0;
+
+    /** 按账号查战绩列表（最近 N 条） */
+    virtual std::vector<MatchRecordRow> queryByAccount(std::uint64_t account_id, int limit) = 0;
 };
 
 } // namespace sightline::app

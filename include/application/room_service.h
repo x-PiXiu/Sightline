@@ -131,10 +131,39 @@ public:
     size_t roomCount() const { return rooms_.size(); }
 
     void attachMatchPersistence(std::shared_ptr<IMatchRepository> repo,
-                                std::function<void(std::function<void()>)> postToStorage)
+                                std::function<void(std::function<void()>)> postToStorage,
+                                std::function<std::uint64_t(PlayerId)> accountLookup)
     {
         match_repo_  = std::move(repo);
         post_to_storage_ = std::move(postToStorage);
+        account_lookup_ = std::move(accountLookup);
+    }
+
+    // ---- D4 大厅：房间列表 / 指定建房 / 战绩查询 ----
+
+    struct RoomBrief {
+        domain::RoomId room_id = 0;
+        std::uint8_t   mode  = 1;
+        std::uint32_t  cur_players = 0;
+        std::uint32_t  max_players = 0;
+    };
+
+    std::vector<RoomBrief> listRooms() const {
+        std::vector<RoomBrief> out;
+        for (const auto& [id, room] : rooms_)
+            out.push_back({id, 1, static_cast<std::uint32_t>(room.playerCount()),
+                           static_cast<std::uint32_t>(room.rules().max_players)});
+        return out;
+    }
+
+    domain::RoomId createRoom() {
+        domain::Room& r = rooms_[next_room_id_] = domain::Room(next_room_id_, config_.room_rules);
+        return next_room_id_++;
+    }
+
+    std::vector<MatchRecordRow> queryRecords(std::uint64_t account_id, int limit) {
+        if (!match_repo_) return {};
+        return match_repo_->queryByAccount(account_id, limit);
     }
 
     /** D4 排行榜：注入 Redis 连接（结算后 ZINCRBY 写入 lb:kills） */

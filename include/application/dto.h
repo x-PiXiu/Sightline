@@ -31,8 +31,17 @@ struct MoveCommand  { Vec3 pos; float yaw;                    // 发送者身份
 struct FireCommand  { Vec3 origin; Vec3 dir; };               // dir 已归一化
 struct PingCommand  { uint64_t client_time; };
 
+// ---- D4 大厅：房间列表 / 建房 / 排行榜 / 战绩查询 ----
+
+struct QueryRecordCommand { std::uint64_t account_id = 0; };
+struct ListRoomsCommand {};
+struct CreateRoomCommand { std::uint8_t mode = 1; };
+struct TopKillsCommand {};
+
 using GameCommand = std::variant<LoginCommand, RegisterCommand, JoinRoomCommand,
-                                 MoveCommand, FireCommand, PingCommand>;
+                                 MoveCommand, FireCommand, PingCommand,
+                                 QueryRecordCommand, ListRoomsCommand,
+                                 CreateRoomCommand, TopKillsCommand>;
 
 // ============ 服务器 → 客户端（事件）============
 
@@ -88,9 +97,42 @@ struct ItemTakenEvent {                       // P2：道具被拾取（服务�
     int picker_new_hp;
 };
 
+// ---- D4 大厅：房间列表 / 建房确认 / 排行榜 / 战绩列表 ----
+
+struct RecordListRow {
+    std::uint64_t match_id = 0;
+    std::uint8_t  mode = 1;
+    bool          win = false;
+    std::uint16_t kills = 0;
+    std::uint16_t deaths = 0;
+};
+struct RecordListEvent { std::vector<RecordListRow> records; };
+
+struct RoomBrief {
+    std::uint32_t room_id = 0;
+    std::uint8_t  mode  = 1;
+    std::uint32_t cur_players = 0;
+    std::uint32_t max_players = 0;
+};
+struct RoomListEvent { std::vector<RoomBrief> rooms; };
+
+struct JoinAckEvent {
+    std::uint32_t room_id = 0;
+    std::uint8_t  ok = 0;
+    std::uint8_t  mode = 1;
+};
+
+struct TopKillsRow {
+    std::uint64_t account_id = 0;
+    std::uint16_t kills = 0;
+};
+struct TopKillsEvent { std::vector<TopKillsRow> rows; };
+
 using GameEvent = std::variant<LoginAckEvent, RoomStartEvent, MoveEvent, HitEvent,
                                RespawnEvent, PlayerLeftEvent, GameOverEvent,
                                PongEvent, KickEvent, RegisterResultEvent,
-                               MatchEndEvent, ItemSpawnEvent, ItemTakenEvent>;
+                               MatchEndEvent, ItemSpawnEvent, ItemTakenEvent,
+                               RecordListEvent, RoomListEvent, TopKillsEvent,
+                               JoinAckEvent>;
 
 } // namespace sightline::app
