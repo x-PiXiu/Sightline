@@ -3,8 +3,11 @@
 
 #include <csignal>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <regex>
+#include <set>
 #include <thread>
 #include "sightline_config.h"
 #include "adapters/game_server.h"
@@ -136,22 +139,82 @@ int main(int argc, char* argv[]) {
     server.start();
 
     // ---- GM 管理 API（03 文档）：HTTP 线程收请求，queueInLoop 跳主 loop 取数/操作 ----
-    auto reloadConfigFn = [&] {                        // 控制台 reload 与 Admin API 共用同一实现
-        g_loop->queueInLoop([&] {
-            if (vm.hotReload("config.lua"))
-            {
-                cfg.applyLua(vm);
-                rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
-                sessions.updateConfig(cfg.session);
-                logger.info("config reloaded: win_kills=" +
-                            std::to_string(cfg.room.room_rules.kills_to_win) +
-                            " (新开局生效)", __FILE__, __LINE__);
-            }
-        });
+    auto applyConfigFromLua = [&] {                 // 同步热载（须在主 loop 线程调用）
+        if (vm.hotReload("config.lua"))
+        {
+            cfg.applyLua(vm);
+            rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
+            sessions.updateConfig(cfg.session);
+            logger.info("config reloaded: win_kills=" +
+                        std::to_string(cfg.room.room_rules.kills_to_win) +
+                        " (新开局生效)", __FILE__, __LINE__);
+        }
     };
+    auto reloadConfigFn = [&] {                     // 异步包装：控制台/Admin API 从外部线程触发
+        g_loop->queueInLoop(applyConfigFromLua);
+    };
+
+    // config.lua 文本改写：逐行只替换命中键的"值 token"，注释与结构原样保留。
+    // 全部键命中才写盘（hits 不齐 = 拒绝半写），失败返回 false。
+    auto rewriteLuaValues = [](const std::string& path,
+                               const std::vector<std::pair<std::string, std::string>>& kv) -> bool {
+        std::ifstream in(path);
+        if (!in) return false;
+        std::vector<std::string> lines;
+        for (std::string ln; std::getline(in, ln); ) lines.push_back(ln);
+        in.close();
+
+        static const std::regex sec_re("^\\s*(\\w+)\\s*=\\s*\\{");
+        std::string cur_sec;
+        int hits = 0;
+        for (auto& line : lines)
+        {
+            std::smatch m;
+            if (std::regex_search(line, m, sec_re)) { cur_sec = m[1]; continue; }
+            for (const auto& [dotted, val] : kv)
+            {
+                const size_t dot = dotted.find('.');
+                if (dot == std::string::npos || dotted.substr(0, dot) != cur_sec) continue;
+                const std::string key = dotted.substr(dot + 1);
+                const std::regex key_re("^\\s*" + key + "\\s*=\\s*(-?[0-9.]+)(.*)$");
+                std::smatch km;
+                if (std::regex_search(line, km, key_re))
+                {
+                    line = line.substr(0, km.position(1)) + val + km[2].str();
+                    ++hits;
+                }
+            }
+        }
+        if (hits != static_cast<int>(kv.size())) return false;
+        std::ofstream out(path, std::ios::trunc);
+        for (size_t i = 0; i < lines.size(); ++i) out << lines[i] << (i + 1 < lines.size() ? "\n" : "");
+        return out.good();
+    };
+
+    // 可热调参数白名单（main 作为组合根知道哪些键能热改；database/admin 段需重启，不开放）
+    auto get_config = [&] {
+        return std::vector<std::pair<std::string, std::string>>{
+            {"game.win_kills",                std::to_string(cfg.room.room_rules.kills_to_win)},
+            {"game.respawn_ms",               std::to_string(cfg.room.respawn_delay_ms)},
+            {"game.max_players",              std::to_string(cfg.room.room_rules.max_players)},
+            {"network.heartbeat_timeout_ms",  std::to_string(cfg.session.heartbeat_timeout_ms)},
+            {"network.scan_interval_ms",      std::to_string(cfg.session.scan_interval_ms)},
+        };
+    };
+    auto set_config = [&](const std::vector<std::pair<std::string, std::string>>& kv) -> std::string {
+        static const std::set<std::string> allowed = {
+            "game.win_kills", "game.respawn_ms", "game.max_players",
+            "network.heartbeat_timeout_ms", "network.scan_interval_ms"};
+        for (const auto& [k, v] : kv)
+            if (!allowed.count(k)) return "非法配置键: " + k;
+        if (!rewriteLuaValues("config.lua", kv)) return "config.lua 写入失败（键不存在或文件不可写）";
+        applyConfigFromLua();                 // 此闭包在主 loop 里执行（routeLocked），同步热载
+        return "";
+    };
+
     adapters::AdminApi adminApi(sessions, rooms, server,
                                 [&loop](std::function<void()> f) { loop.queueInLoop(std::move(f)); },
-                                cfg.admin_token, reloadConfigFn);
+                                cfg.admin_token, reloadConfigFn, get_config, set_config);
     adapters::AdminHttpServer adminHttp;
     if (cfg.admin_port != 0)
     {

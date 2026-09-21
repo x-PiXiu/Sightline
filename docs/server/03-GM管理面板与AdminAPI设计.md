@@ -160,3 +160,16 @@ GET  /api/top-kills       → [{ account_id, kills }]
 - 单测 7/7：hitscan / room / room_service / logger / lua / storage / account_repo 全绿
 - curl 冒烟 11 端点：鉴权 401×2 / stats / players / rooms / top-kills / kick 离线错误 / reload / 面板 200 / 未知路由 404 / 存活复核 全过
 - 端到端（smoke_admin.py）：双人自动匹配同房开战 → Admin 观察一致 → Admin 踢人（被踢方收 Kick 通告+断线，另一人保留）→ 进程优雅退出+端口释放
+
+### 7.5 配置热更面板化（2026-09-22 补充）
+
+GM 面板从"只能重载文件"升级为"在线改参数并热更"：
+
+- **GET /api/config** → 当前生效的可调参数快照（5 个数值键）。
+- **POST /api/config** `{"updates":{"game.win_kills":5}}` → 写回 config.lua + 立即热载，返回 `{"ok":true}`。
+- **可热调白名单**（main 作为组合根持有）：`game.win_kills / respawn_ms / max_players`、`network.heartbeat_timeout_ms / scan_interval_ms`。database/admin 段需重启，不开放。
+- **Lua 文本改写器**（main 匿名命名空间）：逐行只替换命中键的"值 token"——行内 `-- 注释` 与整体结构原样保留；全部键命中才写盘（hits 不齐拒绝半写）。
+- **语义与控制台 reload 一致**：进行中对局不受影响，新开局生效；非法键 400 拒绝。
+- 依赖方向不变：AdminApi 只做 JSON↔键值对翻译，读写在 main 注入的 ConfigGetter/ConfigSetter 回调；application/domain 零改动。
+
+面板侧：新增"配置热更"卡片，输入框只按需读取（不随 5s 自动刷新，避免覆盖正在输入的值）；保存后回读服务端校验后的最终值；原"热更配置"按钮改名"从文件重载"（手动编辑文件后的磁盘→内存重载）。

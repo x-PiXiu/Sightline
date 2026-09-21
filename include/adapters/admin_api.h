@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <regex>
 #include <functional>
 #include "adapters/admin_http_server.h"
 #include "adapters/game_server.h"
@@ -31,13 +32,20 @@ public:
     using PostToMain = std::function<void(std::function<void()>)>;
     /** reloadConfig：config.lua 热载（main 注入，与控制台 reload 同一实现） */
     using ReloadFn = std::function<void()>;
+    /** configGetter：当前生效的可调参数快照（key 有序，值保证为数字字面量） */
+    using ConfigGetter = std::function<std::vector<std::pair<std::string, std::string>>()>;
+    /** configSetter：写回 config.lua + 立即热载；返回空串 = 成功，否则为错误信息。
+     *  白名单校验归 main（组合根知道哪些键可热调），本层只做 JSON↔键值对翻译 */
+    using ConfigSetter = std::function<std::string(const std::vector<std::pair<std::string, std::string>>&)>;;
 
     AdminApi(app::SessionService& sessions, app::RoomService& rooms,
              GameServer& server, PostToMain post_to_main,
-             std::string token, ReloadFn reload_config)
+             std::string token, ReloadFn reload_config,
+             ConfigGetter get_config = {}, ConfigSetter set_config = {})
         : sessions_(sessions), rooms_(rooms), server_(server),
           post_to_main_(std::move(post_to_main)), token_(std::move(token)),
           reload_config_(std::move(reload_config)),
+          get_config_(std::move(get_config)), set_config_(std::move(set_config)),
           started_at_(std::chrono::steady_clock::now()) {}
 
     HttpResponse handle(const HttpRequest& req)
@@ -78,7 +86,9 @@ private:
         if (is_get && req.path == "/api/players")    return {200, "application/json", playersJson()};
         if (is_get && req.path == "/api/rooms")      return {200, "application/json", roomsJson()};
         if (is_get && req.path == "/api/top-kills")  return {200, "application/json", topKillsJson()};
+        if (is_get && req.path == "/api/config")     return {200, "application/json", configJson()};
         if (is_post && req.path == "/api/kick")      return {200, "application/json", kick(req.body)};
+        if (is_post && req.path == "/api/config")    return configSet(req.body);
         if (is_post && req.path == "/api/reload-config")
         {
             if (!reload_config_) return {500, "application/json", err("reload not wired")};
@@ -86,6 +96,39 @@ private:
             return {200, "application/json", "{\"ok\":true}"};
         }
         return {404, "application/json", err("unknown route")};
+    }
+
+    // ---- GET /api/config：当前生效的可调参数 ----
+    std::string configJson()
+    {
+        if (!get_config_) return err("config getter not wired");
+        std::ostringstream o;
+        o << "{\"config\":{";
+        bool first = true;
+        for (const auto& [k, v] : get_config_())
+        {
+            if (!first) o << ",";
+            first = false;
+            o << jstr(k) << ":" << v;          // v 为数字字面量（main 侧保证）
+        }
+        o << "}}";
+        return o.str();
+    }
+
+    // ---- POST /api/config：body {"updates":{"game.win_kills":5,...}} → 写回 + 热载 ----
+    HttpResponse configSet(const std::string& body)
+    {
+        if (!set_config_) return {500, "application/json", err("config setter not wired")};
+        std::vector<std::pair<std::string, std::string>> updates;
+        static const std::regex re("\"([^\"]+)\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)");
+        for (auto it = std::sregex_iterator(body.begin(), body.end(), re);
+             it != std::sregex_iterator(); ++it)
+            updates.emplace_back((*it)[1].str(), (*it)[2].str());
+        if (updates.empty())
+            return {400, "application/json", err("no numeric updates found (body: {\"updates\":{...}})")};
+        if (const std::string e = set_config_(updates); !e.empty())
+            return {400, "application/json", err(e)};
+        return {200, "application/json", "{\"ok\":true}"};
     }
 
     // ---- GET /api/stats：连接/房间/流量/运行时长 ----
@@ -203,6 +246,8 @@ private:
     PostToMain           post_to_main_;
     std::string          token_;
     ReloadFn             reload_config_;
+    ConfigGetter         get_config_;
+    ConfigSetter         set_config_;
     std::chrono::steady_clock::time_point started_at_;
 };
 

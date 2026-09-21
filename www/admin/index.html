@@ -29,6 +29,9 @@
   .b-play { background:#1e3b2a; color:#7fdca4; }
   #msg { color:var(--dim); font-size:12px; margin-top:8px; min-height:18px; }
   .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .cfggrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
+  .cfggrid label { color:var(--dim); font-size:12px; display:block; }
+  .cfggrid input { width:100%; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -39,7 +42,7 @@
     <input id="token" type="password" placeholder="Admin Token">
     <button onclick="saveToken()">保存</button>
     <button class="ghost" onclick="tick()">手动刷新</button>
-    <button class="ghost" onclick="reloadConfig()">热更配置</button>
+    <button class="ghost" onclick="reloadConfig()">从文件重载</button>
   </div>
 </div>
 
@@ -53,6 +56,15 @@
   <div class="card">
     <h2>击杀排行榜 Top 10</h2>
     <table id="top"><thead><tr><th>#</th><th>账号 ID</th><th>击杀</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>配置热更（保存 = 写入 config.lua 并立即热载；进行中对局不受影响，新开局生效）</h2>
+    <div class="cfggrid" id="cfggrid"></div>
+    <button onclick="saveConfig()">保存并热更</button>
+    <button class="ghost" onclick="loadConfig()">放弃改动，重新读取</button>
   </div>
 </div>
 
@@ -141,11 +153,46 @@ async function kick(pid, name){
 
 async function reloadConfig(){
   const r = await api('/api/reload-config', {method:'POST'});
-  note(r.ok ? 'config.lua 已热载（新开局生效）' : '热载失败：' + (r.error||''));
+  note(r.ok ? '已从 config.lua 热载（新开局生效）' : '热载失败：' + (r.error||''));
 }
 
+// ---- 配置热更：只按需读写，不进 5s 自动刷新（避免覆盖正在输入的值）----
+const CONFIG_KEYS = ['game.win_kills','game.respawn_ms','game.max_players',
+                     'network.heartbeat_timeout_ms','network.scan_interval_ms'];
+const CFG_LABELS = {'game.win_kills':'胜利击杀数','game.respawn_ms':'重生间隔 (ms)',
+                    'game.max_players':'单房人数上限','network.heartbeat_timeout_ms':'心跳超时 (ms)',
+                    'network.scan_interval_ms':'心跳扫描周期 (ms)'};
+
+function renderCfg(){
+  $('cfggrid').innerHTML = CONFIG_KEYS.map(k =>
+    `<label>${CFG_LABELS[k]}<input id="cfg:${k}" type="number" step="1"></label>`).join('');
+}
+
+async function loadConfig(){
+  const r = await api('/api/config');
+  if (r.error) { note('配置读取失败：' + r.error); return; }
+  for (const k of CONFIG_KEYS) {
+    const el = document.getElementById('cfg:' + k);
+    if (el && r.config[k] !== undefined) el.value = r.config[k];
+  }
+}
+
+async function saveConfig(){
+  const updates = {};
+  for (const k of CONFIG_KEYS) {
+    const v = Number(document.getElementById('cfg:' + k).value);
+    if (!Number.isFinite(v) || v < 0) { note('非法数值：' + CFG_LABELS[k]); return; }
+    updates[k] = v;
+  }
+  const r = await api('/api/config', {method:'POST', body: JSON.stringify({updates})});
+  note(r.ok ? '已写入 config.lua 并热载（新开局生效）' : '热更失败：' + (r.error || ''));
+  loadConfig();   // 回读确认（服务端校验后的最终值）
+}
+
+renderCfg();
 tick();
 setInterval(tick, 5000);
+loadConfig();
 </script>
 </body>
 </html>
