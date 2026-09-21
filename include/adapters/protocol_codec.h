@@ -111,8 +111,11 @@ public:
                 c.pass_hash.assign(reinterpret_cast<const char*>(p + 2 + alen), 64);
                 return c;
             }
-            case MsgId::C2S_JoinRoom:
-                return JoinRoomCommand{};
+            case MsgId::C2S_JoinRoom: {   // D4 加尾：[4B room_id]（0=自动匹配，旧客户端兼容）
+                JoinRoomCommand c;
+                if (n >= 4) c.room_id = rd32(p);
+                return c;
+            }
             case MsgId::C2S_Move: {
                 if (n < 16) return std::nullopt;
                 MoveCommand c{rdVec3(p), rdF32(p + 12)};

@@ -36,9 +36,15 @@ public:
     /** Lua 热更入口：新开局按新规则（进行中对局不受影响，15 号 01 文档 reload） */
     void updateConfig(const Config& c) { config_ = c; }
 
-    // ---- 进房/匹配：找一间能进的 WAITING 房，否则开新房；人齐自动开战 ----
-    void handleJoin(PlayerId pid, const std::string& name, std::uint64_t account_id = 0) {
-        domain::Room* room = findJoinableRoom();
+    // ---- 进房/匹配：room_id=0 自动匹配，>0 加入指定房间；人齐自动开战 ----
+    void handleJoin(PlayerId pid, const std::string& name, std::uint64_t account_id = 0,
+                    std::uint32_t room_id = 0) {
+        domain::Room* room = nullptr;
+        if (room_id != 0)
+        {
+            auto it = rooms_.find(room_id);
+            if (it != rooms_.end() && it->second.canJoin()) room = &it->second;
+        }
         if (!room) {
             rooms_[next_room_id_] = domain::Room(next_room_id_, config_.room_rules);
             room = &rooms_[next_room_id_];

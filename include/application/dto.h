@@ -24,7 +24,9 @@ struct RegisterCommand {        // D2：账号注册（存储线程异步处理�
     std::string account;
     std::string pass_hash;
 };
-struct JoinRoomCommand {};
+struct JoinRoomCommand {
+    std::uint32_t room_id = 0;   // 0 = 自动匹配；>0 = 加入指定房间（加尾不改头，旧客户端兼容）
+};
 struct MoveCommand  { Vec3 pos; float yaw;                    // 发送者身份由会话上下文提供
                       uint8_t flags = 0;                      // 动画同步：bit0=端枪 bit1=下蹲 bit2=跳跃
                       float aim_pitch = 0.f; };               // 视线俯仰角（度）

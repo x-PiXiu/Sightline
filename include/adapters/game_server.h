@@ -219,8 +219,8 @@ private:
                 }
             });
     }
-    void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::JoinRoomCommand&) {
-        if (pid) rooms_.handleJoin(pid, sessions_.name(pid), sessions_.accountIdOf(pid));
+    void handle(const TcpConnectionPtr&, app::PlayerId pid, const app::JoinRoomCommand& c) {
+        if (pid) rooms_.handleJoin(pid, sessions_.name(pid), sessions_.accountIdOf(pid), c.room_id);
     }
 
     // ---- D4 大厅：房间列表 / 建房 / 排行榜 / 战绩查询 ----
