@@ -84,7 +84,9 @@ async function api(path, opt={}) {
   try {
     return JSON.parse(text);
   } catch (e) {
-    // 响应不是 JSON：请求没到 Admin API（被代理/其它服务劫持），或页面不是从服务器打开的
+    // 响应不是 JSON：请求没到 Admin API（被代理/IDE 预览服务器劫持），或页面不是从服务器打开的
+    if (text.includes('404 Not Found</title>'))
+      return { error: '这个页面不是从 Admin 服务器打开的（像是 IDE 预览/静态服务器）。请在浏览器地址栏直接输入 http://127.0.0.1:8080/ 打开' };
     return { error: `收到非 JSON 响应（HTTP ${r.status}）开头 80 字符: ${text.slice(0, 80)}` };
   }
 }
