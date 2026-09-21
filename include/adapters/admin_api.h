@@ -41,11 +41,13 @@ public:
     AdminApi(app::SessionService& sessions, app::RoomService& rooms,
              GameServer& server, PostToMain post_to_main,
              std::string token, ReloadFn reload_config,
-             ConfigGetter get_config = {}, ConfigSetter set_config = {})
+             ConfigGetter get_config = {}, ConfigSetter set_config = {},
+             std::string panel_file = {})
         : sessions_(sessions), rooms_(rooms), server_(server),
           post_to_main_(std::move(post_to_main)), token_(std::move(token)),
           reload_config_(std::move(reload_config)),
           get_config_(std::move(get_config)), set_config_(std::move(set_config)),
+          panel_file_(std::move(panel_file)),
           started_at_(std::chrono::steady_clock::now()) {}
 
     HttpResponse handle(const HttpRequest& req)
@@ -217,11 +219,12 @@ private:
         return "{\"ok\":true}";
     }
 
-    // ---- 面板页：GET / 返回静态 HTML（HTTP 线程读盘，不占游戏 loop）----
+    // ---- 面板页：GET / 返回静态 HTML（HTTP 线程读盘，不占游戏 loop；路径由 main 解析注入）----
     HttpResponse servePanel()
     {
-        std::ifstream f("www/admin/index.html", std::ios::binary);
-        if (!f) return {404, "text/plain", "www/admin/index.html not found (run server from repo root)"};
+        const std::string path = panel_file_.empty() ? "www/admin/index.html" : panel_file_;
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return {404, "text/plain", "panel file not found: " + path};
         std::ostringstream ss; ss << f.rdbuf();
         return {200, "text/html; charset=utf-8", ss.str()};
     }
@@ -248,6 +251,7 @@ private:
     ReloadFn             reload_config_;
     ConfigGetter         get_config_;
     ConfigSetter         set_config_;
+    std::string          panel_file_;
     std::chrono::steady_clock::time_point started_at_;
 };
 

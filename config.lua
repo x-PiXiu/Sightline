@@ -15,7 +15,7 @@ return {
 
     game = {
         win_kills   = 3,               -- 热更演示：改为 5 → 控制台 reload → 5 杀判胜
-        respawn_ms  = 2500,
+        respawn_ms  = 3000,
         max_players = 8,
     },
 

@@ -173,3 +173,11 @@ GM 面板从"只能重载文件"升级为"在线改参数并热更"：
 - 依赖方向不变：AdminApi 只做 JSON↔键值对翻译，读写在 main 注入的 ConfigGetter/ConfigSetter 回调；application/domain 零改动。
 
 面板侧：新增"配置热更"卡片，输入框只按需读取（不随 5s 自动刷新，避免覆盖正在输入的值）；保存后回读服务端校验后的最终值；原"热更配置"按钮改名"从文件重载"（手动编辑文件后的磁盘→内存重载）。
+
+### 7.6 启动目录无关化（2026-09-22 补充）
+
+CLion 等启动器默认工作目录在构建目录，此前按 CWD 查找 config.lua / www / logs 会全部落空（表现为启动日志"config.lua 未加载成功"，面板 404）。
+
+修复：main 新增 `resolveRepoPath(rel)`——查找顺序 ① CWD → ② `/proc/self/exe` 所在目录 → ③ 其父目录（build 目录的上级即仓库根），命中即返回；全部未命中原样返回保持旧行为。config 加载/热载/写回统一使用解析后的 `configPath`，面板路径与日志目录同样解析。
+
+效果：从任意目录启动均可正确装配（已验证从 /tmp 启动全链路正常）。CLion 侧无需再手动设置 Working directory；若设置，建议指向项目根（`$ProjectFileDir$`）。

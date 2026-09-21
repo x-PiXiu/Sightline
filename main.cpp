@@ -32,6 +32,28 @@ void onSignal(int) {
     if (g_loop) g_loop->quit();   // quit 内部只写原子标志 + eventfd，信号上下文安全
 }
 
+// 相对路径解析：CLion 等启动器默认工作目录在构建目录，而 config.lua/www/logs
+// 按仓库根组织。查找顺序：① CWD（手动从仓库根启动）→ ② 可执行文件所在目录
+// → ③ 其父目录（build-wsl/ 的上级即仓库根）。都找不到则原样返回（保持旧行为）。
+std::filesystem::path resolveRepoPath(const std::string& rel)
+{
+    namespace fs = std::filesystem;
+    if (fs::exists(rel)) return rel;
+    std::error_code ec;
+    const auto exe = fs::read_symlink("/proc/self/exe", ec);   // Linux：exe 真实位置
+    if (!ec)
+    {
+        const auto dir = exe.parent_path();
+        for (const auto& base : {dir, dir / ".."})
+        {
+            std::error_code ec2;
+            const auto p = base / rel;
+            if (fs::exists(p, ec2)) return p;
+        }
+    }
+    return rel;
+}
+
 // 服务(GameServer)与服务(Session/Room)互相需要的解法：
 // 组装期先用代理占位，GameServer 构造完成后绑定真身。代理属于 main，不污染分层。
 class ChannelProxy final : public sightline::app::IGameChannel {
@@ -58,8 +80,9 @@ int main(int argc, char* argv[]) {
     using namespace sightline;
 
     // ---- 配置装配（优先级：命令行 > config.lua > 内置默认；15 号 01 文档 D1）----
+    const std::string configPath = resolveRepoPath("config.lua").string();   // 热载/写回须用同一路径
     LuaVM vm;
-    const bool luaOk = vm.loadFile("config.lua");
+    const bool luaOk = vm.loadFile(configPath);
     SightlineConfig cfg;
     if (luaOk) cfg.applyLua(vm);                                                // Lua 覆盖内置默认
     if (argc > 1) cfg.port = static_cast<uint16_t>(std::stoi(argv[1]));         // 命令行最高优先
@@ -73,12 +96,14 @@ int main(int argc, char* argv[]) {
     logger.setLogLevel(cfg.debug_log ? common::logger::LogLevel::DEBUG
                                      : common::logger::LogLevel::INFO);
     if (cfg.file_log) {   // 生产：追加滚动文件（8MB×5 个），控制台留给开发期
-        std::filesystem::create_directories(cfg.log_dir);
+        const std::string log_dir = resolveRepoPath(cfg.log_dir).string();
+        std::filesystem::create_directories(log_dir);
         logger.addSink(std::make_unique<common::logger::FileSink>(
-            cfg.log_dir + "/sightline.log", 8 * 1024 * 1024, 5));
+            log_dir + "/sightline.log", 8 * 1024 * 1024, 5));
     }
     if (!luaOk)
-        logger.warn("config.lua 未加载成功——全部使用内置默认配置");
+        logger.warn("config.lua 未找到（尝试过: " + configPath +
+                    "）——全部使用内置默认配置");
 
     // ---- 装配线 ----
     common::network::EventLoop loop(cfg.loop);          // 主 loop：acceptor + 定时器 + 游戏逻辑
@@ -140,7 +165,7 @@ int main(int argc, char* argv[]) {
 
     // ---- GM 管理 API（03 文档）：HTTP 线程收请求，queueInLoop 跳主 loop 取数/操作 ----
     auto applyConfigFromLua = [&] {                 // 同步热载（须在主 loop 线程调用）
-        if (vm.hotReload("config.lua"))
+        if (vm.hotReload(configPath))
         {
             cfg.applyLua(vm);
             rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
@@ -207,14 +232,15 @@ int main(int argc, char* argv[]) {
             "network.heartbeat_timeout_ms", "network.scan_interval_ms"};
         for (const auto& [k, v] : kv)
             if (!allowed.count(k)) return "非法配置键: " + k;
-        if (!rewriteLuaValues("config.lua", kv)) return "config.lua 写入失败（键不存在或文件不可写）";
+        if (!rewriteLuaValues(configPath, kv)) return "config.lua 写入失败（键不存在或文件不可写）";
         applyConfigFromLua();                 // 此闭包在主 loop 里执行（routeLocked），同步热载
         return "";
     };
 
     adapters::AdminApi adminApi(sessions, rooms, server,
                                 [&loop](std::function<void()> f) { loop.queueInLoop(std::move(f)); },
-                                cfg.admin_token, reloadConfigFn, get_config, set_config);
+                                cfg.admin_token, reloadConfigFn, get_config, set_config,
+                                resolveRepoPath("www/admin/index.html").string());
     adapters::AdminHttpServer adminHttp;
     if (cfg.admin_port != 0)
     {
