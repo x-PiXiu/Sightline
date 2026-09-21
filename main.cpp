@@ -8,6 +8,8 @@
 #include <thread>
 #include "sightline_config.h"
 #include "adapters/game_server.h"
+#include "adapters/admin_api.h"
+#include "adapters/admin_http_server.h"
 #include "adapters/timer_wheel_adapter.h"
 #include "adapters/mysql_account_repository.h"
 #include "adapters/mysql_match_repository.h"
@@ -133,6 +135,33 @@ int main(int argc, char* argv[]) {
     proxy.bind(server);
     server.start();
 
+    // ---- GM 管理 API（03 文档）：HTTP 线程收请求，queueInLoop 跳主 loop 取数/操作 ----
+    auto reloadConfigFn = [&] {                        // 控制台 reload 与 Admin API 共用同一实现
+        g_loop->queueInLoop([&] {
+            if (vm.hotReload("config.lua"))
+            {
+                cfg.applyLua(vm);
+                rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
+                sessions.updateConfig(cfg.session);
+                logger.info("config reloaded: win_kills=" +
+                            std::to_string(cfg.room.room_rules.kills_to_win) +
+                            " (新开局生效)", __FILE__, __LINE__);
+            }
+        });
+    };
+    adapters::AdminApi adminApi(sessions, rooms, server,
+                                [&loop](std::function<void()> f) { loop.queueInLoop(std::move(f)); },
+                                cfg.admin_token, reloadConfigFn);
+    adapters::AdminHttpServer adminHttp;
+    if (cfg.admin_port != 0)
+    {
+        adminHttp.start(cfg.admin_port, [&adminApi](const adapters::HttpRequest& r) {
+            return adminApi.handle(r);
+        });
+        logger.info("[Admin] GM API on http://0.0.0.0:" + std::to_string(cfg.admin_port) +
+                    "  (面板 / ，API /api/*，Bearer 鉴权)", __FILE__, __LINE__);
+    }
+
     // 可观测性：周期上报（走时间轮的周期定时器）
     loop.runEvery(cfg.stats_interval_s * 1000, [&server] { server.logStats(); });
 
@@ -151,17 +180,7 @@ int main(int argc, char* argv[]) {
         {
             if (line == "reload")
             {
-                g_loop->queueInLoop([&] {
-                    if (vm.hotReload("config.lua"))
-                    {
-                        cfg.applyLua(vm);
-                        rooms.updateConfig(cfg.room);     // 热应用：新开局按新规则（进行中对局不变）
-                        sessions.updateConfig(cfg.session);
-                        logger.info("config reloaded: win_kills=" +
-                                    std::to_string(cfg.room.room_rules.kills_to_win) +
-                                    " (新开局生效)", __FILE__, __LINE__);
-                    }
-                });
+                reloadConfigFn();   // 与 GM Admin API 共用同一热载实现
             }
             else if (line == "quit")
             {
@@ -187,6 +206,7 @@ int main(int argc, char* argv[]) {
     // 控制台线程阻塞在 getline(stdin)——join 会永远等待。
     // detach 让它随进程退出自然消亡（daemon 线程不需要 join）。
     if (consoleThread.joinable()) consoleThread.detach();
+    adminHttp.stop();      // 先停 HTTP 线程：它还会 queueInLoop，须早于 loop 析构
     storageIO.stop();
     logger.info("Sightline stopped", __FILE__, __LINE__);
     return 0;

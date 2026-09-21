@@ -11,6 +11,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <vector>
 #include "application/dto.h"
 #include "application/account_service.h"
 #include "application/ports/i_account_repository.h"
@@ -137,6 +138,28 @@ public:
     PlayerId playerIdOf(uint64_t conn_id) const {
         auto it = conn_to_player_.find(conn_id);
         return it == conn_to_player_.end() ? 0 : it->second;
+    }
+
+    /** GM 面板：在线会话快照（主 loop 线程调用——AdminApi 经 queueInLoop 进入） */
+    struct SessionBrief {
+        PlayerId pid = 0;
+        std::string name;
+        std::uint64_t account_id = 0;
+        bool guest = true;
+    };
+    std::vector<SessionBrief> listSessions() const {
+        std::vector<SessionBrief> out;
+        out.reserve(sessions_.size());
+        for (const auto& [pid, s] : sessions_)
+            out.push_back({pid, s.name, s.account_id, s.guest});
+        return out;
+    }
+
+    /** GM 踢人：语义与心跳超时同款（Kick 通告 + 断开），后续清理走 onDisconnected 正常链 */
+    void kick(PlayerId pid, std::uint8_t reason) {
+        if (!has(pid)) return;
+        channel_.sendTo(pid, KickEvent{reason});
+        channel_.close(pid);
     }
 
     /** 账号查询（战绩落库的身份键；游客/未登录 = 0） */

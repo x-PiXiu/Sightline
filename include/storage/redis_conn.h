@@ -63,18 +63,21 @@ public:
 
     bool ensureConnected()
     {
-        if (connected())
+        if (c_ && c_->err == 0)
         {
-            RedisReply r = command("PING");
+            // 直接发 PING，不经 command()——command 与本方法互调会无限递归（栈溢出）
+            RedisReply r(static_cast<redisReply*>(redisCommand(c_, "PING")));
             if (r.valid() && r.asString() == "PONG") return true;
         }
         return connect();
     }
 
-    /** 通用命令（hiredis printf 风格格式化） */
+    /** 通用命令（hiredis printf 风格格式化）。
+     *  Redis 不可用 → 返回空 reply（valid()==false），调用方按降级处理；
+     *  绝不带空上下文调 redisvCommand（段错误）。 */
     RedisReply command(const char* fmt, ...)
     {
-        ensureConnected();
+        if (!ensureConnected()) return RedisReply(nullptr);
         va_list args;
         va_start(args, fmt);
         void* r = redisvCommand(c_, fmt, args);

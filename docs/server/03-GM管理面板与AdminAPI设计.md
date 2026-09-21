@@ -126,3 +126,37 @@ GET  /api/top-kills       → [{ account_id, kills }]
 | 日期 | 修订 |
 |---|---|
 | 2026-09-21 | 初版：三种形态对比、Web+HTTP Admin API 选型、功能清单（企业标准→Sightline 简易版）、架构图、API 设计、实施排期、面试叙事 |
+
+---
+
+## 七、实现记录（2026-09-22，P0 全量落地）
+
+### 7.1 交付清单
+
+| 组件 | 文件 | 说明 |
+|---|---|---|
+| HTTP 服务 | include/adapters/admin_http_server.h | 独立阻塞线程 + 极简 HTTP/1.1 解析（请求行/Content-Length/Authorization），8KB 头部上限 + 64KB body 上限防恶意内存，收发 5s SO_*TIMEO 防半开连接挂死 |
+| 路由+鉴权 | include/adapters/admin_api.h | Bearer token 鉴权；promise/future + queueInLoop 同步跳主 loop——HTTP 线程不碰游戏状态，逻辑保持单线程零锁；2s 超时兜底主 loop 卡死 |
+| 面板 | www/admin/index.html | 单文件 HTML+JS（无框架），token 存 localStorage，状态/玩家/房间/排行四卡片 + 踢人/热更按钮，5s 自动刷新；由 Admin API 同源伺服（GET /），免 CORS |
+| 装配 | main.cpp | reloadConfigFn 提为控制台/Admin API 共用；adminHttp.stop() 退场先于 storageIO |
+| 配置 | config.lua [admin] 段 | port（0=关闭）+ token（Bearer 凭据，正式部署必须更换） |
+| 端到端 | scripts/smoke_admin.py | 双客户端登录→自动匹配→Admin 核对同房→踢人核对离线 全链路冒烟 |
+
+### 7.2 与设计稿的偏差（含依据）
+
+1. **HTTP 不复用游戏 epoll Reactor（设计稿步骤 1 原计划复用）**——管理请求不可信且低频，解析崩溃/慢连接不能连累游戏 EventLoop；改独立阻塞线程，串行处理一两个浏览器绰绰有余。
+2. **鉴权为固定 Bearer token**——设计稿漏了认证（缺口补丁）。面板页本身免 token（否则浏览器无法加载页面），token 由页面输入经 fetch 头携带；token 变更需重启（同端口语义）。
+3. **/api/players 不含 kills/deaths**——成绩真源在 domain::Room::scoreBoard，MVP 先以房间维度观察；需要时按 roomIdOf 同款姿势扩展。
+4. **top-kills 在主 loop 同步查 Redis**——管理查询低频 + 内网 RTT 亚毫秒可接受；高频化应改存储线程+回投（P1 演进项）。
+
+### 7.3 顺带排掉的三颗雷（冒烟测试的直接产出）
+
+1. **redis_conn.h 无限递归 + 空上下文解引用（致命，D4 潜伏）**：command() 与 ensureConnected() 互调 PING 构成无限递归（Redis 可连时栈溢出）；Redis 不可达时向 redisvCommand 传空上下文段错误。排行榜查询有 C2S 入口——等于客户端一个查询可打挂服务器。修复：PING 直接走 redisCommand 不经 command()；command() 连不上返回空 reply 降级。
+2. **handleJoin 丢失 findJoinableRoom（致命，D4 提交 01c6ab1 回归）**：结构修复时误删自动匹配行，每次加入都开新房，双人永远凑不齐一局（应用层单测 test_room_service 拦截；HEAD 基线复现确认非新引入）。修复：恢复 `if (!room) room = findJoinableRoom();`。
+3. **AdminHttpServer::stop() 死锁（本文件初版缺陷）**：Linux 上 close() 监听 fd 不会唤醒阻塞在 accept() 的线程，主线程 join 死等、进程退不干净。修复：先 shutdown(fd, SHUT_RDWR) 唤醒 accept 再 join（worker 若在 recv() 中最多等 5s 超时）。
+
+### 7.4 验证记录
+
+- 单测 7/7：hitscan / room / room_service / logger / lua / storage / account_repo 全绿
+- curl 冒烟 11 端点：鉴权 401×2 / stats / players / rooms / top-kills / kick 离线错误 / reload / 面板 200 / 未知路由 404 / 存活复核 全过
+- 端到端（smoke_admin.py）：双人自动匹配同房开战 → Admin 观察一致 → Admin 踢人（被踢方收 Kick 通告+断线，另一人保留）→ 进程优雅退出+端口释放

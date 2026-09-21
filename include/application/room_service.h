@@ -45,7 +45,8 @@ public:
             auto it = rooms_.find(room_id);
             if (it != rooms_.end() && it->second.canJoin()) room = &it->second;
         }
-        if (!room) {
+        if (!room) room = findJoinableRoom();   // 自动匹配：优先加入既有可加入房间
+        if (!room) {                            // 没有可加入的才建新房
             rooms_[next_room_id_] = domain::Room(next_room_id_, config_.room_rules);
             room = &rooms_[next_room_id_];
             ++next_room_id_;
@@ -152,14 +153,25 @@ public:
         std::uint8_t   mode  = 1;
         std::uint32_t  cur_players = 0;
         std::uint32_t  max_players = 0;
+        // GM 面板扩展字段（协议编码不读它们——线上包不变，加尾不改头）
+        std::uint8_t   state = 0;          // domain::RoomState 枚举值
+        std::uint32_t  elapsed_sec = 0;
     };
 
     std::vector<RoomBrief> listRooms() const {
         std::vector<RoomBrief> out;
         for (const auto& [id, room] : rooms_)
             out.push_back({id, 1, static_cast<std::uint32_t>(room.playerCount()),
-                           static_cast<std::uint32_t>(room.rules().max_players)});
+                           static_cast<std::uint32_t>(room.rules().max_players),
+                           static_cast<std::uint8_t>(room.state()),
+                           static_cast<std::uint32_t>(room.elapsedSec())});
         return out;
+    }
+
+    /** GM 面板：玩家所在房间号（不在任何房间=0；主 loop 线程调用） */
+    domain::RoomId roomIdOf(PlayerId pid) const {
+        auto it = player_room_.find(pid);
+        return it == player_room_.end() ? 0 : it->second;
     }
 
     domain::RoomId createRoom() {

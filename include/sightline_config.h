@@ -25,6 +25,10 @@ struct SightlineConfig {
     bool file_log = false;                               // true: 追加 FileSink（滚动）
     std::string log_dir = "logs";
 
+    // GM 管理 API（03 文档）：0=关闭；token 为 Bearer 凭据，正式部署必须改默认值
+    uint16_t admin_port = 8080;
+    std::string admin_token = "sightline-dev-token";
+
     common::network::EventLoopConfig loop;
     app::SessionService::Config session;
     app::RoomService::Config room;
@@ -53,6 +57,8 @@ struct SightlineConfig {
                                                 room.room_rules.max_players);
         room.respawn_delay_ms        = vm.getInt("game", "respawn_ms",
                                                 room.respawn_delay_ms);
+        admin_port   = static_cast<uint16_t>(vm.getInt("admin", "port", admin_port));
+        admin_token  = vm.getString("admin", "token", admin_token);
     }
 };
 

@@ -19,6 +19,13 @@ return {
         max_players = 8,
     },
 
+    -- GM 管理 API（docs/server/03）：port=0 关闭；token 为 Bearer 凭据
+    -- ⚠️ token 为开发期默认值；正式部署必须更换（后续接环境变量注入）
+    admin = {
+        port  = 8080,
+        token = "sightline-dev-token",
+    },
+
     -- D2 起由存储模块消费（文档：docs/server/01）——扁平键（main.cpp getString("database", key) 直读）
     -- ⚠️ 凭据为开发期临时值；正式部署时改由环境变量注入，不入库不入 git
     database = {

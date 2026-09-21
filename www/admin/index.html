@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Sightline GM 面板</title>
+<style>
+  :root { --bg:#12141a; --card:#1b1f2a; --line:#2a3040; --txt:#d7dce6; --dim:#7a8299; --acc:#4f8cff; --ok:#3fbf6f; --bad:#e05555; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.6 "Segoe UI",system-ui,sans-serif; padding:24px; }
+  h1 { font-size:18px; margin-bottom:16px; }
+  h1 span { color:var(--dim); font-size:12px; font-weight:normal; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:300px; flex:1; }
+  .card h2 { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:normal; }
+  .num { font-variant-numeric:tabular-nums; }
+  .stat { display:inline-block; margin:4px 18px 4px 0; }
+  .stat b { display:block; font-size:20px; color:var(--acc); font-variant-numeric:tabular-nums; }
+  .stat i { font-style:normal; color:var(--dim); font-size:12px; }
+  input,button { font:inherit; border-radius:6px; }
+  input { background:#0e1016; border:1px solid var(--line); color:var(--txt); padding:6px 10px; width:220px; }
+  button { background:var(--acc); border:none; color:#fff; padding:6px 14px; cursor:pointer; margin-left:8px; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--dim); }
+  button.kick { background:var(--bad); padding:2px 10px; font-size:12px; }
+  .badge { padding:1px 8px; border-radius:10px; font-size:12px; }
+  .b-wait { background:#2c3550; color:#9db4e8; }
+  .b-play { background:#1e3b2a; color:#7fdca4; }
+  #msg { color:var(--dim); font-size:12px; margin-top:8px; min-height:18px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Sightline GM 面板 <span>http 服务 = 游戏进程本体 · Bearer 鉴权</span></h1>
+  <div>
+    <input id="token" type="password" placeholder="Admin Token">
+    <button onclick="saveToken()">保存</button>
+    <button class="ghost" onclick="tick()">手动刷新</button>
+    <button class="ghost" onclick="reloadConfig()">热更配置</button>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>服务器状态（5s 自动刷新）</h2>
+    <div id="stats"></div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>击杀排行榜 Top 10</h2>
+    <table id="top"><thead><tr><th>#</th><th>账号 ID</th><th>击杀</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>在线玩家</h2>
+    <table id="players"><thead><tr><th>PID</th><th>昵称</th><th>账号</th><th>房间</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>房间</h2>
+    <table id="rooms"><thead><tr><th>房号</th><th>状态</th><th>人数</th><th>时长</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (path, opt={}) => fetch(path, {
+  ...opt,
+  headers: { 'Authorization': 'Bearer ' + (localStorage.gmToken || ''), ...(opt.body?{'Content-Type':'application/json'}:{}) }
+}).then(r => r.json()).catch(e => ({error: String(e)}));
+
+function saveToken(){ localStorage.gmToken = $('token').value; note('token 已保存'); tick(); }
+function note(m){ $('msg').textContent = m; }
+const esc = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const fmt = n => n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : n >= 1024 ? (n/1024).toFixed(1)+' KB' : n;
+
+async function tick(){
+  $('token').value = localStorage.gmToken || '';
+  const st = await api('/api/stats');
+  if (st.error) { note('请求失败：' + st.error + '（token 对吗？）'); return; }
+  note('');
+  $('stats').innerHTML =
+    `<span class="stat"><b>${st.connections}</b><i>在线连接</i></span>` +
+    `<span class="stat"><b>${st.rooms}</b><i>房间数</i></span>` +
+    `<span class="stat"><b>${st.msgs_in}</b><i>消息入</i></span>` +
+    `<span class="stat"><b>${st.msgs_out}</b><i>消息出</i></span>` +
+    `<span class="stat"><b>${fmt(st.bytes_in)}</b><i>流量入</i></span>` +
+    `<span class="stat"><b>${fmt(st.bytes_out)}</b><i>流量出</i></span>` +
+    `<span class="stat"><b>${Math.floor(st.uptime_sec/60)}m${st.uptime_sec%60}s</b><i>运行时长</i></span>`;
+
+  const pl = await api('/api/players');
+  $('players').querySelector('tbody').innerHTML = (pl.players||[]).map(p =>
+    `<tr><td class="num">${p.player_id}</td><td>${esc(p.name)}</td>` +
+    `<td class="num">${p.guest ? '<i style="color:var(--dim)">游客</i>' : p.account_id}</td>` +
+    `<td class="num">${p.room_id || '-'}</td>` +
+    `<td><button class="kick" onclick="kick(${p.player_id},'${esc(p.name)}')">踢出</button></td></tr>`
+  ).join('') || '<tr><td colspan="5" style="color:var(--dim)">无人在线</td></tr>';
+
+  const rm = await api('/api/rooms');
+  $('rooms').querySelector('tbody').innerHTML = (rm.rooms||[]).map(r => {
+    const [cls, txt] = r.state === 1 ? ['b-play','对战中'] : ['b-wait','等待中'];
+    return `<tr><td class="num">${r.room_id}</td><td><span class="badge ${cls}">${txt}</span></td>` +
+           `<td class="num">${r.cur_players}/${r.max_players}</td>` +
+           `<td class="num">${r.elapsed_sec}s</td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="color:var(--dim)">暂无房间</td></tr>';
+
+  const tp = await api('/api/top-kills');
+  $('top').querySelector('tbody').innerHTML = (tp.top||[]).map((t,i) =>
+    `<tr><td class="num">${i+1}</td><td class="num">${t.account_id}</td><td class="num">${t.kills}</td></tr>`
+  ).join('') || '<tr><td colspan="3" style="color:var(--dim)">暂无数据（结算后写入）</td></tr>';
+}
+
+async function kick(pid, name){
+  if (!confirm(`踢出玩家 ${name}（PID ${pid}）？`)) return;
+  const r = await api('/api/kick', {method:'POST', body: JSON.stringify({player_id: pid})});
+  note(r.ok ? `已踢出 ${name}` : '踢出失败：' + (r.error||''));
+  tick();
+}
+
+async function reloadConfig(){
+  const r = await api('/api/reload-config', {method:'POST'});
+  note(r.ok ? 'config.lua 已热载（新开局生效）' : '热载失败：' + (r.error||''));
+}
+
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>

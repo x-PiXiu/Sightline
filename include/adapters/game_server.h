@@ -95,12 +95,21 @@ public:
         if (cit != nullptr) cit->shutdown();   // 优雅关闭（策略见 TcpConnection）
     }
 
-    // ---- 可观测性（主 loop 周期调用）----
+    // ---- 可观测性（主 loop 周期调用；GM Admin API 亦读取，原子量跨线程安全）----
 
     struct Stats {
         std::atomic<uint64_t> msgs_in{0}, msgs_out{0};
         std::atomic<uint64_t> bytes_in{0}, bytes_out{0};
     };
+
+    size_t connectionCount() {   // 非 const：conns_mutex_ 未标 mutable（与 logStats 同款处理）
+        std::lock_guard<std::mutex> lock(conns_mutex_);
+        return connections_.size();
+    }
+    uint64_t msgsIn()   const { return stats_.msgs_in.load(std::memory_order_relaxed); }
+    uint64_t msgsOut()  const { return stats_.msgs_out.load(std::memory_order_relaxed); }
+    uint64_t bytesIn()  const { return stats_.bytes_in.load(std::memory_order_relaxed); }
+    uint64_t bytesOut() const { return stats_.bytes_out.load(std::memory_order_relaxed); }
 
     void logStats() {
         size_t conns = 0;
