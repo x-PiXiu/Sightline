@@ -71,7 +71,7 @@
 <div class="row">
   <div class="card">
     <h2>在线玩家</h2>
-    <table id="players"><thead><tr><th>PID</th><th>昵称</th><th>账号</th><th>房间</th><th></th></tr></thead><tbody></tbody></table>
+    <table id="players"><thead><tr><th>PID</th><th>昵称</th><th>账号</th><th>房间</th><th>在线</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
   <div class="card">
@@ -107,6 +107,8 @@ function saveToken(){ localStorage.gmToken = $('token').value; note('token 已�
 function note(m){ $('msg').textContent = m; }
 const esc = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const fmt = n => n >= 1048576 ? (n/1048576).toFixed(1)+' MB' : n >= 1024 ? (n/1024).toFixed(1)+' KB' : n;
+const fmtOnline = s => s >= 3600 ? Math.floor(s/3600)+'h'+Math.floor(s%3600/60)+'m'
+                     : s >= 60 ? Math.floor(s/60)+'m'+(s%60)+'s' : s+'s';
 
 async function tick(){
   $('token').value = localStorage.gmToken || '';
@@ -127,8 +129,9 @@ async function tick(){
     `<tr><td class="num">${p.player_id}</td><td>${esc(p.name)}</td>` +
     `<td class="num">${p.guest ? '<i style="color:var(--dim)">游客</i>' : p.account_id}</td>` +
     `<td class="num">${p.room_id || '-'}</td>` +
+    `<td class="num">${fmtOnline(p.online_sec||0)}</td>` +
     `<td><button class="kick" onclick="kick(${p.player_id},'${esc(p.name)}')">踢出</button></td></tr>`
-  ).join('') || '<tr><td colspan="5" style="color:var(--dim)">无人在线</td></tr>';
+  ).join('') || '<tr><td colspan="6" style="color:var(--dim)">无人在线</td></tr>';
 
   const rm = await api('/api/rooms');
   $('rooms').querySelector('tbody').innerHTML = (rm.rooms||[]).map(r => {

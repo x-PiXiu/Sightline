@@ -163,7 +163,8 @@ private:
               << ",\"name\":" << jstr(s.name)
               << ",\"account_id\":" << s.account_id
               << ",\"guest\":" << (s.guest ? "true" : "false")
-              << ",\"room_id\":" << rooms_.roomIdOf(s.pid) << "}";
+              << ",\"room_id\":" << rooms_.roomIdOf(s.pid)
+              << ",\"online_sec\":" << s.online_sec << "}";
         }
         o << "]}";
         return o.str();

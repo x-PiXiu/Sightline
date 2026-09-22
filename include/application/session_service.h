@@ -82,6 +82,7 @@ public:
                     s.name = !r.record.nickname.empty() ? r.record.nickname
                                                         : ("Player" + std::to_string(pid));
                     s.last_active = std::chrono::steady_clock::now();
+                    s.login_at = s.last_active;
                     s.account_id = r.record.accountId;
                     s.guest = false;
                     sessions_[pid] = s;
@@ -103,6 +104,7 @@ public:
         s.conn_id = conn_id;
         s.name = cmd.name.empty() ? ("Player" + std::to_string(pid)) : cmd.name;
         s.last_active = std::chrono::steady_clock::now();
+        s.login_at = s.last_active;
         sessions_[pid] = s;
         conn_to_player_[conn_id] = pid;
         channel_.sendTo(pid, LoginAckEvent{pid});
@@ -146,12 +148,17 @@ public:
         std::string name;
         std::uint64_t account_id = 0;
         bool guest = true;
+        std::uint32_t online_sec = 0;   // 本次在线时长（快照时差值）
     };
     std::vector<SessionBrief> listSessions() const {
         std::vector<SessionBrief> out;
+        const auto Now = std::chrono::steady_clock::now();
         out.reserve(sessions_.size());
         for (const auto& [pid, s] : sessions_)
-            out.push_back({pid, s.name, s.account_id, s.guest});
+            out.push_back({pid, s.name, s.account_id, s.guest,
+                           static_cast<std::uint32_t>(
+                               std::chrono::duration_cast<std::chrono::seconds>(
+                                   Now - s.login_at).count())});
         return out;
     }
 
@@ -191,6 +198,7 @@ private:
         uint64_t conn_id = 0;
         std::string name;
         std::chrono::steady_clock::time_point last_active;
+        std::chrono::steady_clock::time_point login_at;   // 本次在线起点（GM 面板在线时长数据源）
         std::uint64_t account_id = 0;   // D2：游客=0；账号登录后绑定
         bool guest = true;              // 游客路径登录的会话标记
     };
