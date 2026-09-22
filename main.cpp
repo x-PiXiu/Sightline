@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <regex>
+#include <map>
 #include <set>
 #include <thread>
 #include "sightline_config.h"
@@ -230,8 +231,23 @@ int main(int argc, char* argv[]) {
         static const std::set<std::string> allowed = {
             "game.win_kills", "game.respawn_ms", "game.max_players",
             "network.heartbeat_timeout_ms", "network.scan_interval_ms"};
+        // 安全范围：面板可写 ≠ 可乱写——heartbeat=3ms 这类值会把会话"合法地"全踢光
+        static const std::map<std::string, std::pair<int, int>> limits = {
+            {"game.win_kills",                {1,     100}},
+            {"game.respawn_ms",               {100,   60000}},
+            {"game.max_players",              {2,     64}},
+            {"network.heartbeat_timeout_ms",  {3000,  120000}},
+            {"network.scan_interval_ms",      {200,   10000}},
+        };
         for (const auto& [k, v] : kv)
+        {
             if (!allowed.count(k)) return "非法配置键: " + k;
+            const int val = std::atoi(v.c_str());
+            const auto& [lo, hi] = limits.at(k);
+            if (val < lo || val > hi)
+                return "数值超出安全范围: " + k + "（允许 " +
+                       std::to_string(lo) + "~" + std::to_string(hi) + "）";
+        }
         if (!rewriteLuaValues(configPath, kv)) return "config.lua 写入失败（键不存在或文件不可写）";
         applyConfigFromLua();                 // 此闭包在主 loop 里执行（routeLocked），同步热载
         return "";
