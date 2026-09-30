@@ -1,0 +1,20 @@
+# ===== server =====
+build/
+cmake-build-*/
+logs/
+*.log
+loadbot/loadbot
+
+# ===== UE5 =====
+client/.idea/
+client/.vscode/
+client/.vs/
+client/Binaries/
+client/DerivedDataCache/
+client/Intermediate/
+client/Saved/
+client/Build/
+client/Packaged/
+client/plugins/**/Binaries/
+client/*.code-workspace
+# Lyra 素材不入库（README 写依赖说明）；自建 Content 正常提交
