@@ -1,20 +1,29 @@
-# ===== server =====
+# ===== server (Linux C++) =====
 build/
 cmake-build-*/
 logs/
 *.log
-loadbot/loadbot
+server/loadbot/loadbot
 
-# ===== UE5 =====
-client/.idea/
-client/.vscode/
-client/.vs/
-client/Binaries/
-client/DerivedDataCache/
-client/Intermediate/
-client/Saved/
-client/Build/
-client/Packaged/
-client/plugins/**/Binaries/
-client/*.code-workspace
-# Lyra 素材不入库（README 写依赖说明）；自建 Content 正常提交
+# ===== client (UE5)：只提交源码与工程配置，其余（素材/生成物）全部排除 =====
+client/*
+!client/README.md
+!client/*.uproject
+!client/Source
+!client/Config
+client/Source/**
+!client/Source/**/*.cpp
+!client/Source/**/*.h
+!client/Source/**/*.cs
+client/Config/**
+!client/Config/*.ini
+
+# ===== 通用杂物 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+.idea/
+.vs/
+.vscode/
