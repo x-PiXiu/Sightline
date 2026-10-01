@@ -21,7 +21,9 @@ namespace common {
         }
 
         Socket::Socket() {
-            sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
+            // 修复（交接批注）：ET 模式要求非阻塞 fd——阻塞 listen/conn fd 会让事件循环卡死
+            // （调试侦探故事 #1：阻塞 accept 卡死事件循环，第 13 期细讲）
+            sockfd_ = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
             if (sockfd_ == -1) {
                 LOG_ERROR("Socket creation failed: " + std::string(strerror(errno)));
                 throw std::runtime_error("Socket creation failed: " + std::string(strerror(errno)));
@@ -161,7 +163,7 @@ namespace common {
                 throw std::runtime_error("Socket is not valid");
             }
             socklen_t addrlen = peeraddr->getSockAddrSize();
-            int connfd = ::accept(sockfd_, peeraddr->getSockAddr(), &addrlen);
+            int connfd = ::accept4(sockfd_, peeraddr->getSockAddr(), &addrlen, SOCK_NONBLOCK | SOCK_CLOEXEC);
             if (connfd == -1) {
                 int saved_errno = errno;
                 

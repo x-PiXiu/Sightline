@@ -27,5 +27,12 @@ target_link_libraries(sightline_core PUBLIC Threads::Threads)
 add_executable(smoke_base tests/smoke_base.cpp)
 target_link_libraries(smoke_base PRIVATE sightline_core)
 
-# ============ 第 1 期待开发：Acceptor / ClientConnection / main ============
-# 设计图定稿后按 docs/episodes/ep01/ 实施
+# ============ 第 1 期：服务器本体（三件套 header-only + main，设计图已定稿） ============
+add_executable(sightline_server
+    main.cpp
+    include/net/acceptor.h
+    include/net/client_connection.h
+    include/net/buffer.h
+    include/adapters/frame_codec.h
+)
+target_link_libraries(sightline_server PRIVATE sightline_core)
