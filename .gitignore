@@ -15,6 +15,7 @@ client/Sightline/*
 !client/Sightline/Source
 !client/Sightline/Config
 client/Sightline/Source/**
+!client/Sightline/Source/**/
 !client/Sightline/Source/**/*.cpp
 !client/Sightline/Source/**/*.h
 !client/Sightline/Source/**/*.cs
