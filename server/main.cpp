@@ -57,11 +57,21 @@ int main() {
             QueuedFrame f = std::move(frame_queue.front());
             frame_queue.pop_front();
             if (f.msgid == protocol::MSG_C2S_HEARTBEAT && f.payload.size() == 12) {
+                const uint32_t seq =
+                    static_cast<uint32_t>(static_cast<unsigned char>(f.payload[0]))
+                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[1])) << 8)
+                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[2])) << 16)
+                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[3])) << 24);
+                LOG_INFO("[HEARTBEAT] seq=" + std::to_string(seq) +
+                         " from=" + f.conn->peerAddr().toIpPort());
                 std::string ack = f.payload;                  // 原样回显 seq + clientTs
                 appendU64(ack, nowMs());                      // 附加 serverTs
                 f.conn->send(protocol::MSG_S2C_HEARTBEAT_ACK, ack);
+            } else {
+                LOG_WARNING("[未知消息] msgid=" + std::to_string(f.msgid) +
+                            " 长度=" + std::to_string(f.payload.size()) +
+                            " 来自=" + f.conn->peerAddr().toIpPort() + " —— 已忽略");
             }
-            // 未知 msgid：第 1 期静默忽略（MessageDispatcher 演进）
         }
     });
 
