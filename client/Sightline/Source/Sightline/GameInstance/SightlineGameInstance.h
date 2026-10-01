@@ -42,6 +42,8 @@ private:
     uint32 LastPingMs = 0;
     double LastAckMonotonicMs = 0.0;      // 单调时钟：LAG 判定用
     bool bLag = false;
+    bool bGotWelcome = false;     // 诊断：WELCOME 是否已到（LAG 触发时打印）
+    bool bGotFirstAck = false;    // 诊断：首个 ACK 是否已到
 
     // seq → 单调发送时刻（ping = ack 时刻 − 发送时刻）
     TMap<uint32, double> PendingHeartbeats;

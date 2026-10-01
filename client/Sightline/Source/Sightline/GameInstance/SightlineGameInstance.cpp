@@ -66,7 +66,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
     if (bConnected && !bLag && MonotonicMs() - LastAckMonotonicMs > kLagThresholdMs)
     {
         bLag = true;
-        UE_LOG(LogSightline, Warning, TEXT("[GI] %.0f ms 无 ACK → LAG"), kLagThresholdMs);
+        UE_LOG(LogSightline, Warning, TEXT("[GI] %.0f ms 无 ACK → LAG（未确认心跳 %d 个，已收 WELCOME=%d）"),
+               kLagThresholdMs, PendingHeartbeats.Num(), bGotWelcome ? 1 : 0);
     }
     return true;   // true = 继续调度
 }
@@ -114,22 +115,27 @@ void USightlineGameInstance::Connect()
 
 void USightlineGameInstance::ScheduleReconnect()
 {
-    if (bShuttingDown) return;
+    if (bShuttingDown) return;   // Shutdown 期间：不调度、不打印重连日志
     if (FTimerManager* TM = GetTimerManagerSafe())
     {
         FTimerHandle RetryHandle;
         TM->SetTimer(RetryHandle, FTimerDelegate::CreateUObject(this, &USightlineGameInstance::Connect),
                      kReconnectDelay, false);
+        UE_LOG(LogSightline, Log, TEXT("[GI] %.0f 秒后自动重连"), kReconnectDelay);
     }
 }
 
 void USightlineGameInstance::OnConnectionLost(const FString& Reason)
 {
-    // 接收线程退出/异常断开（游戏线程回调）——停心跳 → 状态复位 → 3s 自动重连
     StopHeartbeat();
     bConnected = false;
     bLag = false;
     Connection.Reset();
+    if (bShuttingDown)
+    {
+        UE_LOG(LogSightline, Log, TEXT("[GI] 连接关闭（%s）—— 正在 Shutdown，不重连"), *Reason);
+        return;
+    }
     UE_LOG(LogSightline, Warning, TEXT("[GI] 连接丢失（%s），%.0f 秒后自动重连"), *Reason, kReconnectDelay);
     ScheduleReconnect();
 }
@@ -195,6 +201,7 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
     {
     case MSG_S2C_WELCOME:
         bConnected = true;
+        bGotWelcome = true;
         bLag = false;
         LastAckMonotonicMs = MonotonicMs();
         StartHeartbeat();                                // 连接确认后才发心跳
@@ -213,6 +220,11 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
         {
             LastPingMs = static_cast<uint32>(FMath::Max(0.0, MonotonicMs() - *SendMs));
             PendingHeartbeats.Remove(Seq);
+            if (!bGotFirstAck)
+            {
+                bGotFirstAck = true;
+                UE_LOG(LogSightline, Log, TEXT("[GI] 首个 ACK 收到（seq=%u，ping=%ums）—— 下行链路确认"), Seq, LastPingMs);
+            }
             UE_LOG(LogSightline, Verbose, TEXT("[GI] ACK seq=%u ping=%ums"), Seq, LastPingMs);
         }
         else

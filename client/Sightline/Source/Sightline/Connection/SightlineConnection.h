@@ -71,7 +71,21 @@ private:
 class FSightlineConnection
 {
 public:
-    ~FSightlineConnection() { Disconnect(TEXT("析构")); }
+    ~FSightlineConnection()
+    {
+        // 析构 = 纯 RAII 收尾：只停线程关 socket，不触发 OnDisconnected
+        // （析构期回调持有者是悬垂风险；正常断开请显式调 Disconnect）
+        if (ReceiverThread)
+        {
+            ReceiverThread->Kill(true);
+            ReceiverThread = nullptr;
+        }
+        if (Socket && SocketSubsystem)
+        {
+            SocketSubsystem->DestroySocket(Socket);
+            Socket = nullptr;
+        }
+    }
 
     bool Connect(const FString& Host, uint16 Port)
     {
