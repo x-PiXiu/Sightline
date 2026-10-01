@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="UE连接组件图" id="ueconn">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1500" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="UE 连接组件图 · 客户端侧数据流（第 1 期 · C++ 为主，蓝图零逻辑）" style="text;fontSize=25;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1100" height="38" as="geometry"/></mxCell>
+        <mxCell id="ver" value="全部组件 🆕 新增（蓝图 FPS 项目经验复用，代码全部 C++）｜对应心跳时序图的 ④⑨ 两个验收画面" style="text;fontSize=16;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="54" width="1100" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="c1" value="USightlineGameInstance&#10;生命周期锚点（切关卡不死）&#10;Connect() / Disconnect() / OnConnected 委托" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="50" y="120" width="330" height="100" as="geometry"/></mxCell>
+        <mxCell id="c2" value="FSocket 连接模块（纯 C++ 封装）&#10;连接 127.0.0.1:8888 · 发送缓冲&#10;Send(HEARTBEAT / 后续全部上行消息)" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="430" y="120" width="340" height="100" as="geometry"/></mxCell>
+        <mxCell id="c3" value="接收线程 FRunnable&#10;阻塞 recv → RecvBuffer → 按帧头切帧&#10;不碰任何游戏对象（纯字节搬运）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="820" y="120" width="330" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" value="Connect()" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;fontSize=14;fontColor=#01579b;background=#f7f4ee;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="启动线程" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;fontSize=14;fontColor=#01579b;background=#f7f4ee;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c2" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="cross" value="⚠️ 唯一跨线程点：AsyncTask 投回游戏线程&#10;（收到的帧在游戏线程处理——UE 游戏对象只能游戏线程碰）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="820" y="280" width="330" height="90" as="geometry"/></mxCell>
+        <mxCell id="e3" value="切好的帧" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=2;dashed=1;fontSize=14;fontColor=#990000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#f7f4ee;" edge="1" parent="1" source="c3" target="cross"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="c4" value="帧处理器（游戏线程）&#10;WELCOME → 置 Connected 状态&#10;HEARTBEAT_ACK → 按 seq 匹配 → ping 计算" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="820" y="430" width="330" height="95" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0288d1;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="cross" target="c4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="c5" value="心跳计时器 FTimerHandle&#10;每 1s：seq++ → 组 HEARTBEAT [seq, clientTs] → Send&#10;（FTimespan 超时无 ACK → HUD 置 LAG）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="430" y="430" width="330" height="95" as="geometry"/></mxCell>
+        <mxCell id="e5" value="每秒触发发送" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0288d1;strokeWidth=2;fontSize=14;fontColor=#01579b;exitX=1;exitY=0.5;entryX=0;entryY=1;labelBackgroundColor=#f7f4ee;" edge="1" parent="1" source="c5" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="c6" value="HUD（第 1 期：AddOnScreenDebugMessage）&#10;Connected 状态 · ping 值 · LAG 警示&#10;—— 本期验收画面 ①② 的显示端" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="820" y="585" width="330" height="95" as="geometry"/></mxCell>
+        <mxCell id="e6" value="状态 / ping 刷新" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#0288d1;strokeWidth=2;fontSize=14;fontColor=#01579b;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#f7f4ee;" edge="1" parent="1" source="c4" target="c6"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="rule" value="客户端铁律（全系列）&#10;· C++ 为主，蓝图只做表现层——逻辑写蓝图里，面试官让你当场解释生命周期，C++ 里它跑不掉&#10;· 蓝图零逻辑：HUD 文案/音效/特效可以用蓝图，连接/心跳/ping 计算全部 C++&#10;· 游戏对象只在游戏线程碰——接收线程只搬运字节，跨线程仅 AsyncTask 一扇门" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=15;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="720" width="1120" height="130" as="geometry"/></mxCell>
+
+        <mxCell id="mirror" value="与服务器镜像关系（图 = 代码一致）&#10;UE FSocket ↔ 服务器 ClientConnection　·　UE RecvBuffer ↔ 服务器 SendBuffer　·　UE 切帧 ↔ 服务器 FrameCodec&#10;同一条 [2B len][2B msgid] 协议，两端各自实现——协议文档（docs/protocol/）是共同契约" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontColor=#1f6b30;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="870" width="1120" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="图例　蓝 = 第 1 期新增（全部）　红 = 跨线程点（唯一）　米白 = 铁律/规范　数据流：左 → 右（连接）+ 环（心跳往返）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=14;fontColor=#333;align=left;spacing=10;" vertex="1" parent="1"><mxGeometry x="40" y="990" width="1120" height="50" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

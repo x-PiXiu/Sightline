@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="心跳时序" id="heartbeatseq">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1300" pageHeight="1160" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="心跳 · 双端时序图 · 终版（第 1 期 · 单线程 + 帧队列）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="36" as="geometry"/></mxCell>
+
+        <mxCell id="h_ue" value="UE 客户端&#10;USightlineGameInstance / FTimerHandle / HUD" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="66" width="300" height="60" as="geometry"/></mxCell>
+        <mxCell id="h_sv" value="服务器主线程（单线程）：net 层 → FrameCodec → 帧队列 → 帧驱动处理" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="560" y="66" width="620" height="60" as="geometry"/></mxCell>
+        <mxCell id="l_ue" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="126" as="sourcePoint"/><mxPoint x="210" y="1130" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l_sv" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="870" y="126" as="sourcePoint"/><mxPoint x="870" y="1130" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="pre" value="前置（第 1 期前置步骤）：服务器已启动 · Acceptor 监听 8888 · 日志已装配 addSink · SIGPIPE 已处理" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;" vertex="1" parent="1"><mxGeometry x="250" y="150" width="760" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="m1" value="① TCP 连接请求" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="220" as="sourcePoint"/><mxPoint x="870" y="220" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s2" value="② 【net】Acceptor：accept → 新建 ClientConnection&#10;（生命周期托管 · shared_from_this）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="880" y="248" width="400" height="56" as="geometry"/></mxCell>
+        <mxCell id="s2b" value="②b 组帧 WELCOME [serverTime] → SendBuffer → write" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="880" y="312" width="400" height="50" as="geometry"/></mxCell>
+        <mxCell id="m3" value="③ WELCOME [serverTime]" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="870" y="392" as="sourcePoint"/><mxPoint x="210" y="392" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s4" value="④ HUD：Connected ✅&#10;（本期验收画面 ①）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="1"><mxGeometry x="40" y="425" width="300" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="m5" value="⑤ HEARTBEAT [seq, clientTs]（FTimerHandle 每秒发）" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="210" y="520" as="sourcePoint"/><mxPoint x="870" y="520" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s6" value="⑥ 【net + adapters】read → RecvBuffer → FrameCodec 切帧&#10;不足一帧留缓冲；切出完整帧 → 入帧队列（std::deque）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="880" y="548" width="400" height="60" as="geometry"/></mxCell>
+        <mxCell id="s7" value="⑦ 【逻辑帧】33ms 帧驱动：从帧队列取消息&#10;→ MessageDispatcher 分发（限频钩子挂点）→ 校验 seq&#10;→ 组 HEARTBEAT_ACK [seq] —— 单线程串行，世界状态一致" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="880" y="618" width="400" height="80" as="geometry"/></mxCell>
+        <mxCell id="m8" value="⑧ HEARTBEAT_ACK [seq]" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="870" y="730" as="sourcePoint"/><mxPoint x="210" y="730" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s9" value="⑨ ACK.seq 匹配 → ping = now − clientTs → HUD ✅&#10;（本期验收画面 ②）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="1"><mxGeometry x="40" y="763" width="330" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="x1" value="⚠️ 异常路径：read 返回 0 / EPOLLERR → ClientConnection 清理（shared_from_this 防悬垂）→ 上层收到断开事件（第 2 期接会话注销）" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;dashed=1;fontSize=14;fontColor=#990000;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="870" y="850" as="sourcePoint"/><mxPoint x="210" y="850" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="note" value="三点说明（上镜讲稿）&#10;· 第 1 期全流程单线程——net、codec、帧驱动在同一个 EventLoop，无跨线程投递；收帧入队、帧内串行处理，世界状态天然一致&#10;· 消息最多等一个帧周期（33ms）才被处理——帧驱动的固有节奏，换来的是回包时序确定、为第 3 期同步直接复用帧队列&#10;· ②⑥⑦ 三个框 = 现状架构图上「缺失红墙」补齐后的样子——同一流程路径，红节点换成了新设计（图 = 代码一致）" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=15;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="910" width="1240" height="130" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="读法：从上往下 = 时间流逝　蓝箭头 = UE 发意图　绿箭头 = 服务器结果　红虚线 = 异常路径　蓝框 = net/adapters　橙框 = 逻辑帧　色标全系列统一（绿复用/蓝新增/红隐患/黄演进）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=14;fontColor=#333;align=left;spacing=10;" vertex="1" parent="1"><mxGeometry x="40" y="1055" width="1240" height="60" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
