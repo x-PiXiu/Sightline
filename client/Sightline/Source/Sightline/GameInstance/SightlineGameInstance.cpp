@@ -88,8 +88,14 @@ void USightlineGameInstance::Connect()
     }
     else
     {
+        // 服务器可能后起——3 秒后自动重试（第 1 期最简重连）
         Connection.Reset();
-        UE_LOG(LogTemp, Error, TEXT("[Sightline] 连接失败（服务器未启动？）"));
+        UE_LOG(LogTemp, Warning, TEXT("[Sightline] 连接失败，3 秒后重试……"));
+        if (FTimerManager* TM = GetTimerManagerSafe())
+        {
+            FTimerHandle RetryHandle;
+            TM->SetTimer(RetryHandle, FTimerDelegate::CreateUObject(this, &USightlineGameInstance::Connect), 3.0f, false);
+        }
     }
 }
 
