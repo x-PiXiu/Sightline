@@ -1,0 +1,36 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="网络底座现状架构" id="netarch">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1560" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Sightline 网络底座 · 现状架构（毕设遗产 · 解耦手术后 v1.0）" style="text;fontSize=25;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="38" as="geometry"/></mxCell>
+
+        <mxCell id="fps" value="UE 客户端想要：TCP 长连接 + 自定义二进制协议 [2B len][2B msgid]" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="330" y="66" width="900" height="52" as="geometry"/></mxCell>
+        <mxCell id="arr1" value="现在连不上" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=3;fontSize=14;fontColor=#990000;dashed=1;labelBackgroundColor=#f7f4ee;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="fps" target="wall"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="wall" value="缺失三件套（第 1 期补齐）：Acceptor（接客） · ClientConnection（连接生命周期） · Buffer（收发缓冲）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;fontStyle=1;fontColor=#990000;dashed=1;dashPattern=8 4;" vertex="1" parent="1"><mxGeometry x="230" y="164" width="1100" height="56" as="geometry"/></mxCell>
+        <mxCell id="arr2" value="补齐后即可到达" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=3;fontSize=14;fontColor=#1f6b30;labelBackgroundColor=#f7f4ee;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="wall" target="base"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="base" value="自研 epoll 网络底座 —— ✅ 第 1 期直接用（解耦手术后：零业务依赖 · 零第三方依赖）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=19;fontStyle=1;fontColor=#1f6b30;verticalAlign=top;spacingTop=8;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="60" y="270" width="1080" height="330" as="geometry"/></mxCell>
+        <mxCell id="n1" value="EventLoop ✅&#10;单事件循环 · 116 行头文件&#10;runAfter / runEvery / queueInLoop" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=15;" vertex="1" parent="1"><mxGeometry x="90" y="318" width="290" height="80" as="geometry"/></mxCell>
+        <mxCell id="n2" value="Channel / Epoll ✅&#10;事件分发与 IO 多路复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=15;" vertex="1" parent="1"><mxGeometry x="420" y="318" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="n3" value="Socket ✅ 谦卑对象&#10;bind/listen/accept · 参数注入" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=15;" vertex="1" parent="1"><mxGeometry x="710" y="318" width="230" height="80" as="geometry"/></mxCell>
+        <mxCell id="n4" value="HierarchicalTimingWheel ⚠️&#10;weak_ptr 存定时器（演进项②）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;" vertex="1" parent="1"><mxGeometry x="90" y="430" width="290" height="80" as="geometry"/></mxCell>
+        <mxCell id="n5" value="Logger ⚠️&#10;不装配 addSink 即静默丢日志（演进项）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;" vertex="1" parent="1"><mxGeometry x="420" y="430" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="n6" value="InetAddress ✅&#10;地址值对象" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=15;" vertex="1" parent="1"><mxGeometry x="710" y="430" width="230" height="80" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n1" target="n2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n2" target="n3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="runEvery（心跳计时直接用）" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=2;fontSize=13;fontColor=#1f6b30;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#f7f4ee;" edge="1" parent="1" source="n1" target="n4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="cut" value="🪚 解耦手术已切除（本次迁移日）&#10;ConfigManager · ThreadPool · 配置热更新机器（~500 行）&#10;回调丢业务线程池路径 · yaml-cpp / nlohmann 第三方依赖&#10;—— 隐患 ③④ 已连根拔除，net 层只向系统调用看" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1180" y="270" width="350" height="160" as="geometry"/></mxCell>
+        <mxCell id="evo" value="演进项（按需触发，不预先实现）&#10;· timerfd 精准唤醒（替代 100ms 轮询 ⑥）&#10;· 堆定时器（替代时间轮 ②）&#10;· 多 IO 线程 · 日志异步化" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontColor=#8a6d1a;dashed=1;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1180" y="460" width="350" height="140" as="geometry"/></mxCell>
+
+        <mxCell id="risks" value="交接批注 v1.0 · 隐患状态更新（细节第 13 期事故复盘见，图随每期演化）&#10;① 缺失三件套 → 第 1 期补齐（本图红墙）　② 时间轮 weak_ptr → 演进项　③ 回调并行跑 → ✅ 已切除&#10;④ 网络层耦合配置/线程池 → ✅ 已切除　⑤ SIGPIPE → 第 1 期 main 显式处理　⑥ 100ms 轮询 → 演进项&#10;第 7 条（新）：Logger 不装配即静默丢日志——冒烟实测发现" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="60" y="640" width="1120" height="150" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="图例（全系列统一）&#10;绿 = 可直接用底座&#10;黄 = 带隐患 / 演进项&#10;红 = 隐患 / 缺失 / 已切除&#10;蓝 = 新增（下张图）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=15;fontColor=#333;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1220" y="640" width="310" height="150" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="结论：解耦手术后的底座符合整洁架构最外层机制的全部要求——net 层只向系统调用看。架构层面无返工项，&#10;第 1 期工作 = 沿流程路径补齐红墙三件套（详见新版业务流程图），演进项按真实需要逐期触发。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=16;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="830" width="1490" height="80" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

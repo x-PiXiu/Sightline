@@ -11,7 +11,6 @@
 #include <cstring>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <openssl/sha.h>
 #include <sys/socket.h>
 #include <sys/timerfd.h>
 #include <iostream>
