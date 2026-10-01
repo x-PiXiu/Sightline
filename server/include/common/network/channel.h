@@ -9,7 +9,6 @@
 #include <memory>
 #include <sys/epoll.h>
 
-#include "common/thread_pool/thread_pool.h"
 #include "common/logger/logger.h"
 
 namespace common {
@@ -27,8 +26,6 @@ namespace common {
             //处理事件
             void handleEvent();
             
-            // 🔧 添加可配置的事件处理方法
-            void handleEventWithConfig(bool use_thread_pool = false);
 
             //设置回调函数
             void setReadCallback(const ReadEventCallback& cb) { readCallback_ = cb; }

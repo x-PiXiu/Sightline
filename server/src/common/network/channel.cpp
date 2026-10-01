@@ -118,11 +118,6 @@ namespace common {
         }
 
 
-        //  添加可配置的事件处理方法
-        void Channel::handleEventWithConfig(bool use_thread_pool) {
-            // 同步处理事件
-            handleEvent();
-        }
 
         void Channel::remove() {
             // 在移除前确保所有事件都被禁用

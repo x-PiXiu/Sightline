@@ -297,63 +297,6 @@ namespace common {
             }
         }
 
-        /**
-         * @brief 从配置管理器初始化Logger
-         * 
-         * 从ConfigManager读取日志配置，包括日志级别、输出目标、异步设置等。
-         * 根据配置创建相应的Sink实例并添加到Logger中。
-         * 
-         * @return true 初始化成功
-         * @return false 初始化失败
-         * 
-         * @example
-         * // 配置文件中可能包含:
-         * // logger.level: "DEBUG"
-         * // logger.console.enabled: true
-         * // logger.file.enabled: true
-         * // logger.file.path: "app.log"
-         */
-        bool Logger::initializeFromConfig() {
-            try {
-                auto& config_manager = config::ConfigManager::getInstance();
-                
-                // 基础配置
-                console_enabled_ = config_manager.get<bool>("logger.console.enabled", true);
-                file_enabled_ = config_manager.get<bool>("logger.file.enabled", false);
-                async_logging_ = config_manager.get<bool>("logger.async.enabled", false);
-                log_level_ = stringToLogLevel(config_manager.get<std::string>("logger.level", "INFO"));
-                
-                // 控制台配置
-                if (console_enabled_) {
-                    addSink(std::make_unique<ConsoleSink>());
-                    SAFE_COUT("[Logger] Console logging enabled with color support");
-                }
-                
-                // 文件配置
-                if (file_enabled_) {
-                    auto log_file_path_ = config_manager.get<std::string>("logger.file.path", "app.log");
-                    auto max_file_size_ = config_manager.get<size_t>("logger.file.max_size", 512 * 1024 * 1024);
-                    auto max_files_ = config_manager.get<int>("logger.file.max_files", 5);
-                    
-                    // 初始化文件输出流
-                    addSink(std::make_unique<FileSink>(log_file_path_, max_file_size_, max_files_));
-                    SAFE_COUT("[Logger] File logging enabled: " + log_file_path_);
-                }
-                
-                // 异步日志配置
-                if (async_logging_) {
-                    startAsyncThread();
-                    SAFE_COUT("[Logger] Async logging enabled");
-                }
-
-                SAFE_COUT("[Logger] Logger initialized from config successfully");
-                return true;
-                
-            } catch (const std::exception& e) {
-                SAFE_CERR("[Logger] Failed to initialize logger from config: " + std::string(e.what()));
-                return false;
-            }
-        }
         
         /**
          * @brief 记录TRACE级别日志

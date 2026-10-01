@@ -38,26 +38,7 @@ namespace common {
              */
             void configureKeepAliveParameters(int idle_time, int interval, int probes);
 
-            /**
-            * @brief 动态更新Socket配置（热更新支持）
-            * @param new_config 新的网络配置
-            * @details 在不关闭连接的情况下更新Socket选项
-            */
-            void updateSocketConfig(const networkConfig& new_config);
 
-            /**
-             * @brief 获取当前Socket的配置状态
-             * @return 当前Socket配置信息
-             */
-            struct SocketConfigState {
-                bool tcp_no_delay;
-                bool keep_alive;
-                int keep_alive_idle_time;
-                int keep_alive_interval;
-                int keep_alive_probes;
-                bool is_valid;
-            };
-            SocketConfigState getCurrentConfigState() const;
 
             //获取socket文件描述符
             int fd() const;

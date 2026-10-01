@@ -17,8 +17,6 @@
 #include <chrono>
 #include <vector>
 
-#include "common/config/config_manager.h"
-#include "common/thread_pool/thread_pool.h"
 
 namespace common {
     namespace logger {
@@ -192,13 +190,6 @@ namespace common {
             Logger(const Logger&) = delete;
             Logger& operator=(const Logger&) = delete;
 
-            /**
-             * @brief 从配置管理器初始化Logger
-             * 
-             * @return true 初始化成功
-             * @return false 初始化失败
-             */
-            bool initializeFromConfig();
 
             // 辅助方法
             std::string levelToString(LogLevel level);
