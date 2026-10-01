@@ -21,17 +21,15 @@ namespace
 void USightlineGameInstance::Init()
 {
     Super::Init();
+
+    // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调替代（HUD 刷新 + LAG 判定）
+    TickerDelegate.BindUObject(this, &USightlineGameInstance::HandleTick);
+    TickerHandle = FTSTicker::GetCoreTicker().AddTicker(TickerDelegate, 0.f);
+
     Connect();   // PIE 即连（第 1 期最简）；心跳在收到 WELCOME 后启动（连接确认前不发）
 }
 
-void USightlineGameInstance::Shutdown()
-{
-    StopHeartbeat();
-    Disconnect();
-    Super::Shutdown();
-}
-
-void USightlineGameInstance::Tick(float DeltaTime)
+bool USightlineGameInstance::HandleTick(float DeltaTime)
 {
     // HUD（验收画面 ①②）：覆盖式刷新同一 key
     if (GEngine)
@@ -48,6 +46,18 @@ void USightlineGameInstance::Tick(float DeltaTime)
     {
         bLag = true;
     }
+    return true;   // true = 继续调度
+}
+
+void USightlineGameInstance::Shutdown()
+{
+    if (TickerHandle.IsValid())
+    {
+        FTSTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+    }
+    StopHeartbeat();
+    Disconnect();
+    Super::Shutdown();
 }
 
 void USightlineGameInstance::Connect()
@@ -56,7 +66,15 @@ void USightlineGameInstance::Connect()
 
     Connection = MakeUnique<FSightlineConnection>();
     // 帧回调由 AsyncTask 保证在游戏线程执行——此处可安全碰 UE 对象
-    Connection->OnFrame.BindUObject(this, &USightlineGameInstance::OnFrameReceived);
+    // BindLambda 捕获弱指针：GameInstance 析构后在途 AsyncTask 执行时安全跳过（防悬垂）
+    TWeakObjectPtr<USightlineGameInstance> WeakThis(this);
+    Connection->OnFrame.BindLambda([WeakThis](uint16 MsgId, const TArray<uint8>& Payload)
+    {
+        if (USightlineGameInstance* GI = WeakThis.Get())
+        {
+            GI->OnFrameReceived(MsgId, Payload);
+        }
+    });
     Connection->OnDisconnected.BindLambda([this](const FString& Reason)
     {
         StopHeartbeat();
@@ -114,7 +132,7 @@ void USightlineGameInstance::StopHeartbeat()
 void USightlineGameInstance::HandleHeartbeatTick()
 {
     ++HeartbeatSeq;
-    const uint64 ClientTs = static_cast<uint64>(FDateTime::UtcNow().ToUnixMsMilliseconds());
+    const uint64 ClientTs = static_cast<uint64>(FDateTime::UtcNow().GetTicks() / ETimespan::TicksPerMillisecond);
 
     TArray<uint8> Payload;                               // [4B seq][8B clientTs]
     Payload.Add(static_cast<uint8>(HeartbeatSeq & 0xFF));

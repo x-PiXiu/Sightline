@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "Connection/SightlineConnection.h"
 #include "TimerManager.h"
+#include "Containers/Ticker.h"
 #include "SightlineGameInstance.generated.h"
 
 UCLASS()
@@ -15,7 +16,6 @@ class SIGHTLINE_API USightlineGameInstance : public UGameInstance
 public:
     virtual void Init() override;
     virtual void Shutdown() override;
-    virtual void Tick(float DeltaTime) override;
 
     void Connect();
     void Disconnect();
@@ -27,6 +27,7 @@ private:
     void StartHeartbeat();
     void StopHeartbeat();
     void HandleHeartbeatTick();
+    bool HandleTick(float DeltaTime);
     FTimerManager* GetTimerManagerSafe();
     void OnFrameReceived(uint16 MsgId, const TArray<uint8>& Payload);
 
@@ -42,4 +43,7 @@ private:
 
     // seq → 单调发送时刻（ping = ack 时刻 − 发送时刻）
     TMap<uint32, double> PendingHeartbeats;
+
+    FTickerDelegate TickerDelegate;          // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调替代
+    FTSTicker::FDelegateHandle TickerHandle;
 };

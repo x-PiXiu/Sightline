@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "HAL/Runnable.h"
 #include "Sockets.h"
+#include "SocketSubsystem.h"
 #include "Connection/SightlineProtocol.h"
 #include "Delegates/Delegate.h"
 #include "Async/Async.h"
@@ -30,10 +31,11 @@ public:
             uint32 Pending = 0;
             if (Socket->HasPendingData(Pending) && Pending > 0)
             {
+                const FOnFrame FrameDelegate = OnFrame;   // 值拷贝（C++ 不能直接按值捕获成员）
                 TArray<uint8> Tmp;
                 Tmp.SetNumUninitialized(FMath::Min(Pending, 65536u));
                 int32 Read = 0;
-                if (Socket->Recv(Tmp.GetData(), Tmp.Num(), Read))
+                if (Socket->Recv(Tmp.GetData(), Tmp.Num(), Read, ESocketReceiveFlags::None))
                 {
                     Buffer.Append(Tmp.GetData(), Read);
                     SightlineProtocol::FFrame Frame;
@@ -42,9 +44,9 @@ public:
                         // 唯一跨线程门：值拷贝投递到游戏线程（接收线程不碰任何游戏对象）
                         TArray<uint8> PayloadCopy = Frame.Payload;
                         const uint16 MsgId = Frame.MsgId;
-                        AsyncTask(ENamedThreads::GameThread, [OnFrame, MsgId, PayloadCopy]()
+                        AsyncTask(ENamedThreads::GameThread, [FrameDelegate, MsgId, PayloadCopy]()
                         {
-                            OnFrame.Execute(MsgId, PayloadCopy);
+                            FrameDelegate.ExecuteIfBound(MsgId, PayloadCopy);
                         });
                     }
                 }
@@ -66,7 +68,7 @@ private:
 class FSightlineConnection
 {
 public:
-    ~FSightlineConnection() { Disconnect(); }
+    ~FSightlineConnection() { Disconnect(TEXT("析构")); }
 
     bool Connect(const FString& Host, uint16 Port)
     {
@@ -83,11 +85,11 @@ public:
         if (!Socket) return false;
         Socket->SetNonBlocking(true);
 
-        bConnected = Socket->Connect(Addr);   // 非阻塞 connect：立即返回，成功与否由后续收发判定
+        bConnected = Socket->Connect(*Addr);   // 非阻塞 connect：立即返回，成功与否由后续收发判定
         if (!bConnected) return false;
 
         ReceiverThread = FRunnableThread::Create(
-            new FSightlineReceiver(Socket),
+            new FSightlineReceiver(Socket, OnFrame),
             TEXT("SightlineRecv"), 0, TPri_Normal);
         return ReceiverThread != nullptr;
     }
