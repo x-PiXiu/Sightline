@@ -7,6 +7,7 @@
 #include "Sockets.h"
 #include "SocketSubsystem.h"
 #include "Connection/SightlineProtocol.h"
+#include "Sightline.h"
 #include "Delegates/Delegate.h"
 #include "Async/Async.h"
 #include <atomic>
@@ -25,6 +26,7 @@ public:
     virtual bool Init() override { return true; }
     virtual uint32 Run() override
     {
+        UE_LOG(LogSightline, Verbose, TEXT("[RecvThread] 启动"));
         TArray<uint8> Buffer;
         while (!bStop)
         {
@@ -53,6 +55,7 @@ public:
             }
             FPlatformProcess::Sleep(0.01f);   // 10ms 轮询——心跳粒度足够，避免阻塞 recv 的关停竞态
         }
+        UE_LOG(LogSightline, Verbose, TEXT("[RecvThread] 退出"));
         return 0;
     }
     virtual void Stop() override { bStop = true; }

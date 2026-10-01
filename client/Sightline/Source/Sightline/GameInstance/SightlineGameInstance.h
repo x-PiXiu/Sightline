@@ -28,6 +28,8 @@ private:
     void StopHeartbeat();
     void HandleHeartbeatTick();
     bool HandleTick(float DeltaTime);
+    void ScheduleReconnect();
+    void OnConnectionLost(const FString& Reason);
     FTimerManager* GetTimerManagerSafe();
     void OnFrameReceived(uint16 MsgId, const TArray<uint8>& Payload);
 
@@ -46,4 +48,5 @@ private:
 
     FTickerDelegate TickerDelegate;          // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调替代
     FTSTicker::FDelegateHandle TickerHandle;
+    bool bShuttingDown = false;              // Shutdown 期间禁止自动重连
 };

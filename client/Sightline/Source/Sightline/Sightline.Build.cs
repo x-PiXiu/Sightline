@@ -10,6 +10,9 @@ public class Sightline : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Sockets", "Networking" });
 
+		// 模块根加入 include 路径——支持 "GameInstance/..." "Connection/..." 子目录引用
+		PublicIncludePaths.Add(ModuleDirectory);
+
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
 		// Uncomment if you are using Slate UI

@@ -3,4 +3,6 @@
 #include "Sightline.h"
 #include "Modules/ModuleManager.h"
 
-IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, Sightline, "Sightline" );
+DEFINE_LOG_CATEGORY(LogSightline);
+
+IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, Sightline, "Sightline");
