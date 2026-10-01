@@ -1,0 +1,42 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="新版架构" id="targetarch1">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1600" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="新版架构 · 优化设计（四层 · 依赖向内 · 单线程起步）" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="16" width="900" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="mainbox" value="main.cpp —— 组装根：创建一切 · 注入端口 · 开跑（最脏的一层，只干装配）" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="120" y="70" width="980" height="55" as="geometry"/></mxCell>
+
+        <mxCell id="netlayer" value="net 层 —— 网络机制（毕设底座 + 补齐）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=19;fontStyle=1;fontColor=#1f6b30;verticalAlign=top;spacingTop=8;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="120" y="150" width="980" height="230" as="geometry"/></mxCell>
+        <mxCell id="n1" value="EventLoop ✅复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="145" y="200" width="170" height="52" as="geometry"/></mxCell>
+        <mxCell id="n2" value="Channel / Epoll ✅复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="335" y="200" width="200" height="52" as="geometry"/></mxCell>
+        <mxCell id="n3" value="Socket ✅复用&#10;bind/listen/accept 封装" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="555" y="195" width="200" height="62" as="geometry"/></mxCell>
+        <mxCell id="n4" value="Logger ✅复用（异步化=演进项）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="775" y="200" width="300" height="52" as="geometry"/></mxCell>
+        <mxCell id="n5" value="Acceptor 🆕" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="145" y="290" width="170" height="52" as="geometry"/></mxCell>
+        <mxCell id="n6" value="ClientConnection 🆕&#10;生命周期托管" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="335" y="285" width="200" height="62" as="geometry"/></mxCell>
+        <mxCell id="n7" value="RecvBuffer / SendBuffer 🆕" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="555" y="290" width="200" height="52" as="geometry"/></mxCell>
+        <mxCell id="n8" value="演进项（按需触发，不预先实现）&#10;timerfd + 堆定时器 · 多 IO 线程 · 日志异步化" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;dashed=1;" vertex="1" parent="1"><mxGeometry x="775" y="280" width="300" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="adplayer" value="adapters 层 —— 翻译（字节 ↔ 消息 ↔ 用例调用）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=19;fontStyle=1;fontColor=#01579b;verticalAlign=top;spacingTop=8;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="120" y="410" width="980" height="140" as="geometry"/></mxCell>
+        <mxCell id="ad1" value="FrameCodec 🆕&#10;[2B len][2B msgid] 切帧" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="145" y="460" width="290" height="62" as="geometry"/></mxCell>
+        <mxCell id="ad2" value="ClientRegistry 🆕&#10;clientId ↔ 连接映射" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="465" y="460" width="290" height="62" as="geometry"/></mxCell>
+        <mxCell id="ad3" value="MessageDispatcher 🆕&#10;按 msgid 分发 · 限频钩子挂点" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#0288d1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="785" y="460" width="290" height="62" as="geometry"/></mxCell>
+
+        <mxCell id="applayer" value="application 层 —— 用例（只依赖自己声明的端口，签名全是业务语言）【第 2 期起填充】" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=19;fontStyle=1;fontColor=#8a4b00;verticalAlign=top;spacingTop=8;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="120" y="580" width="980" height="200" as="geometry"/></mxCell>
+        <mxCell id="ap1" value="能力端口（出）&#10;sendToClient(clientId, bytes)&#10;schedule(ms, cb) / cancel" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#d79b00;fontSize=16;align=left;spacingLeft=14;" vertex="1" parent="1"><mxGeometry x="145" y="630" width="390" height="90" as="geometry"/></mxCell>
+        <mxCell id="ap2" value="事件入口（进）—— 由 adapters 调用&#10;onClientConnected / onClientDisconnected&#10;onFrameMessage(clientId, msgid, payload)" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#d79b00;fontSize=16;align=left;spacingLeft=14;" vertex="1" parent="1"><mxGeometry x="565" y="630" width="510" height="90" as="geometry"/></mxCell>
+
+        <mxCell id="domainlayer" value="domain 层 —— 纯规则，零 IO 零框架（脱离一切可单测）【第 2 期起填充】Room 状态机 · Player · hitscan" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#333333;fontSize=19;fontStyle=1;verticalAlign=middle;dashed=1;dashPattern=8 4;align=left;spacingLeft=16;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="120" y="810" width="980" height="70" as="geometry"/></mxCell>
+
+        <mxCell id="deparrow" value="" style="edgeStyle=none;strokeColor=#c8161d;strokeWidth=4;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="95" y="160" as="sourcePoint"/><mxPoint x="95" y="880" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="deptext" value="依赖方向：外 → 内（铁律）&#10;net 不认识业务 · application 不认识 socket · domain 不认识任何人" style="text;fontSize=16;fontStyle=1;fontColor=#c8161d;align=center;verticalAlign=middle;rotation=-90;" vertex="1" parent="1"><mxGeometry x="-145" y="445" width="380" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="thread" value="线程模型（第 1 期）&#10;单线程单 EventLoop：&#10;Acceptor + 连接 + 33ms 帧驱动&#10;—— 容量估算：千级消息/秒&#10;vs 单线程十万级/秒能力，余量百倍&#10;&#10;演进项：多 IO 线程（第 12 期&#10;按压测数据决定是否拧开）" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=16;fontColor=#333;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="1180" y="150" width="380" height="240" as="geometry"/></mxCell>
+        <mxCell id="pathok" value="UE 连接路径：现状图上的&#10;「缺失红墙」已补齐 ✅&#10;（三件套 = n5 + n6 + n7）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;fontColor=#1f6b30;fontStyle=1;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="1180" y="430" width="380" height="120" as="geometry"/></mxCell>
+        <mxCell id="howev" value="图随每期演化：&#10;每期改造后本图同步升级版本，&#10;观众看着架构从 v1 长到 vN&#10;（现状图 + 本图 = 接手前/后对照）" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=16;fontColor=#990000;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="1180" y="580" width="380" height="150" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="图例（全系列统一）　绿 = 复用毕设底座　蓝 = 第 1 期新增　黄虚线 = 演进项（按需触发）　灰 = 装配/外部&#10;端口审计标准：application 头文件出现任何技术名词（fd/socket/epoll）= 依赖倒置名存实亡" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=15;fontColor=#333;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="930" width="1520" height="80" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
