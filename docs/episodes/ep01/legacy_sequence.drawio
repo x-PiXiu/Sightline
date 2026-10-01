@@ -1,0 +1,30 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="毕设时序图" id="seqlegacy">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="样张③ 时序图 · 毕设网络库（一个 HTTP 请求的角色交互顺序）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="1100" height="36" as="geometry"/></mxCell>
+
+        <mxCell id="h1" value="客户端" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="70" width="200" height="55" as="geometry"/></mxCell>
+        <mxCell id="h2" value="EventLoop 线程（1 个）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="500" y="70" width="260" height="55" as="geometry"/></mxCell>
+        <mxCell id="h3" value="通用 ThreadPool（N 个线程）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="980" y="70" width="280" height="55" as="geometry"/></mxCell>
+        <mxCell id="l1" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="180" y="125" as="sourcePoint"/><mxPoint x="180" y="830" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l2" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="630" y="125" as="sourcePoint"/><mxPoint x="630" y="830" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l3" value="" style="endArrow=none;dashed=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1120" y="125" as="sourcePoint"/><mxPoint x="1120" y="830" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m1" value="① HTTP 请求" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="180" y="180" as="sourcePoint"/><mxPoint x="630" y="180" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s2" value="② epoll_wait 就绪 → Channel 分发 → read（绿底座）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="640" y="210" width="440" height="50" as="geometry"/></mxCell>
+        <mxCell id="s3" value="③ 解析 HTTP 报文" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="640" y="285" width="440" height="45" as="geometry"/></mxCell>
+        <mxCell id="m4" value="④ 业务回调丢过来 ⚠️③（并行无保护）" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;dashed=1;fontSize=15;fontColor=#990000;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="630" y="370" as="sourcePoint"/><mxPoint x="1120" y="370" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s5" value="⑤ N 个线程同时处理不同请求&#10;⚠️ 都可能改同一份共享状态 —— 状态竞争" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="930" y="400" width="450" height="60" as="geometry"/></mxCell>
+        <mxCell id="m6" value="⑥ 处理结果" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;fontSize=15;fontColor=#990000;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1120" y="500" as="sourcePoint"/><mxPoint x="630" y="500" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m7" value="⑦ HTTP 响应" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="630" y="570" as="sourcePoint"/><mxPoint x="180" y="570" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="s8" value="旁支：时间轮 tick 推进定时任务 ⚠️② weak_ptr 存定时器" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="640" y="640" width="440" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="note" value="时序图读法（观众视角）：从上往下 = 时间流逝；横箭头 = 谁把什么交给谁；&#10;框 = 某个角色自己内部做的事。一眼看出：请求在「1 个 IO 线程」和「N 个工作线程」之间横跳——&#10;这就是「IO 并行、逻辑串行」的反面教材：逻辑也被丢出去并行了。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=16;fontColor=#990000;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="40" y="720" width="1320" height="120" as="geometry"/></mxCell>
+        <mxCell id="legend" value="色标：绿=可用底座　红=隐患节点　蓝=外部角色" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=14;fontColor=#333;align=left;spacing=10;" vertex="1" parent="1"><mxGeometry x="40" y="860" width="1320" height="50" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
