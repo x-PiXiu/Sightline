@@ -1,0 +1,44 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="登录房间时序" id="loginroom">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1300" pageHeight="1560" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="登录 + 房间 · 双端时序图（第 2 期 · 服务器说了算）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="36" as="geometry"/></mxCell>
+
+        <mxCell id="h_ue" value="UE 客户端&#10;（A = 建房者　B = 加入者）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="66" width="250" height="60" as="geometry"/></mxCell>
+        <mxCell id="h_net" value="服务器 · net 层&#10;Acceptor / ClientConnection / FrameCodec" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="460" y="66" width="330" height="60" as="geometry"/></mxCell>
+        <mxCell id="h_logic" value="服务器 · 逻辑层&#10;SessionService / RoomService" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="940" y="66" width="320" height="60" as="geometry"/></mxCell>
+        <mxCell id="l_ue" value="" style="endArrow=none;dashed=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="185" y="126" as="sourcePoint"/><mxPoint x="185" y="1390" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l_net" value="" style="endArrow=none;dashed=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="625" y="126" as="sourcePoint"/><mxPoint x="625" y="1390" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l_logic" value="" style="endArrow=none;dashed=1;strokeColor=#d79b00;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="126" as="sourcePoint"/><mxPoint x="1100" y="1390" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="pre" value="前置（第 1 期已完成）：TCP 已连接 · WELCOME 已发 · 心跳保活中" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;" vertex="1" parent="1"><mxGeometry x="300" y="160" width="700" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="m1" value="① LOGIN [账号, 凭证]" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="185" y="240" as="sourcePoint"/><mxPoint x="1100" y="240" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m2" value="② 切帧后分发" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;dashed=1;fontSize=14;fontColor=#1f6b30;background=#f7f4ee;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="625" y="290" as="sourcePoint"/><mxPoint x="1100" y="290" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s3" value="③ 校验凭证 → 建会话&#10;ClientRegistry 绑定 clientId ↔ 会话" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="915" y="318" width="370" height="56" as="geometry"/></mxCell>
+        <mxCell id="m4" value="④ LOGIN_OK [sessionId, 玩家信息]" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="410" as="sourcePoint"/><mxPoint x="185" y="410" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="x2" value="⚠️ 红支线 x2：重复登录 → 踢掉旧会话（一个账号一条活会话）" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;dashed=1;fontSize=14;fontColor=#990000;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="465" as="sourcePoint"/><mxPoint x="185" y="465" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m5" value="⑤ ROOM_LIST 请求" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="185" y="525" as="sourcePoint"/><mxPoint x="1100" y="525" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m6" value="⑥ ROOM_LIST [房间列表：id / 人数 / 状态]" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="580" as="sourcePoint"/><mxPoint x="185" y="580" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m7" value="⑦ CREATE_ROOM（玩家 A）" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="185" y="640" as="sourcePoint"/><mxPoint x="1100" y="640" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s8" value="⑧ 房间状态机：Empty → Waiting&#10;【服务器裁决：建房请求无理由拒绝】" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="915" y="668" width="370" height="56" as="geometry"/></mxCell>
+        <mxCell id="m9" value="⑨ ROOM_CREATED [roomId] → UE(A)" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="758" as="sourcePoint"/><mxPoint x="185" y="758" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m10" value="⑩ ROOM_LIST 更新推送（大厅全体可见）" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="813" as="sourcePoint"/><mxPoint x="185" y="813" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m11" value="⑪ JOIN_ROOM [roomId]（玩家 B）" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="185" y="873" as="sourcePoint"/><mxPoint x="1100" y="873" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="s12" value="⑫ 校验：未满员 / 未开局 → 加入&#10;状态 Waiting 成员 +1" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=15;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="915" y="901" width="370" height="56" as="geometry"/></mxCell>
+        <mxCell id="m13" value="⑬ JOIN_OK → UE(B)　·　PLAYER_JOINED [B 信息] → UE(A)" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontColor=#333;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="990" as="sourcePoint"/><mxPoint x="185" y="990" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="x1" value="⚠️ 红支线 x1：加入满员 / 已开局房间 → JOIN_FAIL「房间已满」——非法请求当场拒绝" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;dashed=1;fontSize=14;fontColor=#990000;background=#f7f4ee;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1100" y="1045" as="sourcePoint"/><mxPoint x="185" y="1045" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="updown" value="注：所有 UE ↔ 逻辑 的消息均经 net 层收发 + FrameCodec 切帧（图中仅 ①② 画全路径，其余为清晰省略中转）；下行「服务器说了算」——客户端只发意图，裁决与广播全部在逻辑层。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=15;fontColor=#990000;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="1090" width="1230" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="readme" value="读法（观众视角）：从上往下 = 时间流逝；蓝箭头 = UE 发意图；绿箭头 = 服务器结果；红虚线 = 非法操作被拒。&#10;数一数：房间的一切状态变化（⑧⑫）都发生在逻辑层——客户端从头到尾没有改过任何状态。" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=15;fontColor=#333;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="40" y="1185" width="1230" height="90" as="geometry"/></mxCell>
+        <mxCell id="legend" value="色标：绿箭头 = 服务器→UE　蓝箭头 = UE→服务器　红虚线 = 非法/拒绝　绿框角色 = net 层　橙框角色与卡片 = 逻辑层" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;fontSize=14;fontColor=#333;align=left;spacing=10;" vertex="1" parent="1"><mxGeometry x="40" y="1290" width="1230" height="50" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
