@@ -2,14 +2,14 @@
 // Created by 29108 on 2025/6/29.
 //
 
-#include "common/network/socket.h"
+#include "net/socket.h"
 #include <cstring>
 #include <stdexcept>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>  // 用于TCP_NODELAY选项
 #include <cstdio>         // 用于perror和fprintf
-#include "common/logger/logger.h"
+#include "logger/logger.h"
 
 namespace common {
     namespace network {

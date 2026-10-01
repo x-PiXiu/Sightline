@@ -8,8 +8,8 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "common/network/event_loop.h"
-#include "common/network/inet_address.h"
+#include "net/event_loop.h"
+#include "net/inet_address.h"
 #include "net/buffer.h"
 #include "adapters/frame_codec.h"
 #include <unistd.h>

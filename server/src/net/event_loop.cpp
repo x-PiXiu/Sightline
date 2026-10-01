@@ -2,9 +2,9 @@
 // Created by 29108 on 2025/7/1.
 //
 
-#include "common/network/event_loop.h"
-#include "common/logger/logger.h"
-#include "common/network/channel.h"
+#include "net/event_loop.h"
+#include "logger/logger.h"
+#include "net/channel.h"
 #include <sys/eventfd.h>
 #include <unistd.h>
 #include <cassert>

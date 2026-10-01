@@ -1,9 +1,9 @@
 //
 // Created by 29108 on 2025/6/30.
 //
-#include "common/network/channel.h"
-#include "common/logger/logger.h"
-#include "common/network/event_loop.h"
+#include "net/channel.h"
+#include "logger/logger.h"
+#include "net/event_loop.h"
 #include <sys/epoll.h>
 #include <cassert>
 

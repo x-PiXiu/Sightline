@@ -3,10 +3,10 @@
 #pragma once
 #include <functional>
 #include <memory>
-#include "common/network/event_loop.h"
-#include "common/network/inet_address.h"
-#include "common/network/socket.h"
-#include "common/network/channel.h"
+#include "net/event_loop.h"
+#include "net/inet_address.h"
+#include "net/socket.h"
+#include "net/channel.h"
 #include <fcntl.h>
 #include <cstring>   // strerror
 

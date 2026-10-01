@@ -1,16 +1,16 @@
 //
 // Created by 29108 on 2025/6/30.
 //
-#include "common/network/epoll.h"
+#include "net/epoll.h"
 
 #include <cassert>
 #include <cstring>
-#include "common/logger/logger.h"
+#include "logger/logger.h"
 #include <stdexcept>
 #include <unistd.h>
 #include <cerrno>
 
-#include "common/network/channel.h"
+#include "net/channel.h"
 
 namespace common {
     namespace network {

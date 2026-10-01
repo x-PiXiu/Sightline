@@ -11,13 +11,13 @@ endif()
 # 目录层级保留 common/ 前缀——源码 include 路径与毕设一致
 # 迁移日手术：ConfigManager / ThreadPool / 配置热更新体系整块切除（net 层零业务依赖）
 add_library(sightline_core STATIC
-    src/common/network/channel.cpp
-    src/common/network/epoll.cpp
-    src/common/network/event_loop.cpp
-    src/common/network/HierarchicalTimingWheel.cpp
-    src/common/network/inet_address.cpp
-    src/common/network/socket.cpp
-    src/common/logger/logger.cpp
+    src/net/channel.cpp
+    src/net/epoll.cpp
+    src/net/event_loop.cpp
+    src/net/HierarchicalTimingWheel.cpp
+    src/net/inet_address.cpp
+    src/net/socket.cpp
+    src/logger/logger.cpp
 )
 target_include_directories(sightline_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 find_package(Threads REQUIRED)

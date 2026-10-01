@@ -1,6 +1,6 @@
 // 最小复现：EventLoop::runEvery 周期路径是否触发（排查心跳 ACK 未回问题）
-#include "common/network/event_loop.h"
-#include "common/logger/logger.h"
+#include "net/event_loop.h"
+#include "logger/logger.h"
 int main() {
     common::logger::Logger::getInstance().addSink(std::make_unique<common::logger::ConsoleSink>());
     common::network::EventLoop loop;

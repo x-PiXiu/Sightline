@@ -1,8 +1,8 @@
 // 底座冒烟测试：无参 EventLoop 创建 → 日志装配 → 定时器触发 → 干净退出
 // 验证毕设网络库原版在 WSL 下可编译、可链接、可运行（不碰 ConfigManager 路径）
 // ⚠️ 遗产行为记录：毕设 Logger 不 addSink 就静默丢日志——装配是使用者的责任
-#include "common/logger/logger.h"
-#include "common/network/event_loop.h"
+#include "logger/logger.h"
+#include "net/event_loop.h"
 
 int main() {
     // 日志装配：ConsoleSink 必须显式添加，否则 LOG_xxx 全部静默丢弃

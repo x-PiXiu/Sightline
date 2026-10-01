@@ -7,9 +7,9 @@
 #include <map>
 #include <memory>
 
-#include "common/logger/logger.h"
-#include "common/network/event_loop.h"
-#include "common/network/inet_address.h"
+#include "logger/logger.h"
+#include "net/event_loop.h"
+#include "net/inet_address.h"
 #include "net/acceptor.h"
 #include "net/client_connection.h"
 #include "adapters/frame_codec.h"
