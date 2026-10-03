@@ -1,0 +1,49 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="现状架构v4" id="netarchv4">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1450" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="前任的网络库 · 现状（v4）" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="45" y="18" width="900" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="ue" value="" style="sketch=1;curveFitting=1;jiggle=2;shape=mxgraph.networks.pc;verticalLabelPosition=bottom;verticalAlign=top;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="130" y="70" width="120" height="100" as="geometry"/></mxCell>
+        <mxCell id="ue_t" value="UE 客户端&#10;需要：TCP 长连接 · 自定义协议" style="text;fontSize=16;fontStyle=1;fontColor=#333;align=center;" vertex="1" parent="1"><mxGeometry x="60" y="172" width="280" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="web" value="" style="sketch=1;curveFitting=1;jiggle=2;shape=cloud;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#f5f5f5;strokeColor=#bbbbbb;opacity=60;" vertex="1" parent="1"><mxGeometry x="1180" y="70" width="110" height="100" as="geometry"/></mxCell>
+        <mxCell id="web_t" value="HTTP / WebSocket&#10;（Web 层 · FPS 不使用）" style="text;fontSize=15;fontColor=#888;align=center;" vertex="1" parent="1"><mxGeometry x="1110" y="172" width="260" height="50" as="geometry"/></mxCell>
+
+        <mxCell id="gap1" value="缺：连接接受" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;fontColor=#990000;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="400" y="120" width="200" height="56" as="geometry"/></mxCell>
+        <mxCell id="gap2" value="缺：连接生命周期" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;fontColor=#990000;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="615" y="120" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="gap3" value="缺：收发缓冲" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;fontColor=#990000;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="850" y="120" width="200" height="56" as="geometry"/></mxCell>
+        <mxCell id="gap_t" value="三个缺口 · 第 1 期补齐 ↓" style="text;fontSize=16;fontStyle=1;fontColor=#990000;align=center;" vertex="1" parent="1"><mxGeometry x="540" y="182" width="260" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="m_ue_gap" style="edgeStyle=none;strokeColor=#6c8ebf;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ue" target="gap1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m_gap_base" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=3;dashed=1;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=1;entryY=0.35;" edge="1" parent="1" source="gap3" target="base"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="m_gap_base_t" value="补齐后贯通" style="text;fontSize=14;fontColor=#1f6b30;" vertex="1" parent="1"><mxGeometry x="1005" y="240" width="130" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="base" value="网络底座 · 可复用" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=20;fontStyle=1;fontColor=#1f4e79;verticalAlign=top;spacingTop=10;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="110" y="290" width="1050" height="450" as="geometry"/></mxCell>
+
+        <mxCell id="hero_loop" value="" style="endArrow=none;strokeColor=#6c8ebf;strokeWidth=4;curved=1;fillColor=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="665" y="420" as="sourcePoint"/><mxPoint x="665" y="420" as="targetPoint"/><Array as="points"><mxPoint x="590" y="390"/><mxPoint x="665" y="365"/><mxPoint x="740" y="390"/></Array></mxGeometry></mxCell>
+        <mxCell id="hero_loop2" value="" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;strokeWidth=4;curved=1;exitX=0.5;exitY=0;entryX=0.5;entryY=0;" edge="1" parent="1" target="hero"><mxGeometry relative="1" as="geometry"><mxPoint x="665" y="365" as="sourcePoint"/><Array as="points"><mxPoint x="760" y="375"/></Array></mxGeometry></mxCell>
+        <mxCell id="hero" value="EventLoop&#10;事件循环（主角）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=20;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="540" y="420" width="250" height="110" as="geometry"/></mxCell>
+
+        <mxCell id="c1" value="Epoll&#10;IO 多路复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="170" y="435" width="190" height="80" as="geometry"/></mxCell>
+        <mxCell id="c2" value="Channel&#10;事件分发" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="385" y="435" width="130" height="80" as="geometry"/></mxCell>
+        <mxCell id="c3" value="Socket&#10;bind / listen / accept" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="850" y="435" width="250" height="80" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c2" target="hero"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="hero" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="c4" value="HierarchicalTimingWheel&#10;定时器 · 已知设计缺陷（演进项）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="170" y="590" width="380" height="80" as="geometry"/></mxCell>
+        <mxCell id="c5" value="Logger&#10;需显式初始化，否则静默" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="590" y="590" width="330" height="80" as="geometry"/></mxCell>
+        <mxCell id="c6" value="InetAddress" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="960" y="590" width="180" height="80" as="geometry"/></mxCell>
+        <mxCell id="e4" value="定时驱动" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontColor=#1f4e79;exitX=0.25;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#f7f4ee;" edge="1" parent="1" source="hero" target="c4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="disk" value="" style="sketch=1;shape=cylinder3;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1290" y="600" width="80" height="100" as="geometry"/></mxCell>
+        <mxCell id="disk_t" value="日志落盘" style="text;fontSize=14;fontColor=#555;align=center;" vertex="1" parent="1"><mxGeometry x="1265" y="705" width="140" height="26" as="geometry"/></mxCell>
+        <mxCell id="e_disk" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;strokeWidth=2;dashed=1;exitX=1;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="c5" target="disk"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="一句话：底座可复用，但缺少 TCP 连接抽象——第 1 期补齐三个缺口。" style="text;fontSize=19;fontStyle=1;fontColor=#c8161d;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="930" width="1350" height="40" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
