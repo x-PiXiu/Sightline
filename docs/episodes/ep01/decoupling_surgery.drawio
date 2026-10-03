@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="解耦手术对比" id="surgerycmp">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1400" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="依赖审计 · 解耦手术（切之前 / 切之后）" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="45" y="20" width="900" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="before" value="切之前：event_loop 相关&#10;━━━━━━━&#10;1502 行（含配置热更新机器）&#10;· ConfigManager 耦合&#10;· ThreadPool 耦合&#10;· 热更新/变更分析/SHA256 审计&#10;· 第三方：yaml-cpp + nlohmann-json" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="100" width="560" height="240" as="geometry"/></mxCell>
+
+        <mxCell id="saw" value="🪚" style="text;fontSize=44;" vertex="1" parent="1"><mxGeometry x="660" y="190" width="80" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="after" value="切之后：event_loop 相关&#10;━━━━━━━&#10;648 行（纯网络机制）&#10;· 零业务依赖&#10;· 零第三方依赖&#10;· 只向系统调用看" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="780" y="100" width="560" height="240" as="geometry"/></mxCell>
+
+        <mxCell id="cutlist" value="🪚 切除清单&#10;━━━━━━━&#10;✂ ConfigManager 模块（配置中心）&#10;✂ ThreadPool 模块（业务线程池）&#10;✂ 配置热更新机器 ~500 行&#10;　（hot-reload / 变更分析 / SHA256 审计）&#10;✂ yaml-cpp + nlohmann-json 第三方依赖" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=15;fontColor=#990000;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="380" width="560" height="230" as="geometry"/></mxCell>
+
+        <mxCell id="why" value="为什么切？━━━━━━━&#10;· net 层该只向系统调用看——配置/线程池是业务的事&#10;· 第三方依赖 = 编译负担 + 升级风险 + 复用阻力&#10;· 架构好不好，先看它敢不敢删" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontColor=#1f6b30;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="780" y="380" width="560" height="230" as="geometry"/></mxCell>
+
+        <mxCell id="verif" value="验证：切完整库重编零错误 · smoke_base 冒烟 PASS · 全仓 ConfigManager/thread_pool 残留 = 0&#10;（commit e404e0f）" style="text;fontSize=14;fontColor=#888;align=left;" vertex="1" parent="1"><mxGeometry x="60" y="640" width="1280" height="26" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
