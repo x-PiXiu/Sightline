@@ -1,0 +1,40 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="演进决策对照" id="evod123">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="演进决策 · 从毕设到 FPS（为什么改 · 改了什么 · 凭什么）" style="text;fontSize=25;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="1100" height="38" as="geometry"/></mxCell>
+        <mxCell id="sub" value="左边是前任的假设（为 Web 而生），右边是 FPS 的需求——每一条差异，对应一个演进决策" style="text;fontSize=15;fontColor=#888;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="54" width="1100" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="hd_l" value="前任的假设（Web 服务）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;fontStyle=1;fontColor=#990000;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="96" width="600" height="46" as="geometry"/></mxCell>
+        <mxCell id="hd_r" value="FPS 的需求" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;fontStyle=1;fontColor=#1f6b30;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="96" width="600" height="46" as="geometry"/></mxCell>
+
+        <mxCell id="c1" value="请求互不相干，线程池并行没问题" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="160" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c1r" value="所有玩家共享同一世界状态" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="160" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c1d" value="决策①：撤帮手池&#10;处理回归循环线程排队" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="222" width="100" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="c2" value="HTTP 短连接 · 请求-响应 · 文本协议" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="340" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c2r" value="TCP 长连接 · 自定义二进制协议" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="340" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c2d" value="决策②：补三件套&#10;Acceptor·ClientConnection·Buffer&#10;＋ FrameCodec 切帧" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="402" width="100" height="120" as="geometry"/></mxCell>
+
+        <mxCell id="c3" value="HTTP 解析器焊死在连接里" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="470" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c3r" value="协议无关的连接（库只管字节）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="470" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c3d" value="决策③：连接与协议解耦&#10;FrameCodec 独立于连接" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="532" width="100" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="c4" value="定时器 weak_ptr 存储（会静默丢）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="600" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c4r" value="心跳 / 超时不允许静默丢失" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="600" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c4d" value="决策④：第 1 期先用（记缺陷）&#10;演进项：堆定时器替换" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;dashed=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="662" width="100" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="c5" value="epoll 100ms 轮询（无 timerfd）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="730" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c5r" value="实时帧驱动（30Hz 不漂移）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="730" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c5d" value="决策⑤：第 1 期先用（不挡路）&#10;演进项：timerfd 精准唤醒" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;dashed=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="792" width="100" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="c6" value="SIGPIPE 靠每个 main 自觉手写" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="860" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c6r" value="统一内聚（谁也不许忘）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="840" y="860" width="600" height="52" as="geometry"/></mxCell>
+        <mxCell id="c6d" value="决策⑥：main 显式写&#10;（交接批注第 8 条）" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="700" y="922" width="100" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="一句话：不是前任写得差——是这套底座为 Web 而生；FPS 换了需求，我就换对应的架构决策。每一条都有源码为证、有取舍逻辑、有验证手段。" style="text;fontSize=16;fontStyle=1;fontColor=#c8161d;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="50" y="1040" width="1420" height="40" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
