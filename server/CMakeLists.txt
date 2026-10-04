@@ -8,7 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ============ 前任遗产：毕设网络库原版（network 底座 + logger） ============
-# 目录层级保留 common/ 前缀——源码 include 路径与毕设一致
+# 目录层级已从毕设的 common/network 收敛为 net/——include 路径随迁移同步更新
 # 迁移日手术：ConfigManager / ThreadPool / 配置热更新体系整块切除（net 层零业务依赖）
 add_library(sightline_core STATIC
     src/net/channel.cpp
