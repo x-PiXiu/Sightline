@@ -1,25 +1,21 @@
 <mxfile host="app.diagrams.net">
-  <diagram name="修改标记图" id="changediff">
-    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1450" pageHeight="1000" math="0" shadow="0">
+  <diagram name="手术账本" id="changediffv2">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="640" math="0" shadow="0">
       <root>
         <mxCell id="0"/><mxCell id="1" parent="0"/>
-        <mxCell id="title" value="第 1 期 · 我们改了什么（三色 diff 视图 · 数据来自 git diff --stat）" style="text;fontSize=25;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1100" height="38" as="geometry"/></mxCell>
-        <mxCell id="stat" value="实测统计（git diff --stat a39a681 → HEAD，server/ 范围）：31 files changed　+1,254 insertions(+)　−6,047 deletions(−)" style="rounded=1;whiteSpace=wrap;fillColor=#333333;strokeColor=#333333;fontSize=16;fontStyle=1;fontColor=#7CFC00;fontFamily=Courier New;align=left;spacingLeft=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="64" width="1370" height="46" as="geometry"/></mxCell>
+        <mxCell id="title" value="手术账本 · git diff --stat（a39a681 → HEAD · server/）" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="900" height="34" as="geometry"/></mxCell>
 
-        <mxCell id="del_t" value="🔴 删除（−6,047 行的主体）" style="text;fontSize=19;fontStyle=1;fontColor=#990000;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="130" width="400" height="32" as="geometry"/></mxCell>
-        <mxCell id="del" value="✂ ConfigManager 模块（配置中心）&#10;✂ ThreadPool 模块（业务线程池）&#10;✂ 配置热更新机器 ~500 行&#10;　（hot-reload · 变更分析 · SHA256 审计）&#10;✂ yaml-cpp + nlohmann-json 第三方依赖&#10;✂ 旧 CMake / 迁移副本残留&#10;━━━━━━━&#10;删除理由：net 层只向系统调用看——&#10;配置/线程池/第三方都是业务的事" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontColor=#990000;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="50" y="168" width="440" height="280" as="geometry"/></mxCell>
+        <mxCell id="n_del" value="− 6,047" style="text;fontSize=34;fontStyle=1;fontColor=#c8161d;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="120" y="70" width="260" height="50" as="geometry"/></mxCell>
+        <mxCell id="n_add" value="+ 1,254" style="text;fontSize=34;fontStyle=1;fontColor=#1f6b30;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="470" y="70" width="260" height="50" as="geometry"/></mxCell>
+        <mxCell id="n_net" value="净减 ≈ 5,000 行" style="text;fontSize=34;fontStyle=1;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="820" y="70" width="300" height="50" as="geometry"/></mxCell>
 
-        <mxCell id="mod_t" value="🟡 修改（黄 = 行为/结构变化）" style="text;fontSize=19;fontStyle=1;fontColor=#8a6d1a;align=left;" vertex="1" parent="1"><mxGeometry x="520" y="130" width="400" height="32" as="geometry"/></mxCell>
-        <mxCell id="mod" value="🔧 socket.cpp：阻塞 fd → 非阻塞&#10;　（SOCK_NONBLOCK + accept4——ET 模式必需，&#10;　否则 accept 循环卡死事件循环）&#10;🔧 event_loop.h：1502 → 115 行&#10;　（配置热更新机器整块切除）&#10;🔧 event_loop.cpp：1502 → 648 行&#10;🔧 logger：不装配即静默 → 需显式 addSink&#10;🔧 目录：common/ 拆除 → net/ logger/&#10;🔧 心跳 tick：异步投递 → loop 线程同步" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="520" y="168" width="440" height="280" as="geometry"/></mxCell>
+        <mxCell id="r_del" value="🔴 删除　ConfigManager（配置中心）· ThreadPool · 配置热更新机器 · yaml/json 第三方" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;fontSize=15;align=left;spacingLeft=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="160" width="1080" height="80" as="geometry"/></mxCell>
+        <mxCell id="r_mod" value="🔧 修改　socket 出生非阻塞 · accept4 · event_loop 瘦身（h 617→115 / cpp 1502→647）· tick 回主循环 · Logger 需显式装配" style="rounded=1;whiteSpace=wrap;fillColor=#fffaf2;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="270" width="1080" height="80" as="geometry"/></mxCell>
+        <mxCell id="r_add" value="🟢 新增　Acceptor · ClientConnection · Buffer · FrameCodec · main 装配 · MSG_IDS 契约 · 冒烟测试" style="rounded=1;whiteSpace=wrap;fillColor=#f6fbf4;strokeColor=#82b366;fontSize=15;align=left;spacingLeft=16;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="380" width="1080" height="80" as="geometry"/></mxCell>
 
-        <mxCell id="add_t" value="🟢 新增（+1,254 行 = 第 1 期全部代码与文档）" style="text;fontSize=19;fontStyle=1;fontColor=#1f6b30;align=left;" vertex="1" parent="1"><mxGeometry x="990" y="130" width="440" height="32" as="geometry"/></mxCell>
-        <mxCell id="add" value="🆕 net/acceptor.h（接客：accept 循环+EMFILE 防护）&#10;🆕 net/client_connection.h（连接生命周期托管）&#10;🆕 net/buffer.h（收发缓冲·最简语义版）&#10;🆕 adapters/frame_codec.h（[2B len][2B msgid] 切帧）&#10;🆕 main.cpp（装配根+帧队列+心跳 echo）&#10;🆕 protocol/MSG_IDS.md（协议契约登记表）&#10;🆕 tests/smoke_base + test_every + scripts/smoke_client.py&#10;🆕 docs/episodes/ep01/ 定稿图×5 + devlog + 口播稿" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="990" y="168" width="440" height="280" as="geometry"/></mxCell>
+        <mxCell id="state" value="切完的网络层：零业务依赖 · 零第三方库——只认标准库 + POSIX" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#555555;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="490" width="1080" height="56" as="geometry"/></mxCell>
 
-        <mxCell id="flow" value="因果链一句话：删除（让 net 层干净）→ 修改（让行为正确）→ 新增（让 FPS 跑起来）——&#10;三色就是第 1 期的全部工作；看懂这张 diff，就看懂了我们这期干了什么。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=16;fontColor=#990000;align=left;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="50" y="470" width="1370" height="80" as="geometry"/></mxCell>
-
-        <mxCell id="e2e" value="端到端验证：python 裸客户端 PASS（WELCOME/心跳×5/seq 匹配）→ UE PIE 实机 PASS（Connected/ping/心跳×24）" style="text;fontSize=15;fontColor=#555;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="570" width="1370" height="30" as="geometry"/></mxCell>
-
-        <mxCell id="note" value="注：删除明细中的 ConfigManager/ThreadPool 模块已存档于 sightline-archived（本地+GitHub），随时可查——「删」不等于「丢」。" style="text;fontSize=14;fontColor=#888;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="620" width="1370" height="26" as="geometry"/></mxCell>
+        <mxCell id="arch" value="被切模块存档于 sightline-archived（本地 + GitHub），随时可查——删 ≠ 丢" style="text;fontSize=13;fontColor=#888888;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="60" y="572" width="900" height="26" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
