@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="帧队列机制" id="framequeuemech">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1300" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="帧队列 · 机制图（第 1 期 · 单线程串行 · 世界状态一致）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="36" as="geometry"/></mxCell>
+
+        <mxCell id="t1" value="消息到达&#10;（Channel 读回调 · ET 响一次读到底）" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="110" width="250" height="90" as="geometry"/></mxCell>
+        <mxCell id="t2" value="切帧 FrameCodec&#10;[2B len][2B msgid]" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="360" y="110" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="t3" value="入帧队列&#10;std::deque&lt;QueuedFrame&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="690" y="110" width="250" height="90" as="geometry"/></mxCell>
+
+        <mxCell id="b1" value="半包 → 留缓冲&#10;切完整才入队" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="330" y="250" width="150" height="66" as="geometry"/></mxCell>
+        <mxCell id="b2" value="坏流（len&lt;2）→&#10;整段清空防卡死" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="500" y="250" width="160" height="66" as="geometry"/></mxCell>
+
+        <mxCell id="t4" value="33ms 帧驱动&#10;timerfd · 时间轮推拍" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="420" width="260" height="90" as="geometry"/></mxCell>
+        <mxCell id="t5" value="取帧 → 分发&#10;main 内联 if/else&#10;（限频钩子挂点 = 第 3 期）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="420" y="410" width="270" height="110" as="geometry"/></mxCell>
+        <mxCell id="t6" value="处理：心跳 echo&#10;校验 seq → 组 ACK&#10;回显 + serverTs" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="820" y="410" width="280" height="110" as="geometry"/></mxCell>
+
+        <mxCell id="e1" value="" style="startArrow=none;endArrow=block;html=1;strokeColor=#333333;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1" source="t1" target="t2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="完整帧" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;" edge="1" parent="1" source="t2" target="t3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="每拍清空队列" style="endArrow=block;html=1;strokeColor=#333333;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="t3" target="t4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="815" y="345"/><mxPoint x="170" y="345"/></Array></mxGeometry></mxCell>
+        <mxCell id="e4" value="" style="startArrow=none;endArrow=block;html=1;strokeColor=#333333;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1" source="t4" target="t5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="" style="startArrow=none;endArrow=block;html=1;strokeColor=#333333;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1" source="t5" target="t6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="处理完回来接着睡（等下一拍）" style="endArrow=block;html=1;strokeColor=#82b366;strokeWidth=2;dashed=1;sketch=1;curveFitting=1;jiggle=2;fontSize=13;exitX=0.5;exitY=0;entryX=0.5;entryY=0;" edge="1" parent="1" source="t6" target="t4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="960" y="370"/><mxPoint x="170" y="370"/></Array></mxGeometry></mxCell>
+        <mxCell id="eb1" value="半包" style="endArrow=block;html=1;strokeColor=#d6b656;strokeWidth=1.5;dashed=1;sketch=1;fontSize=12;" edge="1" parent="1" source="t2" target="b1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb2" value="坏流" style="endArrow=block;html=1;strokeColor=#d6b656;strokeWidth=1.5;dashed=1;sketch=1;fontSize=12;" edge="1" parent="1" source="t2" target="b2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="n1" value="两条铁律&#10;· 单线程串行——世界状态只有一个人写&#10;· 消息最多等一个帧周期（33ms）——帧驱动的固有节奏" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#555555;fontSize=14;align=left;spacingLeft=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="590" width="580" height="100" as="geometry"/></mxCell>
+        <mxCell id="n2" value="第 3 期同步直接复用此队列&#10;移动 / 开枪消息走同一趟管线——现在多写二十行，到时候少重构两百行" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#555555;fontSize=14;align=left;spacingLeft=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="680" y="590" width="580" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="图例：蓝 = 第 1 期新增　绿 = 复用前任底座　黄 = 分支判定　灰 = 外部事件　虚线绿箭头 = 单线程回环　|　铁律：定稿图 = 派活依据，代码与图不一致 = 代码错" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="716" width="1220" height="30" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
