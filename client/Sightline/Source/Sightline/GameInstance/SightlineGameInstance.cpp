@@ -21,6 +21,7 @@ namespace
     constexpr int32  kHudMessageKey   = 1;        // 覆盖式刷新（同一 key）
     constexpr float  kHeartbeatPeriod = 1.0f;     // 1s 一跳
     constexpr double kLagThresholdMs  = 3000.0;   // 3s 无 ACK = LAG
+    constexpr double kReconnectAfterLagMs = 5000.0;  // LAG 持续 5s 不恢复 → 主动断线自动重连
     constexpr float  kReconnectDelay  = 3.0f;     // 断开/失败后 3s 自动重连
     inline double MonotonicMs() { return FPlatformTime::Seconds() * 1000.0; }
 }
@@ -66,8 +67,18 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
     if (bConnected && !bLag && MonotonicMs() - LastAckMonotonicMs > kLagThresholdMs)
     {
         bLag = true;
+        LagEnteredMonotonicMs = MonotonicMs();
         UE_LOG(LogSightline, Warning, TEXT("[GI] %.0f ms 无 ACK → LAG（未确认心跳 %d 个，已收 WELCOME=%d）"),
                kLagThresholdMs, PendingHeartbeats.Num(), bGotWelcome ? 1 : 0);
+    }
+    // LAG 持续不恢复 → 主动断线（半开连接被动等不到对端死亡，就主动拆）；
+    // Disconnect 会经 OnDisconnected → OnConnectionLost → ScheduleReconnect 走既有自愈链
+    if (bConnected && bLag && LagEnteredMonotonicMs > 0.0 &&
+        MonotonicMs() - LagEnteredMonotonicMs > kReconnectAfterLagMs)
+    {
+        UE_LOG(LogSightline, Warning, TEXT("[GI] LAG 持续 %.0f ms → 主动断线，自动重连"),
+               MonotonicMs() - LagEnteredMonotonicMs);
+        Disconnect();
     }
     return true;   // true = 继续调度
 }
@@ -130,6 +141,7 @@ void USightlineGameInstance::OnConnectionLost(const FString& Reason)
     StopHeartbeat();
     bConnected = false;
     bLag = false;
+    LagEnteredMonotonicMs = 0.0;
     Connection.Reset();
     if (bShuttingDown)
     {
@@ -234,6 +246,7 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
         if (bLag)
         {
             bLag = false;
+            LagEnteredMonotonicMs = 0.0;
             UE_LOG(LogSightline, Log, TEXT("[GI] ACK 恢复 → LAG 解除"));
         }
         LastAckMonotonicMs = MonotonicMs();

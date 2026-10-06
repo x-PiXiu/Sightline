@@ -41,6 +41,7 @@ private:
     uint32 HeartbeatSeq = 0;
     uint32 LastPingMs = 0;
     double LastAckMonotonicMs = 0.0;      // 单调时钟：LAG 判定用
+    double LagEnteredMonotonicMs = 0.0;   // 单调时钟：LAG 进入时刻（持续超时 → 主动断线重连）
     bool bLag = false;
     bool bGotWelcome = false;     // 诊断：WELCOME 是否已到（LAG 触发时打印）
     bool bGotFirstAck = false;    // 诊断：首个 ACK 是否已到
