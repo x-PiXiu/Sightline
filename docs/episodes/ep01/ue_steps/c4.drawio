@@ -1,0 +1,32 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="UE连接组件" id="ueconnv2">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="UE 客户端 · 连接组件（第 1 期 · 全部新增 · C++ · 蓝图零逻辑）" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="1000" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="band" value="" style="rounded=1;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="80" width="1120" height="230" as="geometry"/></mxCell>
+        <mxCell id="b1" value="GameInstance&#10;管连接生死&#10;（切关卡不死）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="70" y="140" width="180" height="110" as="geometry"/></mxCell>
+        <mxCell id="b2" value="接收线程&#10;FRunnable&#10;只搬字节" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="310" y="140" width="180" height="110" as="geometry"/></mxCell>
+        <mxCell id="b3" value="AsyncTask&#10;唯一跨线程门" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#c8161d;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="550" y="140" width="180" height="110" as="geometry"/></mxCell>
+        <mxCell id="b4" value="帧处理器（游戏线程）&#10;WELCOME→Connected&#10;ACK 按 seq 匹配→ping" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="790" y="140" width="210" height="110" as="geometry"/></mxCell>
+        <mxCell id="b5" value="HUD&#10;状态 · ping · seq" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=15;sketch=1;curveFitting=1;jiggle=2;;strokeWidth=4" vertex="1" parent="1"><mxGeometry x="790" y="290" width="210" height="64" as="geometry"/></mxCell>
+        <mxCell id="b6" value="心跳计时器&#10;每 1s：seq++ · 组帧发送" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="70" y="290" width="210" height="64" as="geometry"/></mxCell>
+
+        <mxCell id="f1" value="Connect" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;;opacity=25" edge="1" parent="1" source="b1" target="b2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f2" value="切好的帧" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;;opacity=25" edge="1" parent="1" source="b2" target="b3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f3" value="投递" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;;opacity=25" edge="1" parent="1" source="b3" target="b4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f4" value="状态 / ping 刷新" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;exitX=0.75;exitY=1;entryX=0.75;entryY=0;;opacity=25" edge="1" parent="1" source="b4" target="b5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f5" value="每 1s 一跳" style="endArrow=block;html=1;strokeColor=#d79b00;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;fontSize=13;fontColor=#7f6000;exitX=0.5;exitY=0;entryX=0.25;entryY=1;;opacity=25" edge="1" parent="1" source="b6" target="b2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="sm1" value="断开" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;fontSize=13;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="330" y="400" width="120" height="44" as="geometry"/></mxCell>
+        <mxCell id="sm2" value="连接中" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="490" y="400" width="120" height="44" as="geometry"/></mxCell>
+        <mxCell id="sm3" value="已连接" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="650" y="400" width="120" height="44" as="geometry"/></mxCell>
+        <mxCell id="sm4" value="LAG" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;;opacity=30" vertex="1" parent="1"><mxGeometry x="810" y="400" width="120" height="44" as="geometry"/></mxCell>
+        <mxCell id="smnote" value="连接状态机：3s 无 ACK → LAG（自动重连）" style="text;fontSize=14;fontColor=#333333;align=left;sketch=1;;opacity=30" vertex="1" parent="1"><mxGeometry x="70" y="402" width="250" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="rule" value="蓝图 = 0 · 游戏对象只在游戏线程碰 · 与服务器共用同一份协议契约" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="486" width="1120" height="26" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
