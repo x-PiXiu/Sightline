@@ -8,7 +8,7 @@ public class Sightline : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Sockets", "Networking" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Sockets", "Networking", "UMG" });
 
 		// 模块根加入 include 路径——支持 "GameInstance/..." "Connection/..." 子目录引用
 		PublicIncludePaths.Add(ModuleDirectory);

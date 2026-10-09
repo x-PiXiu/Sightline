@@ -1,7 +1,11 @@
-// Sightline 服务器 —— 第 1 期：UE 连接 + 心跳 echo（装配根）
-// 设计依据：docs/episodes/ep01/ 四张定稿图（图 = 代码一致）
-// 装配清单：日志 addSink → SIGPIPE → EventLoop（单线程）→ Acceptor → 帧队列 → 33ms 帧驱动
+// Sightline 服务器 —— 第 2 期：登录 + 房间（装配根）
+// 设计依据：docs/episodes/ep02/设计草案.md + docs/protocol/MSG_IDS.md v2 + 双端架构图（图 = 代码一致）
+// 装配清单：日志 → SIGPIPE → EventLoop → Acceptor → 帧队列 → 33ms 帧驱动
+//           → MessageDispatcher（注册表）→ LobbyService（用例）+ FrameWriter（事件出站）
+// 第 1 期 → 第 2 期的变化：帧驱动里的 if/else 消息链拆成注册表（开闭原则）；
+//           房间业务全部在 lobby::LobbyService（纯逻辑，单测覆盖），main 只做装配与搬运
 #include <csignal>
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <map>
@@ -13,10 +17,14 @@
 #include "net/acceptor.h"
 #include "net/client_connection.h"
 #include "adapters/frame_codec.h"
+#include "adapters/lobby_wiring.h"
+#include "lobby/lobby.h"
 #include "protocol/msg_ids.h"
 
 namespace {
     constexpr uint16_t kListenPort = 8888;
+
+    std::atomic<bool> gShutdownRequested{false};      // 信号只置位；广播在帧驱动里做（信号处理器内不做复杂动作）
 
     struct QueuedFrame {                              // 帧队列元素
         net::ClientConnection::Ptr conn;              // 回包通道
@@ -36,46 +44,57 @@ namespace {
 } // namespace
 
 int main() {
-    // ===== main 只干装配（最脏的一层）=====
-    // 1. 日志装配：不 addSink 则全部静默（交接批注第 7 条，冒烟实测）
+    // ===== main 只干装配（最脏的一层，整洁架构最外圈）=====
+    // 1. 日志装配
     common::logger::Logger::getInstance().addSink(
         std::make_unique<common::logger::ConsoleSink>());
+    common::logger::Logger::getInstance().setLogLevel(common::logger::LogLevel::DEBUG);   // 业务 debug 可见；心跳已在 TRACE 不刷屏
+    LOG_DEBUG("[自检] 日志级别=DEBUG，本行可见即 debug 通路正常");
 
     // 2. SIGPIPE：写已断开的 socket 默认杀进程——先显式忽略（为什么：第 13 期事故复盘）
     std::signal(SIGPIPE, SIG_IGN);
 
-    // 3. 事件循环：第 1 期单线程——IO 与逻辑同线程（架构图 v2.0）
+    // 2.5 优雅关闭（D2-14）：SIGINT/SIGTERM 只置位，帧驱动里广播 KICKED(3) 后 quit
+    std::signal(SIGINT, [](int) { gShutdownRequested = true; });
+    std::signal(SIGTERM, [](int) { gShutdownRequested = true; });
+
+    // 3. 事件循环：单线程——IO 与逻辑同线程（世界状态一致，房间逻辑零锁）
     common::network::EventLoop loop;
 
-    // 4. 帧队列：切好的帧入队，帧驱动消费（第 3 期同步复用）
-    std::deque<QueuedFrame> frame_queue;              // main 不返回（loop 死循环），栈生命周期安全
-    std::map<int, net::ClientConnection::Ptr> connections;
+    // 4. 业务用例 + 出站适配器 + 连接表（先于帧驱动构造，供回调捕获）
+    sightline::lobby::LobbyService lobby;
+    adapters::ConnTable connections;
+    adapters::FrameWriter writer{connections, lobby};
 
-    // 5. 帧驱动：33ms 一帧，消费帧队列（单线程串行——世界状态一致）
+    // 5. 帧队列：切好的帧入队，帧驱动消费
+    std::deque<QueuedFrame> frame_queue;
+
+    // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
+    //    请求侧注册在适配器层（wireLobby）：payload 解析 + 调用例，main 不携带 handler
+    adapters::MessageDispatcher dispatcher;
+    adapters::wireLobby(dispatcher, lobby, writer, connections);
+
+    // 7. 帧驱动：33ms 一帧——消费帧队列（分发）+ 登录宽限清理
     loop.runEvery(33, [&] {
         while (!frame_queue.empty()) {
             QueuedFrame f = std::move(frame_queue.front());
             frame_queue.pop_front();
-            if (f.msgid == protocol::MSG_C2S_HEARTBEAT && f.payload.size() == 12) {
-                const uint32_t seq =
-                    static_cast<uint32_t>(static_cast<unsigned char>(f.payload[0]))
-                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[1])) << 8)
-                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[2])) << 16)
-                  | (static_cast<uint32_t>(static_cast<unsigned char>(f.payload[3])) << 24);
-                LOG_INFO("[HEARTBEAT] seq=" + std::to_string(seq) +
-                         " from=" + f.conn->peerAddr().toIpPort());
-                std::string ack = f.payload;                  // 原样回显 seq + clientTs
-                appendU64(ack, nowMs());                      // 附加 serverTs
-                f.conn->send(protocol::MSG_S2C_HEARTBEAT_ACK, ack);
-            } else {
-                LOG_WARNING("[未知消息] msgid=" + std::to_string(f.msgid) +
-                            " 长度=" + std::to_string(f.payload.size()) +
-                            " 来自=" + f.conn->peerAddr().toIpPort() + " —— 已忽略");
+            dispatcher.dispatch(f.conn->fd(), f.msgid, f.payload);
+        }
+        writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
+
+        // 优雅关闭（D2-14）：广播 KICKED(3 服务器关闭) 后退出事件循环
+        if (gShutdownRequested) {
+            LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
+            for (auto& [fd, c] : connections) {
+                (void)fd;
+                c->send(protocol::MSG_S2C_KICKED, std::string{char(3)});
             }
+            loop.quit();
         }
     });
 
-    // 6. Acceptor：接客 → 新建连接 → WELCOME
+    // 8. Acceptor：接客 → 新建连接 → WELCOME（第 1 期契约不变）→ 登记宽限期
     net::Acceptor acceptor(&loop, common::network::InetAddress(kListenPort));
     acceptor.setNewConnectionCallback([&](int connfd, const common::network::InetAddress& peer) {
         auto conn = std::make_shared<net::ClientConnection>(&loop, connfd, peer);
@@ -85,22 +104,23 @@ int main() {
         });
         conn->setCloseCallback([&](const net::ClientConnection::Ptr& c) {
             connections.erase(c->fd());
+            writer.deliver(lobby.Disconnect(c->fd()));        // 在房中：同 Leave 路径（D2-16）
             LOG_INFO("连接断开: " + c->peerAddr().toIpPort() + " 在线=" +
                      std::to_string(connections.size()));
         });
         connections[connfd] = conn;
 
-        // WELCOME：连接建立即发（时序图 ②b）
-        std::string payload;                            // 8B serverTs（恰好，不再多初始化）
+        std::string payload;                                  // 8B serverTs
         appendU64(payload, nowMs());
         conn->send(protocol::MSG_S2C_WELCOME, payload);
+        lobby.OnConnected(connfd, nowMs());                   // 登录宽限期起点（10s）
 
         LOG_INFO("新连接: " + peer.toIpPort() + " fd=" + std::to_string(connfd) +
                  " 在线=" + std::to_string(connections.size()));
     });
 
     LOG_INFO("Sightline 服务器启动，监听 :" + std::to_string(kListenPort) +
-             "（单线程 · 帧队列 · 心跳 echo）");
+             "（单线程 · 帧队列 · 心跳 · 登录+房间）");
     loop.loop();                                              // 主线程进入事件循环
     LOG_INFO("Sightline 服务器退出");
     return 0;

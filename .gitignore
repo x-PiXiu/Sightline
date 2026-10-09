@@ -4,6 +4,7 @@ cmake-build-*/
 logs/
 *.log
 server/loadbot/loadbot
+server/sightline_server
 
 # ===== client (UE5)：只提交源码与工程配置，其余（素材/生成物）全部排除 =====
 # 工程在 client/Sightline/ 子目录（两层白名单：先放行子目录，再放行内容）
@@ -14,6 +15,7 @@ client/Sightline/*
 !client/Sightline/Sightline.uproject
 !client/Sightline/Source
 !client/Sightline/Config
+!client/Sightline/*.bat
 client/Sightline/Source/**
 !client/Sightline/Source/**/
 !client/Sightline/Source/**/*.cpp

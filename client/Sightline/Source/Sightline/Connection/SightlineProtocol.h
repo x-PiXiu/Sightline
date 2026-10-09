@@ -11,6 +11,17 @@ namespace SightlineProtocol
         MSG_S2C_WELCOME       = 1,  // S→C  [8B serverTs]
         MSG_C2S_HEARTBEAT     = 2,  // C→S  [4B seq][8B clientTs]
         MSG_S2C_HEARTBEAT_ACK = 3,  // S→C  [4B seq][8B clientTs][8B serverTs]
+        // —— 第 2 期：登录 + 房间（与 docs/protocol/MSG_IDS.md v2 保持同步）——
+        MSG_C2S_LOGIN         = 4,  // C→S  [1B 名长][名字]（非空 ≤16B UTF-8）
+        MSG_S2C_LOGIN_RESULT  = 5,  // S→C  [1B 结果码][4B PlayerId]（0 成功/1 重名/2 非法）
+        MSG_C2S_CREATE_ROOM   = 6,  // C→S  [1B 房名长][房间名]（非空 ≤24B；允许重名）
+        MSG_S2C_CREATE_RESULT = 7,  // S→C  [1B 结果码][4B RoomId]（0 成功/1 未登录/2 已在房/3 房名非法）
+        MSG_C2S_JOIN_ROOM     = 8,  // C→S  [4B RoomId]
+        MSG_S2C_JOIN_RESULT   = 9,  // S→C  [1B 结果码][4B RoomId][1B 人数]（0/1 未登录/2 不存在/3 已满/4 已在房）
+        MSG_C2S_LEAVE_ROOM    = 10, // C→S  (空 payload)
+        MSG_S2C_ROOM_LIST     = 11, // S→C  [2B 房间数]{[4B RoomId][1B 人数][1B 房名长][房名][1B 房主名长][房主名]}
+        MSG_S2C_ROOM_STATE    = 12, // S→C  [4B RoomId][1B 房主名长][房主名][1B 人数]{[1B 名长][名字]}（房主=最早加入者）
+        MSG_S2C_KICKED        = 13, // S→C  [1B 原因码]（1 顶号 / 2 登录超时 / 3 服务器关闭；随后断开）
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid

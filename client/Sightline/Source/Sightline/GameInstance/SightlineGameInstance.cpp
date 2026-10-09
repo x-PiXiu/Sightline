@@ -7,6 +7,7 @@
 #include "GameInstance/SightlineGameInstance.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
 #include "Async/Async.h"
 #include "Misc/DateTime.h"
@@ -29,6 +30,16 @@ namespace
 void USightlineGameInstance::Init()
 {
     Super::Init();
+
+    // 第 2 期：大厅会话（先于 Connect 创建——Connect 里要绑定连接）
+    LobbySession = NewObject<ULobbySession>(this);
+
+    // 界面联动：会话委托 → GI 切屏（登录/大厅/房间/被踢/断线）
+    LobbySession->OnLoginResult.AddDynamic(this, &USightlineGameInstance::HandleLoginResultForUI);
+    LobbySession->OnRoomListChanged.AddDynamic(this, &USightlineGameInstance::HandleRoomListForUI);
+    LobbySession->OnRoomStateChanged.AddDynamic(this, &USightlineGameInstance::HandleRoomStateForUI);
+    LobbySession->OnKicked.AddDynamic(this, &USightlineGameInstance::HandleKickedForUI);
+    LobbySession->OnLobbyLinkLost.AddDynamic(this, &USightlineGameInstance::HandleLinkLostForUI);
 
     // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调（HUD 刷新 + LAG 判定）
     TickerDelegate.BindUObject(this, &USightlineGameInstance::HandleTick);
@@ -53,6 +64,13 @@ void USightlineGameInstance::Shutdown()
 
 bool USightlineGameInstance::HandleTick(float DeltaTime)
 {
+    // 第 2 期：视口就绪后展示登录界面（一次性；Init 时视口尚未就绪）
+    if (!bInitialScreenShown && GEngine && GEngine->GameViewport)
+    {
+        bInitialScreenShown = true;
+        ShowLoginScreen();
+    }
+
     // HUD（验收画面 ①②）：覆盖式刷新同一 key
     if (GEngine)
     {
@@ -94,6 +112,7 @@ void USightlineGameInstance::Connect()
 
     UE_LOG(LogSightline, Log, TEXT("[GI] 连接 127.0.0.1:8888 ……"));
     Connection = MakeUnique<FSightlineConnection>();
+    if (LobbySession) LobbySession->BindConnection(Connection.Get());   // 会话绑定新连接
     // BindLambda 捕获弱指针：GameInstance 析构后在途 AsyncTask 执行时安全跳过（防悬垂）
     TWeakObjectPtr<USightlineGameInstance> WeakThis(this);
     Connection->OnFrame.BindLambda([WeakThis](uint16 MsgId, const TArray<uint8>& Payload)
@@ -119,6 +138,7 @@ void USightlineGameInstance::Connect()
     {
         // 服务器可能后起——3 秒后自动重试
         Connection.Reset();
+        if (LobbySession) LobbySession->BindConnection(nullptr);
         UE_LOG(LogSightline, Warning, TEXT("[GI] 连接失败，%.0f 秒后重试"), kReconnectDelay);
         ScheduleReconnect();
     }
@@ -142,6 +162,11 @@ void USightlineGameInstance::OnConnectionLost(const FString& Reason)
     bConnected = false;
     bLag = false;
     LagEnteredMonotonicMs = 0.0;
+    if (LobbySession)
+    {
+        LobbySession->NotifyLinkLost();                   // 会话清空 + 通知 UI（被踢/断线区分开）
+        LobbySession->BindConnection(nullptr);
+    }
     Connection.Reset();
     if (bShuttingDown)
     {
@@ -160,7 +185,136 @@ void USightlineGameInstance::Disconnect()
         Connection->Disconnect(TEXT("主动断开"));
         Connection.Reset();
     }
+    if (LobbySession) LobbySession->BindConnection(nullptr);   // Shutdown 路径静默解绑
     bConnected = false;
+}
+
+// ===== 第 2 期：界面装配与切换 =====
+
+// Widget 类槽兜底：ini 可能被编辑器回写清空/加载时序不齐——路径固定，代码兜底最稳
+void USightlineGameInstance::EnsureWidgetClasses()
+{
+    if (!LoginWidgetClass)
+        LoginWidgetClass = LoadClass<ULoginWidgetBase>(nullptr, TEXT("/Game/Code/UI/WBP_Login.WBP_Login_C"));
+    if (!LobbyWidgetClass)
+        LobbyWidgetClass = LoadClass<ULobbyWidgetBase>(nullptr, TEXT("/Game/Code/UI/WBP_Lobby.WBP_Lobby_C"));
+    if (!RoomWidgetClass)
+        RoomWidgetClass = LoadClass<URoomWidgetBase>(nullptr, TEXT("/Game/Code/UI/WBP_Room.WBP_Room_C"));
+}
+
+void USightlineGameInstance::EnsureUIMouseCursor()
+{
+    // 纯界面流程（登录/大厅/房间）需要可见鼠标；PIE 默认隐藏
+    if (UWorld* World = GetWorld())
+        if (APlayerController* PC = World->GetFirstPlayerController())
+            PC->bShowMouseCursor = true;
+}
+
+void USightlineGameInstance::ShowLoginScreen()
+{
+    if (bShuttingDown) return;                            // 关服拆卸中不建界面（否则 ensure 崩）
+    EnsureWidgetClasses();
+    EnsureUIMouseCursor();
+    if (CurrentScreenWidget)
+    {
+        CurrentScreenWidget->RemoveFromParent();
+        CurrentScreenWidget = nullptr;
+    }
+    if (!LoginWidgetClass)
+    {
+        UE_LOG(LogSightline, Warning, TEXT("[UI] LoginWidgetClass 未配置（工程设置 GameInstance 默认值）"));
+        return;
+    }
+    if (auto* W = CreateWidget<ULoginWidgetBase>(this, LoginWidgetClass))
+    {
+        if (LobbySession) W->Init(LobbySession);
+        W->AddToViewport();
+        CurrentScreenWidget = W;
+    }
+}
+
+void USightlineGameInstance::ShowLobbyScreen()
+{
+    if (bShuttingDown) return;
+    EnsureWidgetClasses();
+    EnsureUIMouseCursor();
+    if (auto* Cur = Cast<ULobbyWidgetBase>(CurrentScreenWidget.Get()))
+    {
+        Cur->RefreshFromModel();                          // 已在大厅：幂等刷新（不重建，保滚动位置）
+        return;
+    }
+    if (CurrentScreenWidget)
+    {
+        CurrentScreenWidget->RemoveFromParent();
+        CurrentScreenWidget = nullptr;
+    }
+    if (!LobbyWidgetClass)
+    {
+        UE_LOG(LogSightline, Warning, TEXT("[UI] LobbyWidgetClass 未配置"));
+        return;
+    }
+    if (auto* W = CreateWidget<ULobbyWidgetBase>(this, LobbyWidgetClass))
+    {
+        if (LobbySession) W->Init(LobbySession);
+        W->AddToViewport();
+        CurrentScreenWidget = W;
+    }
+}
+
+void USightlineGameInstance::ShowRoomScreen()
+{
+    if (bShuttingDown) return;
+    EnsureWidgetClasses();
+    EnsureUIMouseCursor();
+    if (auto* Cur = Cast<URoomWidgetBase>(CurrentScreenWidget.Get()))
+    {
+        return;                                           // 已在房间界面：控件自己随委托刷新
+    }
+    if (CurrentScreenWidget)
+    {
+        CurrentScreenWidget->RemoveFromParent();
+        CurrentScreenWidget = nullptr;
+    }
+    if (!RoomWidgetClass)
+    {
+        UE_LOG(LogSightline, Warning, TEXT("[UI] RoomWidgetClass 未配置"));
+        return;
+    }
+    if (auto* W = CreateWidget<URoomWidgetBase>(this, RoomWidgetClass))
+    {
+        if (LobbySession) W->Init(LobbySession);
+        W->AddToViewport();
+        CurrentScreenWidget = W;
+    }
+}
+
+void USightlineGameInstance::HandleLoginResultForUI(bool bSuccess, int32 PlayerId, const FString& Message)
+{
+    if (bSuccess) ShowLobbyScreen();                      // 登录成功 → 大厅（失败留在登录界面，控件自显错误）
+}
+
+void USightlineGameInstance::HandleRoomListForUI(const TArray<FRoomInfo>& Rooms)
+{
+    // 收到列表 = 此刻人在大厅（房内玩家不订阅列表）→ 幂等切大厅
+    if (LobbySession && LobbySession->Model.bLoggedIn && LobbySession->Model.CurrentRoomId == 0)
+    {
+        ShowLobbyScreen();
+    }
+}
+
+void USightlineGameInstance::HandleRoomStateForUI(int32 RoomId, const FString& HostName, const TArray<FString>& Members)
+{
+    ShowRoomScreen();                                     // 房内状态推送 = 界面切到房间
+}
+
+void USightlineGameInstance::HandleKickedForUI(int32 ReasonCode)
+{
+    ShowLoginScreen();                                    // 被踢/关服 → 回登录界面
+}
+
+void USightlineGameInstance::HandleLinkLostForUI()
+{
+    ShowLoginScreen();                                    // 断线 → 回登录界面
 }
 
 FTimerManager* USightlineGameInstance::GetTimerManagerSafe()
@@ -208,6 +362,13 @@ void USightlineGameInstance::HandleHeartbeatTick()
 
 void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& Payload)
 {
+    // 第 2 期：4~13 号（登录+房间）转发给会话层；1/3（WELCOME/ACK）留在链路层
+    if (LobbySession && MsgId >= SightlineProtocol::MSG_C2S_LOGIN && MsgId <= SightlineProtocol::MSG_S2C_KICKED)
+    {
+        LobbySession->OnFrame(MsgId, Payload);
+        return;
+    }
+
     // 只在游戏线程执行（AsyncTask 保证）——可以安全碰 UE 对象
     switch (MsgId)
     {

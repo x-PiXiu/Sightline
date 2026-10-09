@@ -4,11 +4,13 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "Connection/SightlineConnection.h"
+#include "Lobby/SightlineLobby.h"
+#include "UI/SightlineUIWidgets.h"
 #include "TimerManager.h"
 #include "Containers/Ticker.h"
 #include "SightlineGameInstance.generated.h"
 
-UCLASS()
+UCLASS(Config = Game)   // 三个 Widget 槽的默认值存取 DefaultGame.ini（ini 引用 WBP 的机制基础）
 class SIGHTLINE_API USightlineGameInstance : public UGameInstance
 {
     GENERATED_BODY()
@@ -48,6 +50,40 @@ private:
 
     // seq → 单调发送时刻（ping = ack 时刻 − 发送时刻）
     TMap<uint32, double> PendingHeartbeats;
+
+    // 第 2 期：大厅会话（GI 持有生命周期，帧 4~13 转发给它）
+    UPROPERTY()
+    TObjectPtr<ULobbySession> LobbySession;
+
+public:
+    // —— 界面装配（混合模式：WBP 蓝图放皮，逻辑在 UI/SightlineUIWidgets）——
+    // 三个 WBP 资产的根类分别设为这里指定的 C++ 基类；默认值落在 DefaultGame.ini
+    UPROPERTY(EditDefaultsOnly, Config, Category = "Sightline UI")
+    TSubclassOf<ULoginWidgetBase> LoginWidgetClass;
+    UPROPERTY(EditDefaultsOnly, Config, Category = "Sightline UI")
+    TSubclassOf<ULobbyWidgetBase> LobbyWidgetClass;
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline UI")
+    TSubclassOf<URoomWidgetBase> RoomWidgetClass;
+
+private:
+    void ShowLoginScreen();
+    void ShowLobbyScreen();
+    void ShowRoomScreen();
+    void EnsureWidgetClasses();          // 类槽兜底：ini 被回写/加载时序不齐时按固定路径 LoadClass
+    void EnsureUIMouseCursor();
+    UFUNCTION()
+    void HandleLoginResultForUI(bool bSuccess, int32 PlayerId, const FString& Message);
+    UFUNCTION()
+    void HandleRoomListForUI(const TArray<FRoomInfo>& Rooms);
+    UFUNCTION()
+    void HandleRoomStateForUI(int32 RoomId, const FString& HostName, const TArray<FString>& Members);
+    UFUNCTION()
+    void HandleKickedForUI(int32 ReasonCode);
+    UFUNCTION()
+    void HandleLinkLostForUI();
+    UPROPERTY()
+    TObjectPtr<UUserWidget> CurrentScreenWidget = nullptr;
+    bool bInitialScreenShown = false;
 
     FTickerDelegate TickerDelegate;          // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调替代
     FTSTicker::FDelegateHandle TickerHandle;
