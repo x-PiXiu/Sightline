@@ -1,9 +1,15 @@
 // SightlineUIWidgets 实现 —— 逻辑全 C++：按钮 → 意图；委托 → 刷 UI
 #include "UI/SightlineUIWidgets.h"
 
+#include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
+
+namespace {
+    // 房间容量上限 = 服务器契约满员码的判据（MSG_IDS 消息 9：3 = 已满 4 人）
+    constexpr int32 kRoomCapacity = 4;
+}
 
 // ============ 登录界面 ============
 
@@ -103,8 +109,10 @@ void ULobbyWidgetBase::HandleRoomListChanged(const TArray<FRoomInfo>& Rooms) {
     }
     FString Out;
     for (const FRoomInfo& R : Rooms) {
-        Out += FString::Printf(TEXT("【%d】%s　%d/4 人　房主：%s\n"),
-                               R.RoomId, *R.RoomName, R.MemberCount, *R.HostName);
+        const bool bFull = R.MemberCount >= kRoomCapacity;
+        Out += FString::Printf(TEXT("【%d】%s　%d/%d 人　房主：%s%s\n"),
+                               R.RoomId, *R.RoomName, R.MemberCount, kRoomCapacity,
+                               *R.HostName, bFull ? TEXT("　【满】") : TEXT(""));
     }
     Out += TEXT("\n要加入哪个房间，就把它的【】里的数字填到房号框里，点【进房】");
     RoomListText->SetText(FText::FromString(Out));
@@ -133,11 +141,12 @@ void URoomWidgetBase::Init(ULobbySession* InSession) {
 void URoomWidgetBase::NativeConstruct() {
     Super::NativeConstruct();
     UE_LOG(LogTemp, Warning,
-           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s"),
+           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s | 槽位模式=%s"),
            *GetClass()->GetName(),
            MemberListText ? TEXT("已绑定") : TEXT("未绑定!"),
            RoomTitleText ? TEXT("已绑定") : TEXT("未绑定!"),
-           LeaveButton ? TEXT("已绑定") : TEXT("未绑定!"));
+           LeaveButton ? TEXT("已绑定") : TEXT("未绑定!"),
+           SlotText_1 ? TEXT("ON") : TEXT("OFF（文本名单兜底）"));
     if (MemberListText) MemberListText->SetAutoWrapText(true);   // 成员名单自动换行
     if (LeaveButton) LeaveButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnLeaveClicked);
     if (Session.IsValid()) {
@@ -161,12 +170,70 @@ void URoomWidgetBase::RefreshFromModel() {
 }
 
 void URoomWidgetBase::HandleRoomStateChanged(int32 RoomId, const FString& HostName, const TArray<FString>& Members) {
-    if (RoomTitleText) RoomTitleText->SetText(FText::FromString(FString::Printf(TEXT("房间 %d"), RoomId)));
-    if (MemberListText) {
-        FString Out;
-        for (int32 i = 0; i < Members.Num(); ++i)
-            Out += (i == 0 ? TEXT("★房主 ") : TEXT("      ")) + Members[i] + TEXT("\n");
-        MemberListText->SetText(FText::FromString(Out));
+    const FString RoomName = Session.IsValid() ? Session->Model.CurrentRoomName : FString();
+    const FString MyName = Session.IsValid() ? Session->Model.PlayerName : FString();
+    const bool bSlotMode = (SlotText_1 != nullptr);           // WBP 摆了槽位卡 → 槽位模式
+
+    // 房号大字徽章（最高频操作 = 报号加入）
+    if (RoomIdBadgeText) RoomIdBadgeText->SetText(FText::AsNumber(RoomId));
+
+    // 标题：槽位模式 = 房名 + 人数（房号已由徽章承担）；文本模式 = 全量
+    if (RoomTitleText) {
+        FString Title;
+        if (!bSlotMode) Title += FString::Printf(TEXT("房间 %d"), RoomId);
+        if (!RoomName.IsEmpty()) Title += (Title.IsEmpty() ? TEXT("") : TEXT(" · ")) + RoomName;
+        Title += FString::Printf(TEXT("　%d/%d 人"), Members.Num(), kRoomCapacity);
+        RoomTitleText->SetText(FText::FromString(Title));
+    }
+
+    if (bSlotMode) {
+        // 槽位模式：4 格（有人=绿底白字/房主★/你标记；空=暗底灰字）
+        for (int32 i = 0; i < kRoomCapacity; ++i) {
+            UTextBlock* SlotText = (i == 0) ? SlotText_1 : (i == 1) ? SlotText_2
+                                 : (i == 2) ? SlotText_3 : SlotText_4;
+            UBorder* SlotBox = (i == 0) ? SlotBox_1 : (i == 1) ? SlotBox_2
+                             : (i == 2) ? SlotBox_3 : SlotBox_4;
+            if (!SlotText) continue;
+            if (i < Members.Num()) {
+                const bool bHost = (i == 0);                  // 服务器契约：房主 = 首位
+                const bool bMe = (Members[i] == MyName);
+                SlotText->SetText(FText::FromString(FString::Printf(
+                    TEXT("%s%s%s"), bHost ? TEXT("★ ") : TEXT(""),
+                    *Members[i], bMe ? TEXT("（你）") : TEXT(""))));
+                SlotText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+                if (SlotBox) SlotBox->SetBrushColor(FLinearColor(0.13f, 0.42f, 0.24f, 0.9f));
+            } else {
+                SlotText->SetText(FText::FromString(TEXT("（空位）")));
+                SlotText->SetColorAndOpacity(FSlateColor(FLinearColor(0.5f, 0.5f, 0.53f)));
+                if (SlotBox) SlotBox->SetBrushColor(FLinearColor(0.11f, 0.11f, 0.13f, 0.8f));
+            }
+        }
+        if (MemberListText) MemberListText->SetVisibility(ESlateVisibility::Collapsed);
+        if (StatusText) StatusText->SetText(FText::FromString(
+            FString::Printf(TEXT("等待中…  把房间号 %d 告诉朋友，对方输入房号即可加入"), RoomId)));
+    } else {
+        // 文本名单模式（第 1 档，WBP 未摆槽位卡时兜底）
+        if (MemberListText) {
+            FString Out;
+            for (int32 i = 0; i < kRoomCapacity; ++i) {
+                if (i < Members.Num()) {
+                    const bool bHost = (i == 0);
+                    const bool bMe = (Members[i] == MyName);
+                    Out += FString::Printf(TEXT("%d. %s %s%s%s\n"), i + 1,
+                                           bHost ? TEXT("★") : TEXT("　"),
+                                           *Members[i],
+                                           bHost ? TEXT("（房主）") : TEXT(""),
+                                           bMe ? TEXT("　← 你") : TEXT(""));
+                } else {
+                    Out += FString::Printf(TEXT("%d. （空位）\n"), i + 1);
+                }
+            }
+            Out += TEXT("──────────\n等待中… 把房间号告诉朋友，对方输入房号即可加入");
+            MemberListText->SetText(FText::FromString(Out));
+            MemberListText->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+        }
+        if (StatusText) StatusText->SetText(FText::FromString(
+            FString::Printf(TEXT("等待中…  把房间号 %d 告诉朋友，对方输入房号即可加入"), RoomId)));
     }
 }
 

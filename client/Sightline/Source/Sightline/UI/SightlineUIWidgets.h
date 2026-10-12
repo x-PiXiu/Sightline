@@ -9,6 +9,7 @@
 #include "SightlineUIWidgets.generated.h"
 
 class UButton;
+class UBorder;
 class UEditableTextBox;
 class UTextBlock;
 
@@ -113,6 +114,9 @@ private:
 /**
  * 房间界面基类（WBP_Room 的根类）
  * 控件：RoomTitleText（房号）、MemberListText（成员名单，首位★房主）、LeaveButton
+ * 第 2 档槽位控件（全 BindWidgetOptional——WBP 摆了才生效，不摆回落文本名单模式）：
+ *   SlotBox_1~4（UBorder 槽位卡底）+ SlotText_1~4（槽内文字）、RoomIdBadgeText（房号大字徽章）、
+ *   StatusText（状态行：等待中…；右侧空间留给第 3 期"开始对局"按钮）
  */
 UCLASS(Abstract)
 class SIGHTLINE_API URoomWidgetBase : public UUserWidget {
@@ -140,6 +144,36 @@ protected:
 
     UPROPERTY(meta = (BindWidget))
     UButton* LeaveButton = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UBorder* SlotBox_1 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UBorder* SlotBox_2 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UBorder* SlotBox_3 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UBorder* SlotBox_4 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* SlotText_1 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* SlotText_2 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* SlotText_3 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* SlotText_4 = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* RoomIdBadgeText = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* StatusText = nullptr;
 
 private:
     TWeakObjectPtr<ULobbySession> Session;

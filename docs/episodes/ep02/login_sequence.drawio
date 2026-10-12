@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="登录时序" id="loginseq">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="登录时序（第 2 期 · 会话建立与守卫）" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="700" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="lane_c" value="客户端 连接" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="140" y="70" width="260" height="54" as="geometry"/></mxCell>
+        <mxCell id="lane_s" value="服务器 LobbyService（会话）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="760" y="70" width="300" height="54" as="geometry"/></mxCell>
+
+        <mxCell id="life_c" value="" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="270" y="124" as="sourcePoint"/><mxPoint x="270" y="630" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="life_s" value="" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="124" as="sourcePoint"/><mxPoint x="910" y="630" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m1" value="① TCP 连接建立（非阻塞）" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="270" y="170" as="sourcePoint"/><mxPoint x="910" y="170" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m2" value="② WELCOME [8B serverTs]　▸ 服务器登记 60s 登录宽限" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="225" as="sourcePoint"/><mxPoint x="270" y="225" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m3" value="③ LOGIN(4) [1B 名长][名字]　▸ 客户端预检：非空且 ≤16B" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="270" y="280" as="sourcePoint"/><mxPoint x="910" y="280" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="guard" value="③ 服务器侧校验（处理 LOGIN）&#10;① 名字合法性：非法 → 回执码2&#10;② 重名查索引 → 顶号走 ⑤" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontSize=13;align=left;spacing=6;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="955" y="305" width="215" height="110" as="geometry"/></mxCell>
+        <mxCell id="guard_link" value="" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="300" as="sourcePoint"/><mxPoint x="955" y="340" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m_fail" value="④ LOGIN_RESULT(5) 码2（可重试，宽限照旧）" style="endArrow=block;html=1;strokeColor=#c8161d;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#c8161d;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="455" as="sourcePoint"/><mxPoint x="270" y="455" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m_kick" value="⑤ 顶号：同名旧连接 KICKED(13) 码1 → 断开（新连接照常走 ⑥ 成功）" style="endArrow=block;html=1;strokeColor=#c8161d;strokeWidth=2.5;dashed=1;fontSize=13;fontStyle=1;fontColor=#c8161d;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="530" as="sourcePoint"/><mxPoint x="480" y="530" as="targetPoint"/><Array as="points"><mxPoint x="480" y="510"/></Array></mxGeometry></mxCell>
+        <mxCell id="kicknote" value="（旧连接同名者，另一条生命线）" style="text;fontSize=12;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="380" y="508" width="240" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="m_ok" value="⑥ LOGIN_RESULT(5) 码0 + PlayerId（自增分配，失败登录不耗号）" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="565" as="sourcePoint"/><mxPoint x="270" y="565" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m_list" value="⑦ ROOM_LIST(11) 全量快照 → 推给所有“已登录未进房”连接" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=13;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="615" as="sourcePoint"/><mxPoint x="270" y="615" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="grace" value="60s 登录宽限计时器（服务器侧）&#10;到时未 LOGIN →&#10;KICKED(13) 码2 + 断开" style="rounded=1;whiteSpace=wrap;fillColor=#fff5f5;strokeColor=#c8161d;strokeWidth=2;fontSize=13;align=left;spacing=6;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="955" y="430" width="210" height="110" as="geometry"/></mxCell>
+        <mxCell id="m_grace" value="⏱ 超时守卫（任意时刻分支，与 ⑥⑦ 并行）：KICKED(13) 码2 + 断开" style="endArrow=block;html=1;strokeColor=#c8161d;strokeWidth=2.5;dashed=1;fontSize=13;fontStyle=1;fontColor=#c8161d;labelBackgroundColor=#ffffff;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="955" y="485" as="sourcePoint"/><mxPoint x="270" y="485" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="foot" value="心跳契约(2/3) 全程不变 · 重连后必须重新 LOGIN（会话不跨连接保活 · D2-06）　|　来源：第 2 期设计草案 §3 会话规则 + MSG_IDS.md v2.2" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="655" width="1120" height="26" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

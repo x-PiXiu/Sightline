@@ -24,10 +24,14 @@ static const Event* find(const std::vector<Event>& evs, EvType t) {
     return nullptr;
 }
 
+static void stage(const char* name) {
+    std::cout << "—— " << name << " ——（已过 " << g_checked << " 项）\n";
+}
+
 int main() {
     LobbyService s;
 
-    // ---- 登录 ----
+    stage("登录");
     s.OnConnected(1, 0);
     auto ev = s.Login(1, "alpha");
     CHECK(find(ev, EvType::LoginOk));
@@ -41,22 +45,22 @@ int main() {
     ev = s.Login(2, std::string(17, 'a'));                  // 超长 17B
     CHECK((f = find(ev, EvType::LoginFail)) && f->code == 2);
 
-    // ---- 顶号：alpha 在 fd3 再次登录，顶掉 fd1 ----
+    stage("顶号：alpha 在 fd3 再次登录，顶掉 fd1");
     ev = s.Login(3, "alpha");
     auto* k = find(ev, EvType::Kicked);
     CHECK(k && k->fd == 1 && k->code == 1);                // 旧连接被踢
     CHECK(find(ev, EvType::LoginOk) && find(ev, EvType::LoginOk)->playerId == 2);   // 失败登录不消耗 id
     CHECK(!s.IsLoggedIn(1) && s.IsLoggedIn(3));
 
-    // ---- 宽限与超时 ----
+    stage("宽限与超时");
     s.OnConnected(9, 0);
-    ev = s.SweepLoginTimeouts(9000);
-    CHECK(!find(ev, EvType::Kicked));                       // 9s：未超时
-    ev = s.SweepLoginTimeouts(10001);
+    ev = s.SweepLoginTimeouts(59999);
+    CHECK(!find(ev, EvType::Kicked));                       // 59.9s：未超时（宽限 60s）
+    ev = s.SweepLoginTimeouts(60001);
     k = find(ev, EvType::Kicked);
-    CHECK(k && k->fd == 9 && k->code == 2);                 // 10s+: 登录超时踢出
+    CHECK(k && k->fd == 9 && k->code == 2);                 // 60s+: 登录超时踢出
 
-    // ---- 建房 ----
+    stage("建房");
     ev = s.CreateRoom(4, "第一房");                          // 未登录先建房
     f = find(ev, EvType::CreateFail);
     CHECK(f && f->code == 1);
@@ -75,7 +79,7 @@ int main() {
     f = find(ev, EvType::CreateFail);
     CHECK(f && f->code == 2);
 
-    // ---- 进房与满员 ----
+    stage("进房与满员");
     s.OnConnected(6, 0); s.OnConnected(7, 0); s.OnConnected(8, 0);
     CHECK(find(s.Login(6, "delta"), EvType::LoginOk));
     CHECK(find(s.Login(7, "eps"), EvType::LoginOk));
@@ -101,7 +105,7 @@ int main() {
     f = find(ev, EvType::JoinFail);
     CHECK(f && f->code == 3);                               // 已满拒绝
 
-    // ---- 房主转移：房主 beta(4) 离开 → 最早加入的 delta(6) 接任 ----
+    stage("房主转移：房主 beta(4) 离开 → 最早加入的 delta(6) 接任");
     ev = s.Leave(4);
     auto* st = find(ev, EvType::RoomStatePush);
     CHECK(st && st->hostName == "delta");                   // delta 早于 eps/zeta 加入
@@ -109,7 +113,7 @@ int main() {
     CHECK(st->members[0] == "delta" && st->members[1] == "eps" && st->members[2] == "zeta");
     CHECK(find(ev, EvType::RoomListPush));                  // 人数变了 → 大厅列表刷新
 
-    // ---- 断线（在房中）= 同 Leave 路径 ----
+    stage("断线（在房中）= 同 Leave 路径");
     ev = s.Disconnect(6);
     st = find(ev, EvType::RoomStatePush);
     CHECK(st && st->hostName == "eps");                     // 下一位接任
@@ -132,7 +136,7 @@ int main() {
           && brief(3)->hostName == "beta");
     CHECK(brief(2) && brief(2)->memberCount == 1 && brief(2)->hostName == "gamma");  // gamma 自建的房间 2
 
-    // ---- 房间解散：最后一人离开 → 列表移除 ----
+    stage("房间解散：最后一人离开 → 列表移除");
     ev = s.Leave(7);                                        // eps 离开 → 房间1 人数归 0 解散
     lp = find(ev, EvType::RoomListPush);
     CHECK(lp && lp->rooms.size() == 2);                     // 只剩 房间2(gamma) / 房间3(快照房A)

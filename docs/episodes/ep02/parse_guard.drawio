@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="防越界解析" id="parseguard02">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="panel" value="" style="rounded=1;whiteSpace=wrap;fillColor=#20242c;strokeColor=#3a3f4a;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="40" y="30" width="1120" height="330" as="geometry"/></mxCell>
+        <mxCell id="bar" value="Lobby/SightlineLobby.cpp —— 解析侧：对端字节同样不可信" style="text;fontSize=15;fontStyle=1;fontColor=#aab2c0;align=left;" vertex="1" parent="1"><mxGeometry x="70" y="44" width="900" height="24" as="geometry"/></mxCell>
+        <mxCell id="c1" value="// 解析 [1B len][utf8]；越界返回 false —— 任何字段先验长度再解包" style="text;fontSize=15;fontColor=#7ec699;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="84" width="1060" height="24" as="geometry"/></mxCell>
+        <mxCell id="c2" value="bool ReadLenStr(const TArray&lt;uint8&gt;&amp; P, int32&amp; Off, FString&amp; Out) {" style="text;fontSize=15;fontColor=#e8e8e8;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="122" width="1060" height="22" as="geometry"/></mxCell>
+        <mxCell id="c3" value="    if (!P.IsValidIndex(Off))    return false;   // 下标先验" style="text;fontSize=15;fontColor=#e8e8e8;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="152" width="1060" height="22" as="geometry"/></mxCell>
+        <mxCell id="c4" value="    if (Off + 1 + Len &gt; P.Num()) return false;   // 越界先验" style="text;fontSize=15;fontColor=#ffd54a;fontStyle=1;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="180" width="1060" height="22" as="geometry"/></mxCell>
+        <mxCell id="c5" value="    Out = FromUtf8(P.GetData() + Off + 1, Len);" style="text;fontSize=15;fontColor=#e8e8e8;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="208" width="1060" height="22" as="geometry"/></mxCell>
+        <mxCell id="c6" value="}" style="text;fontSize=15;fontColor=#e8e8e8;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="236" width="400" height="22" as="geometry"/></mxCell>
+        <mxCell id="c7" value="// 调用侧：ParseRoomState 返回 false → break —— 整包丢弃，绝不带病入库" style="text;fontSize=15;fontColor=#7ec699;align=left;fontFamily=Courier New;" vertex="1" parent="1"><mxGeometry x="70" y="286" width="1060" height="24" as="geometry"/></mxCell>
+        <mxCell id="mark" value="对端字节 = 伪造候选" style="text;fontSize=16;fontStyle=1;fontColor=#ffd54a;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="760" y="150" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="note" value="对端不可信是双向的：服务器不信客户端的意图，客户端也不信服务器的字节——模型只收验过身的数据" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="382" width="1120" height="24" as="geometry"/></mxCell>
+        <mxCell id="wm" value="领导请批示 · 第 02 期" style="text;fontSize=13;fontColor=#888888;align=right;sketch=1;" vertex="1" parent="1"><mxGeometry x="900" y="426" width="260" height="22" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
