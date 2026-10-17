@@ -1,0 +1,51 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="延迟构成·第3期" id="latencycomp">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="660" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="延迟构成 —— 150ms 不是一样东西，是四样东西的和" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1100" height="32" as="geometry"/></mxCell>
+
+        <mxCell id="src" value="甲按住 W" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=16;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="30" y="176" width="96" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="seg1name" value="① 传播" style="text;fontSize=17;fontStyle=1;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="150" y="140" width="218" height="24" as="geometry"/></mxCell>
+        <mxCell id="seg1" value="" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="150" y="176" width="218" height="48" as="geometry"/></mxCell>
+        <mxCell id="seg1sub" value="字节在路上跑 · 光速封顶" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="150" y="228" width="218" height="18" as="geometry"/></mxCell>
+        <mxCell id="seg1lvl" value="典型：局域网 &lt;1ms · 跨省几十 ms" style="text;fontSize=14;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="150" y="252" width="218" height="20" as="geometry"/></mxCell>
+        <mxCell id="seg1fix" value="不可压（物理极限）" style="text;fontSize=15;fontStyle=1;fontColor=#666666;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="150" y="276" width="218" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="seg2name" value="② 传输" style="text;fontSize=17;fontStyle=1;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="368" y="140" width="218" height="24" as="geometry"/></mxCell>
+        <mxCell id="seg2" value="" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="368" y="176" width="218" height="48" as="geometry"/></mxCell>
+        <mxCell id="seg2sub" value="字节串行上路 · 大小 × 带宽" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="368" y="228" width="218" height="18" as="geometry"/></mxCell>
+        <mxCell id="seg2lvl" value="包越大 · 线越挤 · 等越久" style="text;fontSize=14;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="368" y="252" width="218" height="20" as="geometry"/></mxCell>
+        <mxCell id="seg2fix" value="可压（字节预算）" style="text;fontSize=15;fontStyle=1;fontColor=#1f4e79;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="368" y="276" width="218" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="seg3name" value="③ 排队" style="text;fontSize=17;fontStyle=1;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="586" y="140" width="218" height="24" as="geometry"/></mxCell>
+        <mxCell id="seg3" value="" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="586" y="176" width="218" height="48" as="geometry"/></mxCell>
+        <mxCell id="seg3sub" value="路由缓冲 + 服务器队列" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="586" y="228" width="218" height="18" as="geometry"/></mxCell>
+        <mxCell id="seg3lvl" value="链路一挤 · 几十 ms 就没了" style="text;fontSize=14;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="586" y="252" width="218" height="20" as="geometry"/></mxCell>
+        <mxCell id="seg3fix" value="可调（队列与调度）" style="text;fontSize=15;fontStyle=1;fontColor=#7f6000;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="586" y="276" width="218" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="seg4name" value="④ 处理" style="text;fontSize=17;fontStyle=1;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="140" width="218" height="24" as="geometry"/></mxCell>
+        <mxCell id="seg4" value="" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="804" y="176" width="218" height="48" as="geometry"/></mxCell>
+        <mxCell id="seg4sub" value="服务器逻辑 + 编解码" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="228" width="218" height="18" as="geometry"/></mxCell>
+        <mxCell id="seg4lvl" value="一个 tick（33ms）内消化" style="text;fontSize=14;fontColor=#333333;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="252" width="218" height="20" as="geometry"/></mxCell>
+        <mxCell id="seg4fix" value="可优化（现有底座内）" style="text;fontSize=15;fontStyle=1;fontColor=#1f6b30;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="276" width="218" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="dst" value="乙屏幕上&#10;的甲动了" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1054" y="164" width="110" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="arrow0" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="src" target="seg1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arrow1" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="seg1" target="seg2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arrow2" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="seg2" target="seg3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arrow3" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="seg3" target="seg4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arrow4" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="seg4" target="dst"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="evline" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#d6b656;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="150" y="322" as="sourcePoint"/><mxPoint x="1022" y="322" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="evlbl" value="②③④ 段的治理手段 —— 演进预留" style="text;fontSize=15;fontStyle=1;fontColor=#7f6000;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="420" y="330" width="340" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="keyline" value="传播是物理极限，治不了；工程能做的，是把延迟重新分配到玩家不敏感的位置 —— 滑块加的 150ms，就是这四段的总和" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=16;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="396" width="1080" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="灰 = 外部约束（不可动）　蓝 = 本期损伤滑块作用面　黄 = 演进预留　绿 = 现有底座　|　量级为通用典型值，实测以 KPI 曲线为准" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="600" width="1120" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

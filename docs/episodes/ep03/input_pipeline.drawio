@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="输入链路·第3期" id="inputpipe">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="输入链路 —— 从按键到字节，每一跳都有名字" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1100" height="32" as="geometry"/></mxCell>
+
+        <mxCell id="n1" value="键盘 WASD" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="130" width="130" height="60" as="geometry"/></mxCell>
+        <mxCell id="n2" value="IMC&#10;「按键→意图」接线表" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="204" y="130" width="150" height="60" as="geometry"/></mxCell>
+        <mxCell id="n3" value="IA&#10;一个具体意图" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="388" y="130" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="n4" value="IMC 挂载&#10;（时机是坑）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#c8161d;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="562" y="130" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="n5" value="30Hz 采样&#10;速度=位移差分" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="736" y="130" width="150" height="60" as="geometry"/></mxCell>
+        <mxCell id="n6" value="组帧&#10;16 号 · 21 字节" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="130" width="130" height="60" as="geometry"/></mxCell>
+        <mxCell id="n7" value="ISendPort&#10;发送" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1084" y="130" width="80" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="a1" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n1" target="n2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a2" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n2" target="n3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a3" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n3" target="n4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a4" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n4" target="n5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a5" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n5" target="n6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a6" value="" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="n6" target="n7"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="c1" value="硬件" style="text;fontSize=13;fontColor=#888888;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="196" width="130" height="18" as="geometry"/></mxCell>
+        <mxCell id="c2" value="资产 /Game/Code/Input" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="192" y="196" width="174" height="18" as="geometry"/></mxCell>
+        <mxCell id="c3" value="资产 /Game/Code/Input" style="text;fontSize=13;fontColor=#555555;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="376" y="196" width="164" height="18" as="geometry"/></mxCell>
+        <mxCell id="c4" value="SightlineCharacter::&#10;SetupPlayerInputComponent" style="text;fontSize=13;fontStyle=1;fontColor=#1f4e79;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="552" y="196" width="160" height="34" as="geometry"/></mxCell>
+        <mxCell id="c5" value="SightlineCharacter::&#10;SampleLocalState·仅本地" style="text;fontSize=13;fontStyle=1;fontColor=#1f4e79;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="731" y="196" width="160" height="34" as="geometry"/></mxCell>
+        <mxCell id="c6" value="MatchSession::&#10;ReportLocalState" style="text;fontSize=13;fontStyle=1;fontColor=#1f4e79;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="900" y="196" width="150" height="34" as="geometry"/></mxCell>
+        <mxCell id="c7" value="SightlineSendPort.h&#10;（第1期连接实现）" style="text;fontSize=13;fontStyle=1;fontColor=#1f6b30;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="1054" y="196" width="140" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="pit" value="坑（本期实测返工）：挂载原来写在 BeginPlay —— Pawn 先 Spawn、后才 Possess，那一刻 Controller 还是空，挂载被跳过，输入映射从未生效。修 = 挪进 SetupPlayerInputComponent（Possess 建输入组件时必调，Controller 必在）" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2;align=left;spacing=8;fontSize=14;fontStyle=1;fontColor=#c8161d;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="292" width="1080" height="64" as="geometry"/></mxCell>
+        <mxCell id="pitline" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#c8161d;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="632" y="240" as="sourcePoint"/><mxPoint x="632" y="292" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="keyline" value="为什么速度=位移差分：远端是直接摆位置，引擎速度恒为零 —— 表现层不许自己猜，谁驱动的状态谁提供数据（动画走的 FAnimInputs 同一个采集点）" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="396" width="1080" height="52" as="geometry"/></mxCell>
+
+        <mxCell id="evolve" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#d6b656;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="60" y="486" as="sourcePoint"/><mxPoint x="1140" y="486" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="evolvelbl" value="本地先行（客户端预测）与输入历史缓冲 —— 演进预留" style="text;fontSize=15;fontStyle=1;fontColor=#7f6000;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="400" y="494" width="420" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="绿 = 复用底座（第 1 期连接）　蓝 = 第 3 期新增　红 = 实测踩坑标注　灰 = 外部　黄虚线 = 演进预留　|　图 = 代码一致" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="616" width="1120" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
