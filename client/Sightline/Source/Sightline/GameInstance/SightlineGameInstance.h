@@ -82,6 +82,7 @@ public:
     TSubclassOf<URoomWidgetBase> RoomWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category = "Sightline UI")
     TSubclassOf<UDebugPanelBase> DebugPanelClass;    // M5：损伤滑块面板（WBP_DebugPanel）
+    bool bDebugPanelDone = false;                    // 装配幂等标志（Init 期视口未就绪挂不上，HandleTick 补挂）
 
 private:
     void ShowLoginScreen();

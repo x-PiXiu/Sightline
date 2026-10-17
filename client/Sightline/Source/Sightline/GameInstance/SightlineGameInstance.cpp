@@ -84,6 +84,9 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         ShowLoginScreen();
     }
 
+    // 调试面板补挂：Init 期视口未就绪挂不上，等首帧视口就绪再挂（函数内幂等）
+    EnsureDebugPanel();
+
     // HUD（验收画面 ①②）：覆盖式刷新同一 key
     if (GEngine)
     {
@@ -273,6 +276,13 @@ void USightlineGameInstance::SetInboundDelayMs(int32 Ms)
 void USightlineGameInstance::EnsureDebugPanel()
 {
 #if !UE_BUILD_SHIPPING
+    if (bDebugPanelDone) return;                     // 幂等：只装配一次
+    // Init 阶段 World 的视口未创建——AddToViewport 经 GameViewportSubsystem 会
+    // "No game viewport was found" 后 return false（widget 根本没上屏，M6 实锤），
+    // 由 HandleTick 在视口就绪后补挂
+    const UWorld* World = GetWorld();
+    if (!World || !World->GetGameViewport()) return;
+    bDebugPanelDone = true;
     EnsureWidgetClasses();
     if (DebugPanelClass == nullptr)
     {
@@ -283,7 +293,9 @@ void USightlineGameInstance::EnsureDebugPanel()
     {
         W->Init(this);
         W->AddToViewport(50);
-        UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板已挂载（M5 损伤滑块）"));
+        // 挂载结果如实报告（AddToViewport 失败不上报，IsInViewport 是唯一真值）
+        UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板挂载 %s（M5 损伤滑块）"),
+               W->IsInViewport() ? TEXT("成功") : TEXT("失败"));
     }
 #endif
 }
