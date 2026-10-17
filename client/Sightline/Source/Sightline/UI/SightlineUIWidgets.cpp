@@ -301,6 +301,10 @@ void UDebugPanelBase::Init(USightlineGameInstance* InGI) {
 
 void UDebugPanelBase::NativeConstruct() {
     Super::NativeConstruct();
+    // 绑定诊断：Optional 控件名对不上时静默失败（不摆/错名都不报错）——一行日志见分晓
+    UE_LOG(LogSightline, Log, TEXT("[UI] DebugPanel 绑定：Slider=%s Text=%s（WBP 控件名须为 DelaySlider / DelayText）"),
+           DelaySlider ? TEXT("有") : TEXT("无"),
+           DelayText ? TEXT("有") : TEXT("无"));
     if (DelaySlider) {
         DelaySlider->SetValue(0.f);
         DelaySlider->OnValueChanged.AddDynamic(this, &UDebugPanelBase::OnDelayChanged);
