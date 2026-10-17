@@ -24,6 +24,7 @@ void USightlineMatchSession::SetRegistry(USightlineEntityRegistry* InRegistry) {
 }
 
 void USightlineMatchSession::NotifyLinkLost() {
+    bInMatch = false;                                  // 链路死 = 对局死
     if (Registry) Registry->Clear();                   // 会话随链路死亡（重连后重新 LOGIN，名册重建）
 }
 
@@ -34,7 +35,8 @@ void USightlineMatchSession::StartMatch() {
 }
 
 void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
-    if (!Conn) return;
+    // 16 是对局期消息：未进对局（PIE 直开对局图等场景）不上报——pid=0 空转包被服务器忽略但白占带宽
+    if (!Conn || !bInMatch || SelfPlayerId == 0) return;
     TArray<uint8> P;                                            // v3 契约 16：[12B pos][4B yaw][4B pitch][1B flags]
     const auto F32 = [&P](float V) {
         uint32 Bits = 0;
@@ -74,6 +76,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             S.SpawnIndex = Payload[Off]; ++Off;
             Roster.Add(S);
         }
+        bInMatch = true;                               // 对局激活：16 上报窗口开启
         Registry->ApplyMatchStart(SelfPlayerId, Roster);
         OnMatchStarted.Broadcast();                    // GI 切对局关卡（生成由 PawnSpawner 延迟执行）
         return;
@@ -109,6 +112,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
     if (MsgId == SightlineProtocol::MSG_S2C_ENTITY_LEAVE) {
         if (Payload.Num() < 4) return;
         const int32 Pid = static_cast<int32>(ReadU32(Payload, 0));
+        if (Pid == SelfPlayerId) bInMatch = false;     // 自己离场：上报窗口关闭
         Registry->ApplyLeave(Pid);
         OnEntityLeft.Broadcast(Pid);
         return;
