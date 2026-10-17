@@ -82,7 +82,7 @@ public:
     TSubclassOf<URoomWidgetBase> RoomWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category = "Sightline UI")
     TSubclassOf<UDebugPanelBase> DebugPanelClass;    // M5：损伤滑块面板（WBP_DebugPanel）
-    bool bDebugPanelDone = false;                    // 装配幂等标志（Init 期视口未就绪挂不上，HandleTick 补挂）
+    TWeakObjectPtr<UDebugPanelBase> DebugPanelWidget; // 面板实例（对局中显示，离场隐藏——用户定）
 
 private:
     void ShowLoginScreen();
@@ -90,7 +90,7 @@ private:
     void ShowRoomScreen();
     void EnsureWidgetClasses();          // 类槽兜底：ini 被回写/加载时序不齐时按固定路径 LoadClass
     void EnsureUIMouseCursor();
-    void EnsureDebugPanel();             // M5：调试面板装配（PIE/开发构建常驻左上）
+    void SyncDebugPanel();               // 面板对账：对局激活挂载 / 离场隐藏（每帧幂等）
     UFUNCTION()
     void HandleLoginResultForUI(bool bSuccess, int32 PlayerId, const FString& Message);
     UFUNCTION()

@@ -33,6 +33,7 @@ public:
     void BindConnection(ISendPort* InConn);
     void SetRegistry(USightlineEntityRegistry* InRegistry);
     void SetSelfPlayerId(int32 InPid) { SelfPlayerId = InPid; }   // 登录回执到位后由 GI 注入
+    bool IsInMatch() const { return bInMatch; }                  // 对局激活查询（GI 面板显隐/生命周期判定）
     /** 链路断开：Registry 清场（对局视角 = 会话结束） */
     void NotifyLinkLost();
 

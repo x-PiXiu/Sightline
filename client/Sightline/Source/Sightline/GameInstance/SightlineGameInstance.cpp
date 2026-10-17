@@ -56,7 +56,7 @@ void USightlineGameInstance::Init()
     TickerDelegate.BindUObject(this, &USightlineGameInstance::HandleTick);
     TickerHandle = FTSTicker::GetCoreTicker().AddTicker(TickerDelegate, 0.f);
 
-    EnsureDebugPanel();                                   // M5：损伤滑块面板（PIE/开发构建常驻）
+    // M5 损伤滑块面板改由 HandleTick 对账（对局中挂载/离场隐藏——Init 期视口未就绪，M6 实锤）
 
     UE_LOG(LogSightline, Log, TEXT("[GI] 初始化完成，发起连接 127.0.0.1:18888"));
     Connect();   // PIE 即连；心跳在收到 WELCOME（连接确认）后才启动
@@ -84,8 +84,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         ShowLoginScreen();
     }
 
-    // 调试面板补挂：Init 期视口未就绪挂不上，等首帧视口就绪再挂（函数内幂等）
-    EnsureDebugPanel();
+    // 调试面板对账：对局激活才显示（用户定：进游戏场景后显示），离场隐藏
+    SyncDebugPanel();
 
     // HUD（验收画面 ①②）：覆盖式刷新同一 key
     if (GEngine)
@@ -273,28 +273,40 @@ void USightlineGameInstance::SetInboundDelayMs(int32 Ms)
         UE_LOG(LogSightline, Log, TEXT("[STAT] DELAY t=%.3f ms=%d"), FPlatformTime::Seconds(), Ms);
 }
 
-void USightlineGameInstance::EnsureDebugPanel()
+void USightlineGameInstance::SyncDebugPanel()
 {
 #if !UE_BUILD_SHIPPING
-    if (bDebugPanelDone) return;                     // 幂等：只装配一次
-    // Init 阶段 World 的视口未创建——AddToViewport 经 GameViewportSubsystem 会
-    // "No game viewport was found" 后 return false（widget 根本没上屏，M6 实锤），
-    // 由 HandleTick 在视口就绪后补挂
+    // 面板是对局工具（损伤滑块服务同步演示）：进游戏场景才显示，登录/大厅期不打扰（用户 2026-10-18 定）。
+    // bPendingArenaSpawn 守门：15 刚到但切图未落定时不上屏（避免在旧世界闪一下又被切图销毁）
+    const bool bWant = !bShuttingDown && MatchSession && MatchSession->IsInMatch() && !bPendingArenaSpawn;
+    if (!bWant)
+    {
+        if (DebugPanelWidget.IsValid())
+        {
+            DebugPanelWidget->RemoveFromParent();
+            DebugPanelWidget.Reset();
+            UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板已隐藏（离场）"));
+        }
+        return;
+    }
+    if (DebugPanelWidget.IsValid() && DebugPanelWidget->IsInViewport()) return;   // 已在屏
+    // 视口未就绪（Init/切图瞬间）下帧再试；切图销毁了旧 widget → 弱指针失效 → 新世界自动重挂
     const UWorld* World = GetWorld();
     if (!World || !World->GetGameViewport()) return;
-    bDebugPanelDone = true;
     EnsureWidgetClasses();
     if (DebugPanelClass == nullptr)
     {
-        UE_LOG(LogSightline, Log, TEXT("[UI] WBP_DebugPanel 未找到——建好后每次 PIE 自动挂载"));
+        static bool bWarned = false;                 // 缺类警告只打一次（每帧对账不许刷屏）
+        if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Log, TEXT("[UI] WBP_DebugPanel 未找到——建好后进对局自动挂载")); }
         return;
     }
     if (auto* W = CreateWidget<UDebugPanelBase>(this, DebugPanelClass))
     {
         W->Init(this);
         W->AddToViewport(50);
+        DebugPanelWidget = W;
         // 挂载结果如实报告（AddToViewport 失败不上报，IsInViewport 是唯一真值）
-        UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板挂载 %s（M5 损伤滑块）"),
+        UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板挂载 %s（对局中显示）"),
                W->IsInViewport() ? TEXT("成功") : TEXT("失败"));
     }
 #endif
