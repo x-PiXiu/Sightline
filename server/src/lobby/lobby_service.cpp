@@ -186,6 +186,54 @@ std::vector<Event> LobbyService::SweepLoginTimeouts(int64_t nowMs) {
     return out;
 }
 
+std::vector<Event> LobbyService::ShutdownBroadcast() {
+    // 优雅关闭（D3-19）：在线玩家 + 宽限期连接各得一条 Kicked(码3)——语义在用例，搬运归 FrameWriter
+    std::vector<Event> out;
+    for (const auto& [fd, p] : playersByFd_) {
+        (void)p;
+        out.push_back({EvType::Kicked, fd, 0, 0, 3});
+    }
+    for (const auto& [fd, grace] : graceByFd_) {
+        (void)grace;
+        out.push_back({EvType::Kicked, fd, 0, 0, 3});
+    }
+    return out;
+}
+
+// —— 对局编排查询（D3-15：纯查询零副作用）——
+
+bool LobbyService::IsHost(int fd) const {
+    const auto rit = roomByFd_.find(fd);
+    if (rit == roomByFd_.end()) return false;
+    const auto roomIt = rooms_.find(rit->second);
+    return roomIt != rooms_.end() && !roomIt->second.memberFds.empty()
+        && roomIt->second.memberFds.front() == fd;
+}
+
+bool LobbyService::RoomIdByFd(int fd, uint32_t& outRoomId) const {
+    const auto rit = roomByFd_.find(fd);
+    if (rit == roomByFd_.end()) return false;
+    outRoomId = rit->second;
+    return true;
+}
+
+int LobbyService::PlayerIdByFd(int fd) const {
+    const auto pit = playersByFd_.find(fd);
+    return pit == playersByFd_.end() ? -1 : static_cast<int>(pit->second.playerId);
+}
+
+std::vector<RoomMemberInfo> LobbyService::RoomRoster(uint32_t roomId) const {
+    std::vector<RoomMemberInfo> out;
+    const auto roomIt = rooms_.find(roomId);
+    if (roomIt == rooms_.end()) return out;
+    out.reserve(roomIt->second.memberFds.size());
+    for (int fd : roomIt->second.memberFds) {
+        const auto pit = playersByFd_.find(fd);
+        if (pit != playersByFd_.end()) out.push_back({pit->second.playerId, pit->second.name});
+    }
+    return out;
+}
+
 // —— 适配器查询 ——
 
 bool LobbyService::IsLoggedIn(int fd) const { return playersByFd_.count(fd) != 0; }

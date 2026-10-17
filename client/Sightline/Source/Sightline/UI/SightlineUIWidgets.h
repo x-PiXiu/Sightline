@@ -11,7 +11,10 @@
 class UButton;
 class UBorder;
 class UEditableTextBox;
+class URichTextBlock;
 class UTextBlock;
+class USightlineMatchSession;
+class USightlineGameInstance;
 
 /**
  * 登录界面基类（WBP_Login 的根类）
@@ -57,7 +60,8 @@ private:
 
 /**
  * 大厅界面基类（WBP_Lobby 的根类）
- * 控件：PlayerNameText（我的名字）、RoomListText（房间列表多行文本）、
+ * 控件：PlayerNameText（我的名字）、RoomListText（房间名册富文本：URichTextBlock，
+ *       列锚名册 + 颜色标签，样式表 default/head/full · 字体 Font_Mono——设计见 ui_roomlist_spec）、
  *       RoomNameInput（建房名）、RoomIdInput（要进的房号）、CreateButton、JoinButton
  * 刷新：OnRoomListChanged → 重绘列表（GI 负责界面切换，本类负责列表内容）
  */
@@ -93,7 +97,7 @@ protected:
     UTextBlock* PlayerNameText = nullptr;
 
     UPROPERTY(meta = (BindWidget))
-    UTextBlock* RoomListText = nullptr;
+    URichTextBlock* RoomListText = nullptr;
 
     UPROPERTY(meta = (BindWidget))
     UEditableTextBox* RoomNameInput = nullptr;
@@ -124,6 +128,7 @@ class SIGHTLINE_API URoomWidgetBase : public UUserWidget {
 
 public:
     void Init(ULobbySession* InSession);
+    void InitMatch(USightlineMatchSession* InMatch);   // 对局会话注入（开始对局意图的出口，D3-15 客户端镜像）
     void RefreshFromModel();                        // 幂等进入：先显示当前房间状态
 
 protected:
@@ -132,6 +137,9 @@ protected:
 
     UFUNCTION()
     void OnLeaveClicked();
+
+    UFUNCTION()
+    void OnStartMatchClicked();                     // 开始对局（意图只发包；服务器校验房主）
 
     UFUNCTION()
     void HandleRoomStateChanged(int32 RoomId, const FString& HostName, const TArray<FString>& Members);
@@ -144,6 +152,10 @@ protected:
 
     UPROPERTY(meta = (BindWidget))
     UButton* LeaveButton = nullptr;
+
+    /** 开始对局按钮（BindWidgetOptional——WBP 摆了才生效；可见性由 C++ 按房主驱动，P5） */
+    UPROPERTY(meta = (BindWidgetOptional))
+    UButton* StartMatchButton = nullptr;
 
     UPROPERTY(meta = (BindWidgetOptional))
     UBorder* SlotBox_1 = nullptr;
@@ -177,4 +189,34 @@ protected:
 
 private:
     TWeakObjectPtr<ULobbySession> Session;
+    TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 对局意图出口（GI InitMatch 注入）
+};
+
+/**
+ * 调试面板基类（WBP_DebugPanel 的根类）—— M5 损伤滑块（演示基建首登场）
+ * 控件（全 BindWidgetOptional——WBP 摆了才生效，没摆面板退化为空壳）：
+ *   DelaySlider（延迟滑块 0~500）、DelayText（当前毫秒显示）
+ * 逻辑：滑块 → GI.SetInboundDelayMs（延迟队列本体在连接适配器）；面板只是表现层的旋钮
+ */
+UCLASS()
+class SIGHTLINE_API UDebugPanelBase : public UUserWidget {
+    GENERATED_BODY()
+
+public:
+    void Init(USightlineGameInstance* InGI);
+
+protected:
+    virtual void NativeConstruct() override;
+
+    UFUNCTION()
+    void OnDelayChanged(float Value);
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    class USlider* DelaySlider = nullptr;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* DelayText = nullptr;
+
+private:
+    TWeakObjectPtr<USightlineGameInstance> GI;
 };

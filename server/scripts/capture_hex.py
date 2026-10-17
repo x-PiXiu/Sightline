@@ -2,7 +2,7 @@
 """一次性抓包脚本：连接 8888，打印 WELCOME/HEARTBEAT/ACK 每帧的 msgid 与原始字节 hex（S7 动画 FACT 用）"""
 import socket, struct, time, sys
 
-s = socket.create_connection(("127.0.0.1", 8888), timeout=3)
+s = socket.create_connection(("127.0.0.1", 18888), timeout=3)
 s.settimeout(2.0)
 
 def send_frame(msgid, payload):

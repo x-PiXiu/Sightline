@@ -1,12 +1,12 @@
 // SightlineLobby —— 第 2 期客户端会话层（用例 + 实体）
-// 整洁架构位置：UMG（外）→ ULobbySession（本文件）→ FSightlineConnection（传输，第 1 期）
+// 整洁架构位置：UMG（外）→ ULobbySession（本文件）→ ISendPort（发送端口，D3-18——FSightlineConnection 实现）
 // 职责边界：意图接口只发包（客户端只发建议）；一切房间状态以服务器推送为准（权威原则）
 // 线程约定：全部接口只在游戏线程调用（帧由 AsyncTask 门投递回来）
 #pragma once
 #include "CoreMinimal.h"
 #include "SightlineLobby.generated.h"
 
-class FSightlineConnection;
+class ISendPort;
 
 /** 大厅列表项（服务器 ROOM_LIST 快照的一行） */
 USTRUCT(BlueprintType)
@@ -50,7 +50,7 @@ class SIGHTLINE_API ULobbySession : public UObject {
 
 public:
     /** GameInstance 在新建连接 / 断开时调用（可传 nullptr；本类不拥有连接） */
-    void BindConnection(FSightlineConnection* InConn);
+    void BindConnection(ISendPort* InConn);
     /** 链路断开（GI 的 OnConnectionLost 路径）：会话清空并广播 */
     void NotifyLinkLost();
 
@@ -81,5 +81,5 @@ private:
     void ResetModel();                               // 断线/被踢：会话清空
     bool SendLenPrefixedName(uint16 MsgId, const FString& Name);  // 登录/建房的 [1B len][utf8]
 
-    FSightlineConnection* Conn = nullptr;            // 非拥有指针（GI 持有生命周期）
+    ISendPort* Conn = nullptr;                       // 非拥有指针（GI 持有生命周期；D3-18 只认端口）
 };

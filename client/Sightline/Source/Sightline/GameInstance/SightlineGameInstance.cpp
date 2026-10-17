@@ -7,8 +7,10 @@
 #include "GameInstance/SightlineGameInstance.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Game/SightlineGameMode.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "TimerManager.h"
+#include "Kismet/GameplayStatics.h"
 #include "Async/Async.h"
 #include "Misc/DateTime.h"
 #include "Sockets.h"
@@ -41,11 +43,22 @@ void USightlineGameInstance::Init()
     LobbySession->OnKicked.AddDynamic(this, &USightlineGameInstance::HandleKickedForUI);
     LobbySession->OnLobbyLinkLost.AddDynamic(this, &USightlineGameInstance::HandleLinkLostForUI);
 
+    // 第 3 期：对局会话（Registry 纯态 + MatchSession 用例 + Spawner 效果适配器——D3-16 三层）
+    EntityRegistry = NewObject<USightlineEntityRegistry>(this);
+    MatchSession = NewObject<USightlineMatchSession>(this);
+    MatchSession->SetRegistry(EntityRegistry);
+    PawnSpawner = NewObject<USightlinePawnSpawner>(this);
+    PawnSpawner->Init(EntityRegistry, nullptr);           // 远端类槽在生成时从 GameMode 现取
+    PawnSpawner->BindDelegates();
+    MatchSession->OnMatchStarted.AddDynamic(this, &USightlineGameInstance::HandleMatchStarted);
+
     // UGameInstance 无 Tick 虚函数——FTSTicker 每帧回调（HUD 刷新 + LAG 判定）
     TickerDelegate.BindUObject(this, &USightlineGameInstance::HandleTick);
     TickerHandle = FTSTicker::GetCoreTicker().AddTicker(TickerDelegate, 0.f);
 
-    UE_LOG(LogSightline, Log, TEXT("[GI] 初始化完成，发起连接 127.0.0.1:8888"));
+    EnsureDebugPanel();                                   // M5：损伤滑块面板（PIE/开发构建常驻）
+
+    UE_LOG(LogSightline, Log, TEXT("[GI] 初始化完成，发起连接 127.0.0.1:18888"));
     Connect();   // PIE 即连；心跳在收到 WELCOME（连接确认）后才启动
 }
 
@@ -81,12 +94,44 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
             FString::Printf(TEXT("%s   ping=%ums   seq=%u"), *Status, LastPingMs, HeartbeatSeq));
     }
 
-    // LAG 进入判定：已连接但超过阈值无 ACK
+    // 第 3 期：切对局关卡后延迟批量生成远端角色（0.6s 守门 = 等 OpenLevel 加载落定，M3 简化；
+    //         精确的就绪钩子 = 演进项）——本地 Pawn 由 GameMode 生成，这里只补远端
+    if (bPendingArenaSpawn && FPlatformTime::Seconds() >= PendingArenaSpawnAt)
+    {
+        bPendingArenaSpawn = false;
+        if (UWorld* W = GetWorld())
+        {
+            TSubclassOf<APawn> RemoteClass = nullptr;
+            if (const ASightlineGameMode* GM = Cast<ASightlineGameMode>(W->GetAuthGameMode()))
+                RemoteClass = GM->QuinnClass;
+            if (PawnSpawner) PawnSpawner->SpawnAllRemote(W, RemoteClass);
+            UE_LOG(LogSightline, Log, TEXT("[GI] 对局关卡就绪 → 远端角色批量生成"));
+        }
+    }
+
+    // 自动重连（到点即连）——同心跳，时间戳轮询（跨切图存活）
+    if (bReconnectPending && !bShuttingDown && !bConnected
+        && MonotonicMs() >= ReconnectAtMonotonicMs)
+    {
+        bReconnectPending = false;
+        Connect();
+    }
+
+    // 心跳（1s 节拍）——由本 FTSTicker 按节拍驱动（进程级，跨切图存活）；
+    // World 级 TimerManager 上的定时器会随 MATCH_START 切图死亡（M6 联调实锤）
+    if (bConnected && !bShuttingDown && LastHeartbeatMonotonicMs > 0.0
+        && MonotonicMs() - LastHeartbeatMonotonicMs >= kHeartbeatPeriod * 1000.0f)
+    {
+        LastHeartbeatMonotonicMs = MonotonicMs();
+        HandleHeartbeatTick();
+    }
+
+    // LAG = "3s 无任何下行帧"（链路静默），不是"无 ACK"——见 OnFrameReceived 入口注释
     if (bConnected && !bLag && MonotonicMs() - LastAckMonotonicMs > kLagThresholdMs)
     {
         bLag = true;
         LagEnteredMonotonicMs = MonotonicMs();
-        UE_LOG(LogSightline, Warning, TEXT("[GI] %.0f ms 无 ACK → LAG（未确认心跳 %d 个，已收 WELCOME=%d）"),
+        UE_LOG(LogSightline, Warning, TEXT("[GI] %.0f ms 无下行帧 → LAG（未确认心跳 %d 个，已收 WELCOME=%d）"),
                kLagThresholdMs, PendingHeartbeats.Num(), bGotWelcome ? 1 : 0);
     }
     // LAG 持续不恢复 → 主动断线（半开连接被动等不到对端死亡，就主动拆）；
@@ -110,9 +155,10 @@ void USightlineGameInstance::Connect()
         return;
     }
 
-    UE_LOG(LogSightline, Log, TEXT("[GI] 连接 127.0.0.1:8888 ……"));
+    UE_LOG(LogSightline, Log, TEXT("[GI] 连接 127.0.0.1:18888 ……"));
     Connection = MakeUnique<FSightlineConnection>();
     if (LobbySession) LobbySession->BindConnection(Connection.Get());   // 会话绑定新连接
+    if (MatchSession) MatchSession->BindConnection(Connection.Get());   // 对局会话绑定新连接（M3）
     // BindLambda 捕获弱指针：GameInstance 析构后在途 AsyncTask 执行时安全跳过（防悬垂）
     TWeakObjectPtr<USightlineGameInstance> WeakThis(this);
     Connection->OnFrame.BindLambda([WeakThis](uint16 MsgId, const TArray<uint8>& Payload)
@@ -130,7 +176,7 @@ void USightlineGameInstance::Connect()
         }
     });
 
-    if (Connection->Connect(TEXT("127.0.0.1"), 8888))
+    if (Connection->Connect(TEXT("127.0.0.1"), 18888))
     {
         UE_LOG(LogSightline, Log, TEXT("[GI] 连接请求已发起（等待 WELCOME 确认）"));
     }
@@ -139,6 +185,7 @@ void USightlineGameInstance::Connect()
         // 服务器可能后起——3 秒后自动重试
         Connection.Reset();
         if (LobbySession) LobbySession->BindConnection(nullptr);
+        if (MatchSession) MatchSession->BindConnection(nullptr);
         UE_LOG(LogSightline, Warning, TEXT("[GI] 连接失败，%.0f 秒后重试"), kReconnectDelay);
         ScheduleReconnect();
     }
@@ -147,13 +194,11 @@ void USightlineGameInstance::Connect()
 void USightlineGameInstance::ScheduleReconnect()
 {
     if (bShuttingDown) return;   // Shutdown 期间：不调度、不打印重连日志
-    if (FTimerManager* TM = GetTimerManagerSafe())
-    {
-        FTimerHandle RetryHandle;
-        TM->SetTimer(RetryHandle, FTimerDelegate::CreateUObject(this, &USightlineGameInstance::Connect),
-                     kReconnectDelay, false);
-        UE_LOG(LogSightline, Log, TEXT("[GI] %.0f 秒后自动重连"), kReconnectDelay);
-    }
+    // 时间戳轮询承载（HandleTick 驱动，跨切图存活）——World 级 TimerManager 上的定时器
+    // 会随 MATCH_START 切图死亡（M6 联调实锤，与心跳同款）；局部 FTimerHandle 还无法取消
+    bReconnectPending = true;
+    ReconnectAtMonotonicMs = MonotonicMs() + kReconnectDelay * 1000.0;
+    UE_LOG(LogSightline, Log, TEXT("[GI] %.0f 秒后自动重连"), kReconnectDelay);
 }
 
 void USightlineGameInstance::OnConnectionLost(const FString& Reason)
@@ -166,6 +211,11 @@ void USightlineGameInstance::OnConnectionLost(const FString& Reason)
     {
         LobbySession->NotifyLinkLost();                   // 会话清空 + 通知 UI（被踢/断线区分开）
         LobbySession->BindConnection(nullptr);
+    }
+    if (MatchSession)
+    {
+        MatchSession->NotifyLinkLost();                   // Registry 清场（对局随链路死亡）
+        MatchSession->BindConnection(nullptr);
     }
     Connection.Reset();
     if (bShuttingDown)
@@ -186,6 +236,7 @@ void USightlineGameInstance::Disconnect()
         Connection.Reset();
     }
     if (LobbySession) LobbySession->BindConnection(nullptr);   // Shutdown 路径静默解绑
+    if (MatchSession) MatchSession->BindConnection(nullptr);
     bConnected = false;
 }
 
@@ -200,6 +251,8 @@ void USightlineGameInstance::EnsureWidgetClasses()
         LobbyWidgetClass = LoadClass<ULobbyWidgetBase>(nullptr, TEXT("/Game/Code/UI/WBP_Lobby.WBP_Lobby_C"));
     if (!RoomWidgetClass)
         RoomWidgetClass = LoadClass<URoomWidgetBase>(nullptr, TEXT("/Game/Code/UI/WBP_Room.WBP_Room_C"));
+    if (!DebugPanelClass)
+        DebugPanelClass = LoadClass<UDebugPanelBase>(nullptr, TEXT("/Game/Code/UI/WBP_DebugPanel.WBP_DebugPanel_C"));
 }
 
 void USightlineGameInstance::EnsureUIMouseCursor()
@@ -208,6 +261,31 @@ void USightlineGameInstance::EnsureUIMouseCursor()
     if (UWorld* World = GetWorld())
         if (APlayerController* PC = World->GetFirstPlayerController())
             PC->bShowMouseCursor = true;
+}
+
+void USightlineGameInstance::SetInboundDelayMs(int32 Ms)
+{
+    if (Connection) Connection->SetInboundDelayMs(Ms);    // 延迟队列本体在连接适配器（D3-11）
+    if (CSightlineStatLog.GetValueOnGameThread() != 0)
+        UE_LOG(LogSightline, Log, TEXT("[STAT] DELAY t=%.3f ms=%d"), FPlatformTime::Seconds(), Ms);
+}
+
+void USightlineGameInstance::EnsureDebugPanel()
+{
+#if !UE_BUILD_SHIPPING
+    EnsureWidgetClasses();
+    if (DebugPanelClass == nullptr)
+    {
+        UE_LOG(LogSightline, Log, TEXT("[UI] WBP_DebugPanel 未找到——建好后每次 PIE 自动挂载"));
+        return;
+    }
+    if (auto* W = CreateWidget<UDebugPanelBase>(this, DebugPanelClass))
+    {
+        W->Init(this);
+        W->AddToViewport(50);
+        UE_LOG(LogSightline, Log, TEXT("[UI] 调试面板已挂载（M5 损伤滑块）"));
+    }
+#endif
 }
 
 void USightlineGameInstance::ShowLoginScreen()
@@ -283,6 +361,7 @@ void USightlineGameInstance::ShowRoomScreen()
     if (auto* W = CreateWidget<URoomWidgetBase>(this, RoomWidgetClass))
     {
         if (LobbySession) W->Init(LobbySession);
+        if (MatchSession) W->InitMatch(MatchSession);     // M3：开始对局意图的出口注入（漏接 = 按钮点击空转）
         W->AddToViewport();
         CurrentScreenWidget = W;
     }
@@ -290,7 +369,21 @@ void USightlineGameInstance::ShowRoomScreen()
 
 void USightlineGameInstance::HandleLoginResultForUI(bool bSuccess, int32 PlayerId, const FString& Message)
 {
-    if (bSuccess) ShowLobbyScreen();                      // 登录成功 → 大厅（失败留在登录界面，控件自显错误）
+    if (!bSuccess) return;                                // 失败留在登录界面（控件自显错误）
+    if (MatchSession) MatchSession->SetSelfPlayerId(PlayerId);   // Registry 标 bSelf 用（名册自识别）
+    ShowLobbyScreen();                                    // 登录成功 → 大厅
+}
+
+// ===== 第 3 期：对局（MATCH_START → 切对局关卡 → 延迟生成远端角色）=====
+
+void USightlineGameInstance::HandleMatchStarted()
+{
+    UE_LOG(LogSightline, Log, TEXT("[GI] MATCH_START → 切对局关卡 NewMap"));
+    bInArena = true;
+    bPendingArenaSpawn = true;
+    PendingArenaSpawnAt = FPlatformTime::Seconds() + 0.6;   // 等 OpenLevel 加载落定（M3 简化守门）
+    if (APlayerController* PC = GetFirstLocalPlayerController())
+        PC->ClientTravel(TEXT("/Game/Code/Map/NewMap"), ETravelType::TRAVEL_Absolute);
 }
 
 void USightlineGameInstance::HandleRoomListForUI(const TArray<FRoomInfo>& Rooms)
@@ -298,6 +391,15 @@ void USightlineGameInstance::HandleRoomListForUI(const TArray<FRoomInfo>& Rooms)
     // 收到列表 = 此刻人在大厅（房内玩家不订阅列表）→ 幂等切大厅
     if (LobbySession && LobbySession->Model.bLoggedIn && LobbySession->Model.CurrentRoomId == 0)
     {
+        if (bInArena)                                     // 对局中离开房间 → 切回大厅世界并清场
+        {
+            bInArena = false;
+            if (PawnSpawner) PawnSpawner->DespawnAll();
+            if (EntityRegistry) EntityRegistry->Clear();
+            if (APlayerController* PC = GetFirstLocalPlayerController())
+                PC->ClientTravel(TEXT("/Engine/Maps/Templates/OpenWorld"), ETravelType::TRAVEL_Absolute);
+            UE_LOG(LogSightline, Log, TEXT("[GI] 离开对局 → 切回大厅世界"));
+        }
         ShowLobbyScreen();
     }
 }
@@ -317,30 +419,18 @@ void USightlineGameInstance::HandleLinkLostForUI()
     ShowLoginScreen();                                    // 断线 → 回登录界面
 }
 
-FTimerManager* USightlineGameInstance::GetTimerManagerSafe()
-{
-    // World 可能尚未就绪（Init 阶段）或已销毁（Shutdown 阶段）——调用方判空
-    UWorld* World = GetWorld();
-    return World ? &World->GetTimerManager() : nullptr;
-}
 
 void USightlineGameInstance::StartHeartbeat()
 {
-    if (FTimerManager* TM = GetTimerManagerSafe())
-    {
-        TM->SetTimer(HeartbeatTimerHandle,
-            FTimerDelegate::CreateUObject(this, &USightlineGameInstance::HandleHeartbeatTick),
-            kHeartbeatPeriod, true);
-        UE_LOG(LogSightline, Log, TEXT("[GI] 心跳启动（每 %.0f 秒）"), kHeartbeatPeriod);
-    }
+    // 心跳承载于 FTSTicker（进程级，跨切图存活）——World 级 TimerManager 上的定时器
+    // 会随 MATCH_START 切图死亡（M6 联调实锤），故改由 HandleTick 按节拍驱动
+    LastHeartbeatMonotonicMs = MonotonicMs();
+    UE_LOG(LogSightline, Log, TEXT("[GI] 心跳启动（每 %.0f 秒）"), kHeartbeatPeriod);
 }
 
 void USightlineGameInstance::StopHeartbeat()
 {
-    if (FTimerManager* TM = GetTimerManagerSafe())
-    {
-        TM->ClearTimer(HeartbeatTimerHandle);
-    }
+    LastHeartbeatMonotonicMs = 0.0;          // 0 = 心跳暂停
 }
 
 void USightlineGameInstance::HandleHeartbeatTick()
@@ -362,10 +452,28 @@ void USightlineGameInstance::HandleHeartbeatTick()
 
 void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& Payload)
 {
+    // 链路活性判定源：任何下行帧都算（ACK 只负责 ping）——对局期 17 快照 30Hz 在流时
+    // 链路明明活着，不能因心跳 ACK 迟到而误判 LAG（PIE 双开卡顿误报，M6 联调实锤）
+    LastAckMonotonicMs = MonotonicMs();
+    if (bLag)
+    {
+        bLag = false;
+        LagEnteredMonotonicMs = 0.0;
+        UE_LOG(LogSightline, Log, TEXT("[GI] 下行帧恢复（msgid=%u）→ LAG 解除"), MsgId);
+    }
+
     // 第 2 期：4~13 号（登录+房间）转发给会话层；1/3（WELCOME/ACK）留在链路层
     if (LobbySession && MsgId >= SightlineProtocol::MSG_C2S_LOGIN && MsgId <= SightlineProtocol::MSG_S2C_KICKED)
     {
         LobbySession->OnFrame(MsgId, Payload);
+        return;
+    }
+
+    // 第 3 期：15/17/18（对局）转发给对局会话（17 的快照解析 M4 实装，先统一入口喂 Registry）
+    if (MatchSession &&
+        (MsgId == MSG_S2C_MATCH_START || MsgId == MSG_S2C_ENTITY_STATE || MsgId == MSG_S2C_ENTITY_LEAVE))
+    {
+        MatchSession->HandleFrame(MsgId, Payload);
         return;
     }
 
@@ -375,8 +483,6 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
     case MSG_S2C_WELCOME:
         bConnected = true;
         bGotWelcome = true;
-        bLag = false;
-        LastAckMonotonicMs = MonotonicMs();
         StartHeartbeat();                                // 连接确认后才发心跳
         UE_LOG(LogSightline, Log, TEXT("[GI] WELCOME 收到 → Connected（验收画面①）"));
         break;
@@ -404,13 +510,6 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
         {
             UE_LOG(LogSightline, Verbose, TEXT("[GI] ACK seq=%u（过期/未知，忽略）"), Seq);
         }
-        if (bLag)
-        {
-            bLag = false;
-            LagEnteredMonotonicMs = 0.0;
-            UE_LOG(LogSightline, Log, TEXT("[GI] ACK 恢复 → LAG 解除"));
-        }
-        LastAckMonotonicMs = MonotonicMs();
         break;
     }
     default:

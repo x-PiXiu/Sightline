@@ -6,12 +6,15 @@
 #pragma once
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "lobby/lobby.h"
 #include "logger/logger.h"
+#include "match/match_service.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
 #include "net/client_connection.h"
 #include "protocol/msg_ids.h"
 
@@ -94,6 +97,62 @@ public:
         }
     }
 
+    // 对局事件 → 15/17/18 帧（v3 契约；翻译唯一落点，与 deliver 同一职责线）
+    void deliverMatch(const std::vector<sightline::match::MatchEvent>& events) {
+        using MT = sightline::match::MatchEvent::Type;
+        for (const auto& e : events) {
+            switch (e.type) {
+            case MT::MatchStart: {
+                std::string p = u32(static_cast<uint32_t>(e.roster.size()));
+                for (const auto& r : e.roster) {
+                    p += u32(r.playerId);
+                    p += lenPrefixed(r.name);
+                    p += static_cast<char>(r.spawnIndex);
+                }
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    send(fd, protocol::MSG_S2C_MATCH_START, p);
+                LOG_INFO("[出站] MATCH_START 房=" + std::to_string(e.roomId) +
+                         " 名册=" + std::to_string(e.roster.size()));
+                break;
+            }
+            case MT::EntityLeave: {
+                const std::string p = u32(e.leavePlayerId);
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    if (lobby_.PlayerIdByFd(fd) != static_cast<int>(e.leavePlayerId))  // 不含当事人
+                        send(fd, protocol::MSG_S2C_ENTITY_LEAVE, p);
+                LOG_INFO("[出站] ENTITY_LEAVE pid=" + std::to_string(e.leavePlayerId));
+                break;
+            }
+            case MT::Snapshot: {
+                // 按接收者编码：滤掉自己的实体（v3 契约——17 不含接收者自己）
+                // ⚠ 计数必须 = 实际写入条数（先滤后数，再写头）——声明的 n 与实体不一致会导致客户端幻影解析
+                const auto f32 = [](float F) {
+                    std::string B(sizeof(float), '\0');
+                    std::memcpy(B.data(), &F, sizeof(float));
+                    return B;
+                };
+                for (int fd : lobby_.RoomMemberFds(e.roomId)) {
+                    const int selfPid = lobby_.PlayerIdByFd(fd);
+                    std::string body;
+                    int n = 0;
+                    for (const auto& S : e.entities) {
+                        if (static_cast<int>(S.playerId) == selfPid) continue;
+                        ++n;
+                        body += u32(S.playerId);
+                        body += f32(S.x); body += f32(S.y); body += f32(S.z);
+                        body += f32(S.yaw); body += f32(S.pitch);
+                        body += static_cast<char>(S.flags);
+                    }
+                    std::string p = u16(static_cast<uint16_t>(n));
+                    p += body;
+                    send(fd, protocol::MSG_S2C_ENTITY_STATE, p);
+                }
+                break;
+            }
+            }
+        }
+    }
+
 private:
     static std::string u32(uint32_t v) {
         std::string s;
@@ -129,6 +188,8 @@ private:
 };
 
 // ===== 入站：msgid → Handler 注册表（开闭原则：新消息只注册）=====
+// 同一 msgid 可挂多个 Handler（M3：10 号的"对局离场钩子"与大厅离开共存），
+// 执行顺序 = 注册顺序——顺序敏感的钩子（如 fd→PlayerId 翻译须先于 lobby 移除）应先注册
 class MessageDispatcher {
 public:
     using Handler = std::function<void(int fd, const std::string& payload)>;
@@ -139,7 +200,7 @@ public:
     };
 
     void on(uint16_t msgid, std::string name, Handler h, bool trace = false) {
-        handlers_[msgid] = Entry{std::move(name), trace, std::move(h)};
+        handlers_[msgid].push_back(Entry{std::move(name), trace, std::move(h)});
     }
 
     void dispatch(int fd, uint16_t msgid, const std::string& payload) {
@@ -150,15 +211,17 @@ public:
                         " 来自 fd=" + std::to_string(fd) + " —— 已忽略");
             return;
         }
-        const std::string line = "[收帧·" + it->second.name + "] fd=" +
-                                 std::to_string(fd) + " msgid=" + std::to_string(msgid) +
-                                 " 字节=" + std::to_string(payload.size());
-        if (it->second.trace) LOG_TRACE(line); else LOG_DEBUG(line);
-        it->second.handler(fd, payload);
+        for (const auto& entry : it->second) {
+            const std::string line = "[收帧·" + entry.name + "] fd=" +
+                                     std::to_string(fd) + " msgid=" + std::to_string(msgid) +
+                                     " 字节=" + std::to_string(payload.size());
+            if (entry.trace) LOG_TRACE(line); else LOG_DEBUG(line);
+            entry.handler(fd, payload);
+        }
     }
 
 private:
-    std::map<uint16_t, Entry> handlers_;
+    std::map<uint16_t, std::vector<Entry>> handlers_;
 };
 
 // ===== 请求侧注册（适配器职责：payload 解析 + 调用例）=====

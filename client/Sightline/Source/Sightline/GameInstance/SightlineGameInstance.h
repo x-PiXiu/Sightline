@@ -5,8 +5,10 @@
 #include "Engine/GameInstance.h"
 #include "Connection/SightlineConnection.h"
 #include "Lobby/SightlineLobby.h"
+#include "Match/SightlineEntityRegistry.h"
+#include "Match/SightlineMatchSession.h"
+#include "Match/SightlinePawnSpawner.h"
 #include "UI/SightlineUIWidgets.h"
-#include "TimerManager.h"
 #include "Containers/Ticker.h"
 #include "SightlineGameInstance.generated.h"
 
@@ -24,6 +26,8 @@ public:
 
     bool IsConnected() const { return bConnected; }
     uint32 GetLastPingMs() const { return LastPingMs; }
+    USightlineMatchSession* GetMatchSession() const { return MatchSession; }   // 角色采样上报绑定用（D3-17）
+    void SetInboundDelayMs(int32 Ms);                // M5：损伤滑块透传（连接适配器的延迟队列）
 
 private:
     void StartHeartbeat();
@@ -32,11 +36,12 @@ private:
     bool HandleTick(float DeltaTime);
     void ScheduleReconnect();
     void OnConnectionLost(const FString& Reason);
-    FTimerManager* GetTimerManagerSafe();
     void OnFrameReceived(uint16 MsgId, const TArray<uint8>& Payload);
 
     TUniquePtr<FSightlineConnection> Connection;
-    FTimerHandle HeartbeatTimerHandle;
+    double LastHeartbeatMonotonicMs = 0.0;   // 心跳节拍（FTSTicker 承载——World 级 TimerManager 会随切图死亡，M6 联调实锤）
+    bool   bReconnectPending = false;        // 重连调度（时间戳轮询——World 级 TimerManager 会随切图死亡，M6 联调实锤）
+    double ReconnectAtMonotonicMs = 0.0;     // 到点即连；置回 false 即取消（比局部 FTimerHandle 多出的能力）
 
     // 连接状态
     bool bConnected = false;
@@ -55,6 +60,17 @@ private:
     UPROPERTY()
     TObjectPtr<ULobbySession> LobbySession;
 
+    // 第 3 期：对局会话（帧 15/17/18 转发；Registry 纯态 + Spawner 效果适配器——D3-16）
+    UPROPERTY()
+    TObjectPtr<USightlineEntityRegistry> EntityRegistry;
+    UPROPERTY()
+    TObjectPtr<USightlineMatchSession> MatchSession;
+    UPROPERTY()
+    TObjectPtr<USightlinePawnSpawner> PawnSpawner;
+    bool bInArena = false;                    // 当前在对局关卡（离开房间 → 切回大厅世界）
+    bool bPendingArenaSpawn = false;          // 切图后批量生成远端角色（0.6s 守门，M3 简化）
+    double PendingArenaSpawnAt = 0.0;
+
 public:
     // —— 界面装配（混合模式：WBP 蓝图放皮，逻辑在 UI/SightlineUIWidgets）——
     // 三个 WBP 资产的根类分别设为这里指定的 C++ 基类；默认值落在 DefaultGame.ini
@@ -64,6 +80,8 @@ public:
     TSubclassOf<ULobbyWidgetBase> LobbyWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category = "Sightline UI")
     TSubclassOf<URoomWidgetBase> RoomWidgetClass;
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline UI")
+    TSubclassOf<UDebugPanelBase> DebugPanelClass;    // M5：损伤滑块面板（WBP_DebugPanel）
 
 private:
     void ShowLoginScreen();
@@ -71,6 +89,7 @@ private:
     void ShowRoomScreen();
     void EnsureWidgetClasses();          // 类槽兜底：ini 被回写/加载时序不齐时按固定路径 LoadClass
     void EnsureUIMouseCursor();
+    void EnsureDebugPanel();             // M5：调试面板装配（PIE/开发构建常驻左上）
     UFUNCTION()
     void HandleLoginResultForUI(bool bSuccess, int32 PlayerId, const FString& Message);
     UFUNCTION()
@@ -81,6 +100,8 @@ private:
     void HandleKickedForUI(int32 ReasonCode);
     UFUNCTION()
     void HandleLinkLostForUI();
+    UFUNCTION()
+    void HandleMatchStarted();                       // 15 → 切对局关卡 + 延迟生成远端角色
     UPROPERTY()
     TObjectPtr<UUserWidget> CurrentScreenWidget = nullptr;
     bool bInitialScreenShown = false;

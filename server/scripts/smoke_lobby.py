@@ -12,7 +12,7 @@ import sys
 import time
 
 HOST = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
-PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8888
+PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18888
 
 S2C = {"WELCOME": 1, "HEARTBEAT_ACK": 3, "LOGIN_RESULT": 5, "CREATE_RESULT": 7,
        "JOIN_RESULT": 9, "ROOM_LIST": 11, "ROOM_STATE": 12, "KICKED": 13}

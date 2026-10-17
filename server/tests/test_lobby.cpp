@@ -142,6 +142,23 @@ int main() {
     CHECK(lp && lp->rooms.size() == 2);                     // 只剩 房间2(gamma) / 房间3(快照房A)
     CHECK(brief(1) == nullptr && brief(2) != nullptr && brief(3) != nullptr);
 
+    stage("优雅关闭：ShutdownBroadcast → 在线+宽限期各得 Kicked(3)（D3-19）");
+    {
+        LobbyService s2;
+        s2.OnConnected(21, 0);
+        (void)find(s2.Login(21, "关服甲"), EvType::LoginOk);    // 在线玩家
+        s2.OnConnected(22, 0);                                   // 宽限期裸连接
+        const auto sd = s2.ShutdownBroadcast();
+        CHECK(sd.size() == 2);
+        bool hitOnline = false, hitGrace = false;
+        for (const auto& e : sd) {
+            CHECK(e.type == EvType::Kicked && e.code == 3);
+            hitOnline |= (e.fd == 21);
+            hitGrace |= (e.fd == 22);
+        }
+        CHECK(hitOnline && hitGrace);                            // 两类连接全覆盖
+    }
+
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（LobbyService 纯逻辑，未起网络）\n";
     return 0;
 }

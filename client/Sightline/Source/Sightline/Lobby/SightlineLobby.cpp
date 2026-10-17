@@ -2,7 +2,7 @@
 // 名字编码：TCHAR → UTF-8（服务器契约）；解析侧防越界：任何字段先验长度再解包
 #include "Lobby/SightlineLobby.h"
 
-#include "Connection/SightlineConnection.h"
+#include "Connection/SightlineSendPort.h"
 #include "Connection/SightlineProtocol.h"
 #include "Logging/LogMacros.h"
 
@@ -59,7 +59,7 @@ namespace {
     }
 } // namespace
 
-void ULobbySession::BindConnection(FSightlineConnection* InConn) {
+void ULobbySession::BindConnection(ISendPort* InConn) {
     Conn = InConn;
 }
 

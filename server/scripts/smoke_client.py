@@ -3,7 +3,7 @@
 不依赖 UE，独立验证服务器协议实现（定稿图心跳时序图的等价物）"""
 import socket, struct, time, sys
 
-HOST, PORT = "127.0.0.1", 8888
+HOST, PORT = "127.0.0.1", 18888
 
 def recv_frame(sock):
     hdr = b""

@@ -13,6 +13,7 @@ FLAGS="-std=c++20 -Wall -Wswitch -Werror=switch -I include"
 build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
+        src/match/match_service.cpp \
         -o sightline_server -lpthread
     echo "✓ sightline_server 编译完成"
 }
@@ -21,6 +22,10 @@ build_test() {
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_lobby.cpp src/lobby/lobby_service.cpp -o /tmp/test_lobby
     /tmp/test_lobby
+    # shellcheck disable=SC2086
+    $CXX $FLAGS tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp \
+        -o /tmp/test_match
+    /tmp/test_match
 }
 
 case "${1:-all}" in

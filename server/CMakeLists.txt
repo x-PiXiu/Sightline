@@ -33,16 +33,27 @@ add_library(sightline_lobby STATIC
 target_include_directories(sightline_lobby PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # 依赖规则自检：sightline_lobby 不得链接/包含 net —— 违反会在 CI grep 或 code review 抓出
 
-# ============ 第 2 期：服务器本体（装配根） ============
+# ============ 第 3 期：对局用例层（与 lobby 并列——D3-15：只认 PlayerId，与 lobby 互不 include） ============
+add_library(sightline_match STATIC
+    src/match/match_service.cpp
+)
+target_include_directories(sightline_match PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# 依赖规则自检：sightline_match 不得链接/包含 net，也不得包含 lobby——组合归适配层 wireMatch
+
+# ============ 第 3 期：服务器本体（装配根） ============
 add_executable(sightline_server
     main.cpp
 )
-target_link_libraries(sightline_server PRIVATE sightline_lobby sightline_core)
+target_link_libraries(sightline_server PRIVATE sightline_lobby sightline_match sightline_core)
 
 # ============ 测试 ============
 add_executable(test_lobby tests/test_lobby.cpp)
 target_link_libraries(test_lobby PRIVATE sightline_lobby)
 add_test(NAME test_lobby COMMAND test_lobby)
+
+add_executable(test_match tests/test_match.cpp)
+target_link_libraries(test_match PRIVATE sightline_match sightline_lobby)
+add_test(NAME test_match COMMAND test_match)
 
 add_executable(smoke_base tests/smoke_base.cpp)
 target_link_libraries(smoke_base PRIVATE sightline_core)

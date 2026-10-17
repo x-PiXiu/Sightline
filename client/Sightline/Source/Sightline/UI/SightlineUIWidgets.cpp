@@ -4,7 +4,11 @@
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
+#include "Components/RichTextBlock.h"
+#include "Components/Slider.h"
 #include "Components/TextBlock.h"
+#include "GameInstance/SightlineGameInstance.h"
+#include "Match/SightlineMatchSession.h"
 
 namespace {
     // 房间容量上限 = 服务器契约满员码的判据（MSG_IDS 消息 9：3 = 已满 4 人）
@@ -66,13 +70,40 @@ void ULoginWidgetBase::SetMessage(const FString& Text) {
 
 // ============ 大厅界面 ============
 
+namespace {
+    // —— 名册排版（docs/episodes/ep03/ui_roomlist_spec）：Font_Mono 等宽 + 全角补位列锚 + RichText 颜色标签 ——
+    // 半角槽：ASCII=1、CJK/全角=2；全角空格(U+3000)=2 槽。列宽（半角槽）：房号 4 · 房名 24 · 人数 4
+    int32 ListDisplaySlots(const FString& In) {
+        int32 Slots = 0;
+        for (const TCHAR C : In) Slots += (C >= 0x2E80) ? 2 : 1;
+        return Slots;
+    }
+    FString ListPad(const FString& In, const int32 TargetSlots) {
+        FString Out = In;
+        int32 Gap;
+        while ((Gap = TargetSlots - ListDisplaySlots(Out)) >= 2) Out += TEXT("　");
+        if (Gap == 1) Out += TEXT(" ");
+        return Out;
+    }
+    FString ListRow(const int32 RoomId, const FString& RoomName,
+                    const int32 Count, const int32 Capacity, const FString& Host,
+                    const bool bFullStyled) {
+        const FString Row = FString::Printf(TEXT("%s　%s　%s　%s"),
+            *ListPad(FString::FromInt(RoomId), 4),
+            *ListPad(RoomName, 24),
+            *ListPad(FString::Printf(TEXT("%d/%d"), Count, Capacity), 4),
+            *Host);
+        return bFullStyled ? FString::Printf(TEXT("<full>%s</>"), *Row) : Row;
+    }
+}
+
 void ULobbyWidgetBase::Init(ULobbySession* InSession) {
     Session = InSession;
 }
 
 void ULobbyWidgetBase::NativeConstruct() {
     Super::NativeConstruct();
-    if (RoomListText) RoomListText->SetAutoWrapText(true);   // 多行列表自动换行（C++ 兜底，不依赖面板设置）
+    if (RoomListText) RoomListText->SetAutoWrapText(false);  // 列锚名册禁自动换行（列宽有界见 ui_roomlist_spec，折行即破对齐）
     if (CreateButton) CreateButton->OnClicked.AddDynamic(this, &ULobbyWidgetBase::OnCreateClicked);
     if (JoinButton) JoinButton->OnClicked.AddDynamic(this, &ULobbyWidgetBase::OnJoinClicked);
     if (Session.IsValid()) {
@@ -107,14 +138,14 @@ void ULobbyWidgetBase::HandleRoomListChanged(const TArray<FRoomInfo>& Rooms) {
         RoomListText->SetText(FText::FromString(TEXT("暂无房间——输入房间名点【建房】")));
         return;
     }
-    FString Out;
+    FString Out = FString::Printf(TEXT("<head>%s　%s　%s　%s</>\n"),
+        *ListPad(TEXT("房号"), 4), *ListPad(TEXT("房名"), 24),
+        *ListPad(TEXT("人数"), 4), TEXT("房主"));
     for (const FRoomInfo& R : Rooms) {
-        const bool bFull = R.MemberCount >= kRoomCapacity;
-        Out += FString::Printf(TEXT("【%d】%s　%d/%d 人　房主：%s%s\n"),
-                               R.RoomId, *R.RoomName, R.MemberCount, kRoomCapacity,
-                               *R.HostName, bFull ? TEXT("　【满】") : TEXT(""));
+        Out += ListRow(R.RoomId, R.RoomName, R.MemberCount, kRoomCapacity, R.HostName,
+                       R.MemberCount >= kRoomCapacity) + TEXT("\n");
     }
-    Out += TEXT("\n要加入哪个房间，就把它的【】里的数字填到房号框里，点【进房】");
+    Out += TEXT("\n要加入哪个房间，就把它的房号填到右侧房号框里，点【申请进房】");
     RoomListText->SetText(FText::FromString(Out));
 }
 
@@ -138,17 +169,26 @@ void URoomWidgetBase::Init(ULobbySession* InSession) {
     Session = InSession;
 }
 
+void URoomWidgetBase::InitMatch(USightlineMatchSession* InMatch) {
+    MatchSession = InMatch;                                // 开始对局意图的出口（D3-15 客户端镜像）
+}
+
 void URoomWidgetBase::NativeConstruct() {
     Super::NativeConstruct();
     UE_LOG(LogTemp, Warning,
-           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s | 槽位模式=%s"),
+           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s | StartMatchButton=%s | 槽位模式=%s"),
            *GetClass()->GetName(),
            MemberListText ? TEXT("已绑定") : TEXT("未绑定!"),
            RoomTitleText ? TEXT("已绑定") : TEXT("未绑定!"),
            LeaveButton ? TEXT("已绑定") : TEXT("未绑定!"),
+           StartMatchButton ? TEXT("已绑定") : TEXT("未绑定!"),
            SlotText_1 ? TEXT("ON") : TEXT("OFF（文本名单兜底）"));
     if (MemberListText) MemberListText->SetAutoWrapText(true);   // 成员名单自动换行
     if (LeaveButton) LeaveButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnLeaveClicked);
+    if (StartMatchButton) {
+        StartMatchButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnStartMatchClicked);
+        StartMatchButton->SetVisibility(ESlateVisibility::Collapsed);   // 默认折叠，房主身份到了再显
+    }
     if (Session.IsValid()) {
         Session->OnRoomStateChanged.AddDynamic(this, &URoomWidgetBase::HandleRoomStateChanged);
         RefreshFromModel();                                       // 幂等进入：先显示当前房间状态
@@ -166,7 +206,9 @@ void URoomWidgetBase::RefreshFromModel() {
     if (!Session.IsValid()) return;
     const FLobbyModel& M = Session->Model;
     // 房主 = 成员列表首位（服务器契约：按加入顺序）；成员名逐行显示
-    HandleRoomStateChanged(M.CurrentRoomId, FString(), M.CurrentMembers);
+    // HostName 实参修正：原传空串——P5 的开始对局按钮可见性依赖它，进房首次绘制即须正确显隐
+    const FString HostName = M.CurrentMembers.Num() > 0 ? M.CurrentMembers[0] : FString();
+    HandleRoomStateChanged(M.CurrentRoomId, HostName, M.CurrentMembers);
 }
 
 void URoomWidgetBase::HandleRoomStateChanged(int32 RoomId, const FString& HostName, const TArray<FString>& Members) {
@@ -235,8 +277,40 @@ void URoomWidgetBase::HandleRoomStateChanged(int32 RoomId, const FString& HostNa
         if (StatusText) StatusText->SetText(FText::FromString(
             FString::Printf(TEXT("等待中…  把房间号 %d 告诉朋友，对方输入房号即可加入"), RoomId)));
     }
+
+    // 开始对局按钮可见性（P5）：房主可见，非房主折叠（点击只发意图，服务器二次校验）
+    if (StartMatchButton)
+        StartMatchButton->SetVisibility(HostName == MyName
+            ? ESlateVisibility::Visible
+            : ESlateVisibility::Collapsed);
 }
 
 void URoomWidgetBase::OnLeaveClicked() {
     if (Session.IsValid()) Session->LeaveRoom();                  // 回大厅由 GI 的列表委托驱动
+}
+
+void URoomWidgetBase::OnStartMatchClicked() {
+    if (MatchSession.IsValid()) MatchSession->StartMatch();       // 意图只发包（v3 契约 14，空 payload）
+}
+
+// ============ 调试面板（M5 损伤滑块）============
+
+void UDebugPanelBase::Init(USightlineGameInstance* InGI) {
+    GI = InGI;
+}
+
+void UDebugPanelBase::NativeConstruct() {
+    Super::NativeConstruct();
+    if (DelaySlider) {
+        DelaySlider->SetValue(0.f);
+        DelaySlider->OnValueChanged.AddDynamic(this, &UDebugPanelBase::OnDelayChanged);
+    }
+    if (DelayText) DelayText->SetText(FText::FromString(TEXT("入站延迟 0 ms")));
+}
+
+void UDebugPanelBase::OnDelayChanged(float Value) {
+    const int32 Ms = FMath::RoundToInt(Value);
+    if (DelayText) DelayText->SetText(FText::FromString(
+        FString::Printf(TEXT("入站延迟 %d ms"), Ms)));
+    if (GI.IsValid()) GI->SetInboundDelayMs(Ms);              // 队列本体在连接适配器（D3-11）
 }

@@ -31,6 +31,12 @@ struct Room {
     bool empty() const { return memberFds.empty(); }
 };
 
+/** 名册项（对局编排的过桥数据——D3-15：lobby 与 match 互不认识，适配层以此纯数据组合） */
+struct RoomMemberInfo {
+    uint32_t playerId = 0;
+    std::string name;
+};
+
 // 名字合法性：非空、≤16B（两处调用：登录校验 / 房间名 ≤24B 走同函数传上限）
 bool ValidName(const std::string& name, size_t maxBytes);
 
@@ -78,6 +84,15 @@ public:
     std::vector<Event> Disconnect(int fd);
     // —— 帧驱动每 tick 调用：清理登录宽限超时（时间由外层注入，纯函数可测）——
     std::vector<Event> SweepLoginTimeouts(int64_t nowMs);
+
+    // —— 优雅关闭（D3-19）：向所有在线/宽限期连接产出 Kicked(码3) 事件——语义在用例，搬运归 FrameWriter ——
+    std::vector<Event> ShutdownBroadcast();
+
+    // —— 对局编排查询（D3-15，v3 契约：纯查询零副作用，供 wireMatch 过桥）——
+    bool IsHost(int fd) const;                                   // fd 是否其所在房的现任房主（首位）
+    bool RoomIdByFd(int fd, uint32_t& outRoomId) const;          // fd 是否在房中
+    int  PlayerIdByFd(int fd) const;                             // fd→PlayerId 翻译；无则 -1
+    std::vector<RoomMemberInfo> RoomRoster(uint32_t roomId) const;  // 按加入序（首位=房主）
 
     // —— 适配器查询（FrameWriter 编码用）——
     bool IsLoggedIn(int fd) const;

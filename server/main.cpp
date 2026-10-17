@@ -1,9 +1,9 @@
-// Sightline 服务器 —— 第 2 期：登录 + 房间（装配根）
-// 设计依据：docs/episodes/ep02/设计草案.md + docs/protocol/MSG_IDS.md v2 + 双端架构图（图 = 代码一致）
+// Sightline 服务器 —— 第 3 期：登录 + 房间 + 朴素同步对局（装配根）
+// 设计依据：docs/episodes/ep03/设计草案.md + docs/protocol/MSG_IDS.md v3 + 双端架构图（图 = 代码一致）
 // 装配清单：日志 → SIGPIPE → EventLoop → Acceptor → 帧队列 → 33ms 帧驱动
-//           → MessageDispatcher（注册表）→ LobbyService（用例）+ FrameWriter（事件出站）
-// 第 1 期 → 第 2 期的变化：帧驱动里的 if/else 消息链拆成注册表（开闭原则）；
-//           房间业务全部在 lobby::LobbyService（纯逻辑，单测覆盖），main 只做装配与搬运
+//           → MessageDispatcher（注册表）→ LobbyService + MatchService（用例）+ FrameWriter（事件出站）
+// 第 2 期 → 第 3 期的变化：业务层长出 MatchService（开始对局/名册/离场，D3-15 编排归适配层）；
+//           帧驱动职责 +1：实体快照广播（M4 到位）；关服广播收进用例（D3-19）
 #include <csignal>
 #include <atomic>
 #include <chrono>
@@ -18,11 +18,13 @@
 #include "net/client_connection.h"
 #include "adapters/frame_codec.h"
 #include "adapters/lobby_wiring.h"
+#include "adapters/match_wiring.h"
 #include "lobby/lobby.h"
+#include "match/match_service.h"
 #include "protocol/msg_ids.h"
 
 namespace {
-    constexpr uint16_t kListenPort = 8888;
+    constexpr uint16_t kListenPort = 18888;   // 8888 被系统 iphlpsvc 占用，2026-10-15 换 18888（实现细节，不入契约）
 
     std::atomic<bool> gShutdownRequested{false};      // 信号只置位；广播在帧驱动里做（信号处理器内不做复杂动作）
 
@@ -63,6 +65,7 @@ int main() {
 
     // 4. 业务用例 + 出站适配器 + 连接表（先于帧驱动构造，供回调捕获）
     sightline::lobby::LobbyService lobby;
+    sightline::match::MatchService match;
     adapters::ConnTable connections;
     adapters::FrameWriter writer{connections, lobby};
 
@@ -70,8 +73,10 @@ int main() {
     std::deque<QueuedFrame> frame_queue;
 
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
-    //    请求侧注册在适配器层（wireLobby）：payload 解析 + 调用例，main 不携带 handler
+    //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
+    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer};
+    matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
     // 7. 帧驱动：33ms 一帧——消费帧队列（分发）+ 登录宽限清理
@@ -82,14 +87,12 @@ int main() {
             dispatcher.dispatch(f.conn->fd(), f.msgid, f.payload);
         }
         writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
+        writer.deliverMatch(match.TickSnapshot());           // M4：33ms 实体快照广播（17，不含自机）
 
-        // 优雅关闭（D2-14）：广播 KICKED(3 服务器关闭) 后退出事件循环
+        // 优雅关闭（D2-14/D3-19）：关服语义在用例，main 只搬运——广播 KICKED(3) 后退出事件循环
         if (gShutdownRequested) {
             LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
-            for (auto& [fd, c] : connections) {
-                (void)fd;
-                c->send(protocol::MSG_S2C_KICKED, std::string{char(3)});
-            }
+            writer.deliver(lobby.ShutdownBroadcast());
             loop.quit();
         }
     });
@@ -104,6 +107,7 @@ int main() {
         });
         conn->setCloseCallback([&](const net::ClientConnection::Ptr& c) {
             connections.erase(c->fd());
+            matchWiring.HandleDisconnect(c->fd());            // 对局离场（D3-15：须先于 lobby 移除做 fd→pid 翻译）
             writer.deliver(lobby.Disconnect(c->fd()));        // 在房中：同 Leave 路径（D2-16）
             LOG_INFO("连接断开: " + c->peerAddr().toIpPort() + " 在线=" +
                      std::to_string(connections.size()));

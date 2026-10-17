@@ -1,0 +1,68 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="房间列表内容与色板·第3期草案" id="rlistspec3">
+    <mxGraphModel dx="1400" dy="1000" grid="0" page="1" pageWidth="1360" pageHeight="990" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="RoomListText 内容与色板设计（大厅屏 · 配套三屏线框）—— 1:1 面板 · 列锚对齐 · 颜色码直标" style="text;fontSize=20;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="30" y="14" width="1300" height="36" as="geometry"/></mxCell>
+        <mxCell id="ruler" value="列锚（相对面板）：房号 @24/宽100 ｜ 房名 @140/宽400 ｜ 人数 @560/宽180 ｜ 房主 @760/宽376　｜　行高 72 · 表头 48 · 行 Font 40 · 表头 Font 30 · 面板 1160×680 @ (40,140)" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="60" width="1180" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="panel" value="" style="rounded=0;fillColor=#faf7f0;strokeColor=#595959;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="40" y="96" width="1160" height="680" as="geometry"/></mxCell>
+
+        <mxCell id="h1" value="房号" style="text;fontSize=30;fontStyle=1;fontColor=#999999;align=left;spacingLeft=0;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="104" width="100" height="48" as="geometry"/></mxCell>
+        <mxCell id="h2" value="房名" style="text;fontSize=30;fontStyle=1;fontColor=#999999;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="104" width="400" height="48" as="geometry"/></mxCell>
+        <mxCell id="h3" value="人数" style="text;fontSize=30;fontStyle=1;fontColor=#999999;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="104" width="180" height="48" as="geometry"/></mxCell>
+        <mxCell id="h4" value="房主" style="text;fontSize=30;fontStyle=1;fontColor=#999999;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="104" width="376" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="r1a" value="1" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="160" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r1b" value="第一房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="160" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r1c" value="2/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="160" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r1d" value="alpha" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="160" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r2a" value="2" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="232" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r2b" value="试炼房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="232" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r2c" value="1/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="232" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r2d" value="beta" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="232" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r3a" value="3" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="304" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r3b" value="演武房" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="304" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r3c" value="4/4（满）" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="304" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r3d" value="gamma" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="304" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r4a" value="4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="376" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r4b" value="练习房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="376" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r4c" value="1/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="376" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r4d" value="delta" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="376" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r5a" value="5" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="448" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r5b" value="狙击房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="448" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r5c" value="2/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="448" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r5d" value="echo" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="448" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r6a" value="6" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="520" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r6b" value="新兵房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="520" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r6c" value="3/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="520" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r6d" value="fox" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="520" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r7a" value="7" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="592" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r7b" value="深夜房" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="592" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r7c" value="1/4" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="592" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r7d" value="ghost" style="text;fontSize=40;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="592" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="r8a" value="8" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="64" y="664" width="100" height="72" as="geometry"/></mxCell>
+        <mxCell id="r8b" value="决赛圈" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="180" y="664" width="400" height="72" as="geometry"/></mxCell>
+        <mxCell id="r8c" value="4/4（满）" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="600" y="664" width="180" height="72" as="geometry"/></mxCell>
+        <mxCell id="r8d" value="hawk" style="text;fontSize=30;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="800" y="664" width="376" height="72" as="geometry"/></mxCell>
+
+        <mxCell id="pal_lbl" value="公文腔色板（颜色码直标 · 全三屏通用）：" style="text;fontSize=14;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="806" width="600" height="24" as="geometry"/></mxCell>
+        <mxCell id="p1" value="#C8161D&#10;批示红&#10;满员 / 警示 / 主按钮" style="rounded=0;whiteSpace=wrap;fillColor=#c8161d;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1"><mxGeometry x="40" y="836" width="180" height="84" as="geometry"/></mxCell>
+        <mxCell id="p2" value="#333333&#10;墨黑 · 正文" style="rounded=0;whiteSpace=wrap;fillColor=#333333;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1"><mxGeometry x="240" y="836" width="180" height="84" as="geometry"/></mxCell>
+        <mxCell id="p3" value="#999999&#10;灰 · 表头 / 次要 / 空态" style="rounded=0;whiteSpace=wrap;fillColor=#999999;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1"><mxGeometry x="440" y="836" width="180" height="84" as="geometry"/></mxCell>
+        <mxCell id="p4" value="#FAF7F0&#10;纸白 · 面板底" style="rounded=0;whiteSpace=wrap;fillColor=#faf7f0;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="640" y="836" width="180" height="84" as="geometry"/></mxCell>
+        <mxCell id="p5" value="#FBEAE8&#10;淡朱 · 高亮底（备用）" style="rounded=0;whiteSpace=wrap;fillColor=#fbeae8;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="840" y="836" width="180" height="84" as="geometry"/></mxCell>
+        <mxCell id="p6" value="#595959&#10;墨线 · 描边" style="rounded=0;whiteSpace=wrap;fillColor=#595959;strokeColor=#595959;fontSize=13;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1"><mxGeometry x="1040" y="836" width="180" height="84" as="geometry"/></mxCell>
+
+        <mxCell id="note" value="契约变更（进 P5 增补，批示后生效）：RoomListText 类型 UTextBlock → URichTextBlock（字段名不变）· 新增样式表资产（default / full / head 三样式）+ Font_Mono 等宽字体资产（Consolas · 中文回退默认字体）· C++ 拼串改带样式标签　|　补位规则：房名补满 12 全角 · 人数固定 n/4 · 房号补 2 全角宽　|　少房时空行 = 名册未满语义（不填装饰）；交替行底色需 ListView 化 = 演进项" style="text;fontSize=12;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="934" width="1300" height="48" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
