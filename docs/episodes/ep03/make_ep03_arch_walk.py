@@ -13,16 +13,16 @@ OUT.mkdir(exist_ok=True)
 DRAWIO = r"D:\DevSoft\Drawio\draw.io\draw.io.exe"
 
 # 组序 = 时间序；组间 past/future 由索引推导
-GROUPS = {
+GROUPS = {   # 组序 = 口播点名顺序（对局用例 → 五个新消息 → 快照广播器）——灯序必须跟话序（judge 七审实锤）
     "g_match":  ["b_match", "eme"],
-    "g_bcast":  ["b_bcast", "ebc", "ebclbl"],
     "g_wires":  ["edm", "emw", "emwlbl"],
+    "g_bcast":  ["b_bcast", "ebc", "ebclbl"],
     "g_lobby":  ["b_lobby", "lwlobby"],
 }
 STATES = [
     ("a1", ["g_match"]),
-    ("a2", ["g_bcast"]),
-    ("a3", ["g_wires"]),
+    ("a2", ["g_wires"]),
+    ("a3", ["g_bcast"]),
     ("a4", ["g_lobby", "g_match"]),          # 两间屋：双框同时亮
     ("a5", ["g_wires"]),                     # 中间人抄名册 + 注记注入
 ]
