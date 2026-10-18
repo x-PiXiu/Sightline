@@ -27,6 +27,7 @@ public:
     bool IsConnected() const { return bConnected; }
     uint32 GetLastPingMs() const { return LastPingMs; }
     USightlineMatchSession* GetMatchSession() const { return MatchSession; }   // 角色采样上报绑定用（D3-17）
+    USightlineEntityRegistry* GetEntityRegistry() const { return EntityRegistry; }  // GameMode 查自机名册序（P1 出生点）
     void SetInboundDelayMs(int32 Ms);                // M5：损伤滑块透传（连接适配器的延迟队列）
 
 private:

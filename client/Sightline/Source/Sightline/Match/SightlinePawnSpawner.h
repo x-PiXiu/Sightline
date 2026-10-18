@@ -9,6 +9,7 @@
 #include "SightlinePawnSpawner.generated.h"
 
 class USightlineEntityRegistry;
+class APlayerStart;
 
 UCLASS()
 class SIGHTLINE_API USightlinePawnSpawner : public UObject {
@@ -25,6 +26,9 @@ public:
     void DespawnAll();
 
     int32 SpawnedCount() const;
+
+    /** 出生点查找（唯一实现，本地/远端共用——三重匹配：内部名/Tag/Label）；找不到返回 nullptr */
+    static APlayerStart* FindSpawnStart(UWorld* World, int32 SpawnIndex);
 
     UFUNCTION()
     void HandleEntityUpdated(int32 PlayerId);               // 17：直设位置 + 喂 FAnimInputs（M4）
