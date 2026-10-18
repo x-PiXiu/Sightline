@@ -77,6 +77,8 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             Roster.Add(S);
         }
         bInMatch = true;                               // 对局激活：16 上报窗口开启
+        if (CSightlineStatLog.GetValueOnGameThread() != 0)   // 误差曲线对齐锚（plot_stat_curve：各端以最后锚为 t0）
+            UE_LOG(LogTemp, Log, TEXT("[STAT] MATCH_START t=%.3f"), FPlatformTime::Seconds());
         Registry->ApplyMatchStart(SelfPlayerId, Roster);
         OnMatchStarted.Broadcast();                    // GI 切对局关卡（生成由 PawnSpawner 延迟执行）
         return;
