@@ -49,10 +49,20 @@ public:
                     while (SightlineProtocol::TryDecode(Buffer, Frame))
                     {
                         const int32 Delay = InboundDelayMs.load();
-                        if (Delay > 0)   // 损伤注入：入队到期投递（队列仅接收线程触达，零锁）
-                            DelayQueue.push_back({NowMs() + Delay, Frame.MsgId, MoveTemp(Frame.Payload)});
+                        if (Delay > 0)   // 损伤注入：基线+抖动（队列仅接收线程触达，零锁）
+                        {
+                            // 恒定延迟只是整条流平移——30Hz 直设的台阶顿挫与它无关（本机回环上视觉无差）。
+                            // 真实网络的可见伤害来自抖动（TCP 下丢包=重传延迟尖峰）——漂移有界随机游走：
+                            // 走低=多帧齐到→瞬移；走高=队列断流→卡顿；相邻帧倒挂→拉扯。均值 0 不偏 KPI 基线。
+                            JitterDriftMs = FMath::Clamp(JitterDriftMs + JitterRng.FRandRange(-kJitterStepMs, kJitterStepMs),
+                                                         -0.5f * Delay, 0.5f * Delay);
+                            DelayQueue.push_back({NowMs() + Delay + JitterDriftMs, Frame.MsgId, MoveTemp(Frame.Payload)});
+                        }
                         else
+                        {
+                            JitterDriftMs = 0.f;          // 滑块归零：漂移清场，恢复纯净 33ms 流
                             Dispatch(Frame.MsgId, Frame.Payload, FrameDelegate);
+                        }
                     }
                 }
             }
@@ -100,6 +110,9 @@ private:
     std::atomic<bool> bStop{false};
     std::atomic<int32> InboundDelayMs{0};
     std::deque<FDelayedFrame> DelayQueue;
+    FRandomStream JitterRng{0x5172A1};        // 抖动源（实例私有=接收线程单写，确定性可复现）
+    float JitterDriftMs = 0.f;                // 抖动漂移（有界随机游走，[-Delay/2,+Delay/2]，均值 0）
+    static constexpr float kJitterStepMs = 15.f;   // 每帧漂移步长（30Hz 节拍下 ~1s 一个冻结/爆发周期）
 };
 
 /** 连接：FSocket 生命周期 + 接收线程的持有者（Disconnect 顺序 = 先停线程再关 socket） */
