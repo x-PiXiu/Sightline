@@ -223,7 +223,10 @@ namespace common {
              * 
              * @param enabled true启用，false禁用
              */
-            void setAsyncLogging(bool enabled) { async_logging_ = enabled; }
+            void setAsyncLogging(bool enabled) {
+                async_logging_ = enabled;
+                if (enabled && !async_thread_) startAsyncThread();   // 设计补全：线程从未被拉起（死代码修复）
+            }
             
             // 日志记录方法
             void trace(const std::string& message, const char* file = "", int line = 0);

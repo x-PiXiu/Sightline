@@ -51,6 +51,7 @@ int main() {
     common::logger::Logger::getInstance().addSink(
         std::make_unique<common::logger::ConsoleSink>());
     common::logger::Logger::getInstance().setLogLevel(common::logger::LogLevel::DEBUG);   // 业务 debug 可见；心跳已在 TRACE 不刷屏
+    common::logger::Logger::getInstance().setAsyncLogging(true);   // 异步日志：终端冻结（选中文本/拖窗口）不再卡事件循环——双端 LAG 级联根因（M6 实锤）
     LOG_DEBUG("[自检] 日志级别=DEBUG，本行可见即 debug 通路正常");
 
     // 2. SIGPIPE：写已断开的 socket 默认杀进程——先显式忽略（为什么：第 13 期事故复盘）
