@@ -10,17 +10,17 @@ OUT = ROOT / "client_walk"
 OUT.mkdir(exist_ok=True)
 DRAWIO = r"D:\DevSoft\Drawio\draw.io\draw.io.exe"
 
-ORDER = ["g_match", "g_reg", "g_char", "e_m2r", "e_m2r_lbl", "g_input", "e_i2c", "e_i2c_lbl",
+ORDER = ["g_match", "g_reg", "g_spawn", "g_char", "e_m2r", "e_m2r_lbl", "g_input", "e_i2c", "e_i2c_lbl",
          "e_mrep", "e_badge", "e_badge_lbl", "b2", "b3", "b4", "g_slider", "e_s2m", "e_s2m_lbl",
          "e_b4s", "e_r2c", "e_r2c_lbl", "e_c2a", "e_c2a_lbl", "g_abp"]
 GROUPS = {k: [k] for k in ORDER}          # 一元素一组，组序即执行序
 STATES = [   # (名, current 元素)；past/future 由 ORDER 索引推导
-    ("c1", ["g_match", "g_reg", "g_char", "e_m2r", "e_m2r_lbl"]),        # 四器官齐亮
+    ("c1", ["g_match", "g_reg", "g_spawn", "g_char", "e_m2r", "e_m2r_lbl"]),  # 四器官齐亮
     ("c2", ["g_input", "e_i2c", "e_i2c_lbl"]),                            # 输入
     ("c3", ["g_char", "e_mrep", "g_match", "e_badge", "e_badge_lbl"]),    # 采样上报
     ("c4", ["b2", "b3", "b4", "g_slider", "e_s2m", "e_s2m_lbl"]),         # 收包（滑块扣延迟处）
     ("c5", ["g_match", "e_b4s", "g_reg"]),                                # 解析入账
-    ("c6", ["g_reg", "e_m2r", "e_m2r_lbl", "g_char", "e_r2c", "e_r2c_lbl"]),  # 变画面（省略④）
+    ("c6", ["g_reg", "e_m2r", "e_m2r_lbl", "g_spawn", "g_char", "e_r2c", "e_r2c_lbl"]),  # 变画面（省略④）
     ("c7", ["g_char", "e_c2a", "e_c2a_lbl", "g_abp"]),                    # 供动画数
 ]
 
