@@ -6,7 +6,7 @@
         <mxCell id="title" value="Sightline 动画系统（第 3 期 · 客户端）—— 一套骨架 · 两种数据源 · 本地第一人称 / 远端全身" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="30" y="10" width="1340" height="34" as="geometry"/></mxCell>
 
         <mxCell id="conn" value="SightlineConnection&#10;收发线程（第 1 期已有）" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="30" y="110" width="160" height="70" as="geometry"/></mxCell>
-        <mxCell id="src_net" value="网络源 · S2C ENTITY_STATE&#10;33ms 位置直发（本期故意做错）&#10;远端实体 ApplyState" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;strokeWidth=2" vertex="1" parent="1"><mxGeometry x="230" y="92" width="240" height="106" as="geometry"/></mxCell>
+        <mxCell id="src_net" value="网络源 · S2C ENTITY_STATE&#10;33ms 位置直发（朴素版）&#10;远端实体 ApplyState" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;strokeWidth=2" vertex="1" parent="1"><mxGeometry x="230" y="92" width="240" height="106" as="geometry"/></mxCell>
         <mxCell id="warn" value="直设位置零物理速度：&#10;Speed = 位置差分 EMA&#10;bFalling = 网络 flags（bit0 腾空）" style="text;fontSize=13;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="234" y="204" width="240" height="58" as="geometry"/></mxCell>
         <mxCell id="src_local" value="本地源 · Enhanced Input&#10;IA_Move / IA_Look / IA_Jump&#10;WASD 相对视角方向移动" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=14;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;strokeWidth=2" vertex="1" parent="1"><mxGeometry x="230" y="290" width="240" height="106" as="geometry"/></mxCell>
 
@@ -22,7 +22,7 @@
 
         <mxCell id="assets" value="Lyra 素材库（已导入 · 零修改）&#10;步态 Walk/Jog × 8 向（含 Start/Stop/Pivot）&#10;Jump 6 段 · BS/AO 成品&#10;武器蒙太奇全家 · 死亡×5 · 受击×15" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=13;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="830" y="570" width="330" height="110" as="geometry"/></mxCell>
 
-        <mxCell id="O1" value="本地视角（第一人称）&#10;看不到自己的身体&#10;只余影子定位&#10;自身 ABP 照跑 · 零分支复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=13;sketch=1;curveFitting=1;jiggle=2;strokeWidth=2" vertex="1" parent="1"><mxGeometry x="1210" y="150" width="180" height="130" as="geometry"/></mxCell>
+        <mxCell id="O1" value="本地视角（第一人称）&#10;低头可见自己的身体&#10;影子由本体自然投射&#10;自身 ABP 照跑 · 零分支复用" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=13;sketch=1;curveFitting=1;jiggle=2;strokeWidth=2" vertex="1" parent="1"><mxGeometry x="1210" y="150" width="180" height="130" as="geometry"/></mxCell>
         <mxCell id="O2" value="远端视角（全身）&#10;向左 = 向左动画（8 向）&#10;抬头低头 = AO 跟随&#10;卡顿 = 纯网络（本期主角）" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=13;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;strokeWidth=3" vertex="1" parent="1"><mxGeometry x="1210" y="330" width="180" height="130" as="geometry"/></mxCell>
 
         <mxCell id="th_w" value="武器" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;sketch=1;" vertex="1" parent="1"><mxGeometry x="30" y="560" width="120" height="34" as="geometry"/></mxCell>
