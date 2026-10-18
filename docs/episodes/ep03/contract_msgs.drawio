@@ -1,0 +1,74 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="契约v3五消息·第3期" id="contractv3">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="第 3 期契约 v3 · 五条新消息的字节账本" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="32" as="geometry"/></mxCell>
+        <mxCell id="fmt" value="每帧 = [2B 长度][2B msgid][payload] · 小端 · 长度 = msgid + payload（不含自身）" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="50" width="900" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="b14" value="14" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=17;fontStyle=1;fontColor=#8a5d00;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="88" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n14" value="START_MATCH&#10;开始对局" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="90" width="130" height="40" as="geometry"/></mxCell>
+        <mxCell id="s14" value="空 payload · 整帧 4 字节" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#888888;fontSize=14;fontColor=#555555;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="260" y="88" width="220" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="b15" value="15" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="152" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n15" value="MATCH_START&#10;对局开始" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="154" width="130" height="40" as="geometry"/></mxCell>
+        <mxCell id="s15a" value="4B 人数" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="152" width="90" height="44" as="geometry"/></mxCell>
+        <mxCell id="s15b" value="4B 玩家" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="350" y="152" width="90" height="44" as="geometry"/></mxCell>
+        <mxCell id="s15c" value="1B&#10;名长" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#888888;fontSize=12;fontColor=#555555;sketch=1;" vertex="1" parent="1"><mxGeometry x="440" y="152" width="56" height="44" as="geometry"/></mxCell>
+        <mxCell id="s15d" value="名字 UTF-8 × n" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#888888;fontSize=13;fontColor=#555555;sketch=1;" vertex="1" parent="1"><mxGeometry x="496" y="152" width="130" height="44" as="geometry"/></mxCell>
+        <mxCell id="s15e" value="1B&#10;出生点序" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="626" y="152" width="76" height="44" as="geometry"/></mxCell>
+        <mxCell id="s15f" value="… ×N" style="text;fontSize=15;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="712" y="162" width="80" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="b16" value="16" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=17;fontStyle=1;fontColor=#8a5d00;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="222" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n16" value="MOVE_REPORT&#10;位置上报" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="224" width="130" height="40" as="geometry"/></mxCell>
+        <mxCell id="s16a" value="12B 位置 xyz" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="222" width="170" height="44" as="geometry"/></mxCell>
+        <mxCell id="s16b" value="4B 偏航" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="430" y="222" width="96" height="44" as="geometry"/></mxCell>
+        <mxCell id="s16c" value="4B 俯仰" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="526" y="222" width="96" height="44" as="geometry"/></mxCell>
+        <mxCell id="s16d" value="1B 状态" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="622" y="222" width="80" height="44" as="geometry"/></mxCell>
+        <mxCell id="s16tag" value="= 21B · 省略①② 锚点" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;fontSize=14;fontStyle=1;fontColor=#c8161d;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="730" y="224" width="210" height="40" as="geometry"/></mxCell>
+        <mxCell id="c16" value="服务器收到 → 原样入库：不校验 · 不和解 —— 位置可信性，下期手术" style="text;fontSize=14;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="272" width="680" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="b17" value="17" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="308" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n17" value="ENTITY_STATE&#10;实体状态" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="310" width="140" height="40" as="geometry"/></mxCell>
+        <mxCell id="s17a" value="2B 数量" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="308" width="76" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17b" value="4B 玩家" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="336" y="308" width="86" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17c" value="12B 位置" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="422" y="308" width="150" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17d" value="4B 偏航" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="572" y="308" width="86" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17e" value="4B 俯仰" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="658" y="308" width="86" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17f" value="1B 状态" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="744" y="308" width="76" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17g" value="… ×N" style="text;fontSize=15;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="830" y="318" width="70" height="24" as="geometry"/></mxCell>
+        <mxCell id="s17tag" value="= 27 + 25B×N · 省略③ 锚点" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;fontSize=14;fontStyle=1;fontColor=#c8161d;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="910" y="310" width="250" height="40" as="geometry"/></mxCell>
+        <mxCell id="c17" value="按接收者滤自己 · 全量下发：不裁 · 不压 —— 带宽优化，演进预留" style="text;fontSize=14;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="358" width="680" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="b18" value="18" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="394" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n18" value="ENTITY_LEAVE&#10;实体离场" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="396" width="140" height="40" as="geometry"/></mxCell>
+        <mxCell id="s18a" value="4B 玩家" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="394" width="96" height="44" as="geometry"/></mxCell>
+        <mxCell id="s18note" value="退房 / 掉线都走它 —— 屏幕上当场收走" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="380" y="404" width="420" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="dis" value="完整一帧解剖 · 实例：甲（pid=9）的一条 17 号快照（单实体）" style="text;fontSize=16;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="462" width="700" height="24" as="geometry"/></mxCell>
+        <mxCell id="brk1" value="帧头（len + msgid）" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="492" width="120" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk2" value="数量" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="380" y="492" width="56" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk3" value="玩家 4B" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="436" y="492" width="112" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk4" value="位置 12B" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="548" y="492" width="336" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk5" value="偏航 4B" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="884" y="492" width="112" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk6" value="俯仰 4B" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="996" y="492" width="112" height="16" as="geometry"/></mxCell>
+        <mxCell id="brk7" value="状态" style="text;fontSize=12;fontColor=#6c8ebf;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="1108" y="492" width="28" height="16" as="geometry"/></mxCell>
+
+        <mxCell id="hex" value="" style="rounded=0;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;sketch=1;align=center;verticalAlign=middle;" vertex="1" parent="1"><mxGeometry x="260" y="512" width="868" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexhead" value="1D 00 | 11 00" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="512" width="112" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexcnt" value="01 00" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="372" y="512" width="56" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexpid" value="09 00 00 00" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="428" y="512" width="112" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexpos" value="CD AC 13 44 · 00 00 7C 42 · CD 4C B3 42" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="540" y="512" width="336" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexyaw" value="00 00 2C 43" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="876" y="512" width="112" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexpit" value="33 33 73 C0" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="988" y="512" width="112" height="30" as="geometry"/></mxCell>
+        <mxCell id="hexflg" value="00" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontColor=#1f4e79;fontFamily=Consolas;sketch=1;" vertex="1" parent="1"><mxGeometry x="1100" y="512" width="28" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="disnote" value="红字警示（第 1 期立的规矩）：len 装的是 msgid + payload，不含它自己 —— 接收端靠它数「还差几字节到齐」。&#10;小端示例：数量 01 00 = 1 个实体；pid 09 00 00 00 = 9；位置 = x(590.7)·y(63.0)·z(89.65) 的 float 原始字节（struct 小端实算 CD AC 13…）。" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="552" width="1120" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="strip" value="1 ~ 13 号：一个字节没动 —— 契约只增不改" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=17;fontStyle=1;fontColor=#1f4e79;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="260" y="618" width="620" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="橙 = C2S 意图（客户端 → 服务器）　蓝 = S2C 下发（服务器 → 客户端）　红 = 省略锚点 / 警示　灰 = 变长 / 辅助字段　|　图 = 代码一致（MSG_IDS.md v3）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="700" width="1120" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

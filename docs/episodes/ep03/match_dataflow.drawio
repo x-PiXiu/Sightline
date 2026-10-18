@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram name="朴素同步数据流·第3期" id="matchdataflow">
-    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="920" math="0" shadow="0">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="1010" math="0" shadow="0">
       <root>
         <mxCell id="0"/><mxCell id="1" parent="0"/>
         <mxCell id="title" value="朴素同步数据流（直发版）—— 客户端说什么，远端就画什么" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1100" height="32" as="geometry"/></mxCell>
@@ -34,18 +34,18 @@
         <mxCell id="m16" value="" style="endArrow=block;html=1;strokeColor=#d79b00;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="180" y="402" as="sourcePoint"/><mxPoint x="600" y="402" as="targetPoint"/></mxGeometry></mxCell>
         <mxCell id="m16lbl" value="16 MOVE_REPORT　每 33ms 一报" style="text;fontSize=15;fontStyle=1;fontColor=#7f6000;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="200" y="356" width="340" height="20" as="geometry"/></mxCell>
         <mxCell id="m16lbl2" value="甲触发 · 服务器不裁决" style="text;fontSize=14;fontColor=#7f6000;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="200" y="376" width="340" height="18" as="geometry"/></mxCell>
-        <mxCell id="m16red" value="位置/速度/合法性 全都不校验 —— 朴素版：先省略" style="text;fontSize=15;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="200" y="420" width="520" height="20" as="geometry"/></mxCell>
+        <mxCell id="m16red" value="原样入库：不校验 · 不和解 —— 省略 ①②" style="text;fontSize=15;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="200" y="420" width="520" height="20" as="geometry"/></mxCell>
         <mxCell id="m16redline" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#c8161d;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="196" y="416" as="sourcePoint"/><mxPoint x="580" y="416" as="targetPoint"/></mxGeometry></mxCell>
 
         <mxCell id="mtick" value="" style="endArrow=block;html=1;strokeColor=#999999;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="600" y="482" as="sourcePoint"/><mxPoint x="660" y="482" as="targetPoint"/><Array as="points"><mxPoint x="660" y="464"/><mxPoint x="660" y="500"/></Array></mxGeometry></mxCell>
-        <mxCell id="mticklbl" value="每 33ms：全员实体组装快照" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="470" y="470" width="240" height="20" as="geometry"/></mxCell>
+        <mxCell id="mticklbl" value="每 33ms 一拍：报过位置的才入包（门控）" style="text;fontSize=13;fontColor=#555555;align=right;sketch=1;" vertex="1" parent="1"><mxGeometry x="300" y="470" width="285" height="20" as="geometry"/></mxCell>
 
         <mxCell id="m17" value="" style="endArrow=block;html=1;strokeColor=#1f4e79;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="600" y="546" as="sourcePoint"/><mxPoint x="1000" y="546" as="targetPoint"/></mxGeometry></mxCell>
-        <mxCell id="m17lbl" value="17 ENTITY_STATE（按接收者滤掉自己）" style="text;fontSize=15;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="630" y="520" width="330" height="20" as="geometry"/></mxCell>
+        <mxCell id="m17lbl" value="17 ENTITY_STATE（滤掉自己）· 全量下发：不裁 · 不压（省略③）" style="text;fontSize=14;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="622" y="520" width="368" height="20" as="geometry"/></mxCell>
 
         <mxCell id="mset" value="" style="endArrow=block;html=1;strokeColor=#999999;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1000" y="612" as="sourcePoint"/><mxPoint x="940" y="612" as="targetPoint"/><Array as="points"><mxPoint x="940" y="594"/><mxPoint x="940" y="630"/></Array></mxGeometry></mxCell>
         <mxCell id="msetlbl" value="SetActorLocation 直接设置" style="text;fontSize=14;fontColor=#555555;align=right;sketch=1;" vertex="1" parent="1"><mxGeometry x="770" y="588" width="160" height="20" as="geometry"/></mxCell>
-        <mxCell id="msetred" value="30Hz 快照直设 60 帧屏幕 = 肉眼跳变（卡顿·瞬移·拉扯）" style="text;fontSize=15;fontStyle=1;fontColor=#c8161d;align=right;sketch=1;" vertex="1" parent="1"><mxGeometry x="470" y="636" width="460" height="20" as="geometry"/></mxCell>
+        <mxCell id="msetred" value="33ms 直设不插值（省略④ · 客户端侧）= 肉眼跳变" style="text;fontSize=15;fontStyle=1;fontColor=#c8161d;align=right;sketch=1;" vertex="1" parent="1"><mxGeometry x="470" y="636" width="460" height="20" as="geometry"/></mxCell>
         <mxCell id="msetredline" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#c8161d;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="924" y="608" as="sourcePoint"/><mxPoint x="700" y="632" as="targetPoint"/></mxGeometry></mxCell>
 
         <mxCell id="mevolve" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#d6b656;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="60" y="470" as="sourcePoint"/><mxPoint x="60" y="680" as="targetPoint"/></mxGeometry></mxCell>
@@ -53,9 +53,13 @@
         <mxCell id="mevolve2w" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#d6b656;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="60" y="680" as="sourcePoint"/><mxPoint x="900" y="680" as="targetPoint"/></mxGeometry></mxCell>
         <mxCell id="mevolvelbl" value="服务器校验 · 远端插值 · 本地预测与和解 —— 演进预留" style="text;fontSize=15;fontStyle=1;fontColor=#7f6000;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="76" y="686" width="560" height="20" as="geometry"/></mxCell>
 
-        <mxCell id="conclusion" value="客户端说什么就是什么 —— 第 4 期要治的病根，全埋在这条链上" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2.5;fontSize=17;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="200" y="730" width="800" height="46" as="geometry"/></mxCell>
+        <mxCell id="m18a" value="" style="endArrow=block;html=1;strokeColor=#1f4e79;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="600" y="726" as="sourcePoint"/><mxPoint x="180" y="726" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m18albl" value="18 ENTITY_LEAVE（划名册 · 全员广播）" style="text;fontSize=15;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="210" y="732" width="340" height="20" as="geometry"/></mxCell>
+        <mxCell id="m18b" value="" style="endArrow=block;html=1;strokeColor=#1f4e79;strokeWidth=2.5;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="600" y="726" as="sourcePoint"/><mxPoint x="1000" y="726" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m18blbl" value="18（全员广播）" style="text;fontSize=14;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="630" y="732" width="220" height="20" as="geometry"/></mxCell>
+        <mxCell id="conclusion" value="客户端说什么就是什么 —— 第 4 期要治的病根，全埋在这条链上" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2.5;fontSize=17;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="200" y="780" width="800" height="46" as="geometry"/></mxCell>
 
-        <mxCell id="legend" value="橙实线 = 客户端意图（C2S）　蓝实线 = 服务器下发（S2C）　红虚线 = 本期省略处　黄虚线 = 演进预留　灰 = 中性动作　|　图 = 代码一致（MSG_IDS v3 · 同步主链 14/15/16/17）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="812" width="1120" height="24" as="geometry"/></mxCell>
+        <mxCell id="legend" value="橙实线 = 客户端意图（C2S）　蓝实线 = 服务器下发（S2C）　红字/红虚线 = 本期省略处（①~④ 锚点）　黄虚线 = 演进预留　|　图 = 代码一致（MSG_IDS v3 · 14~18）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="866" width="1120" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

@@ -22,15 +22,16 @@ MD_ALL = {
     "g16":   ["m16", "m16lbl", "m16lbl2", "m16red", "m16redline"],
     "gtick": ["mtick", "mticklbl"],
     "g17":   ["m17", "m17lbl"],
-    "gset":  ["mset", "msetlbl", "msetred", "msetredline"],
+    "g18":   ["m18a", "m18albl", "m18b", "m18blbl"],
     "gconc": ["conclusion"],
 }
+# 注：直设组（gset/msetred 省略④）不入三态——常亮定稿（省略④归 S4 客户端段指认）
 MD_STATES = [
     ("md_d1", ["g14"]),
     ("md_d2", ["g15"]),
     ("md_d3", ["g16"]),
     ("md_d4", ["gtick", "g17"]),
-    ("md_d5", ["gset"]),
+    ("md_d5", ["g18"]),
     ("md_d6", ["gconc"]),
 ]
 
@@ -87,9 +88,9 @@ def make_state(src_xml, all_groups, cur_groups):
             def cur(st):
                 if 'endArrow=' in st:                       # 箭头
                     if 'strokeWidth=' in st:
-                        st = re.sub(r'strokeWidth=[\d.]+', 'strokeWidth=4.5', st)
+                        st = re.sub(r'strokeWidth=[\d.]+', 'strokeWidth=6', st)
                     else:
-                        st += ';strokeWidth=4.5'
+                        st += ';strokeWidth=6'
                     return st
                 if 'rounded=' in st and 'fillColor=' in st:  # 框
                     st = re.sub(r'fillColor=#[0-9a-fA-F]+', 'fillColor=#ffcccc', st)
