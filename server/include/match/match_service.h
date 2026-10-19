@@ -24,7 +24,8 @@ struct Entity {
     float x = 0.f, y = 0.f, z = 0.f;
     float yaw = 0.f, pitch = 0.f;
     std::uint8_t flags = 0;            // bit0=腾空
-    bool bHasReport = false;           // 首次 16 上报前不入快照（位置未知的玩家不进世界）
+    std::uint32_t ackedSeq = 0;        // 已确认的最新输入序号（v4 · R11；权威推算 M3 落地，本期布局先行）
+    bool bHasReport = false;           // 首次上报前不入快照（位置未知的玩家不进世界）
 };
 
 /** 快照项（17 载荷的一行） */
@@ -33,6 +34,7 @@ struct EntitySnapshot {
     float x = 0.f, y = 0.f, z = 0.f;
     float yaw = 0.f, pitch = 0.f;
     std::uint8_t flags = 0;
+    std::uint32_t ackedSeq = 0;        // v4：17 号每实体 25B→29B（契约破例 D4-01）
 };
 
 /** 对局领域事件（纯数据；FrameWriter 翻译成 15/17/18 帧——v3 契约） */
@@ -57,9 +59,10 @@ public:
     bool IsActive(std::uint32_t playerId) const;
 
     // —— M4：实体位置暂存与快照组装 ——
-    /** 16 上报入库（只覆盖不校验；未知 pid 静默忽略——不在局者上报无效） */
+    /** 16/19 上报入库（只覆盖不校验；未知 pid 静默忽略——不在局者上报无效）
+     *  v4：seq = 19 号输入序号，入库取 max 作为 ackedSeq（R11；权威推算 M3 落地） */
     void UpdateEntity(std::uint32_t playerId, float x, float y, float z,
-                      float yaw, float pitch, std::uint8_t flags);
+                      float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0);
 
     /** 每帧驱动 tick 调用：在局则返回一条 Snapshot 事件（全员实体，FrameWriter 按接收者滤自己） */
     std::vector<MatchEvent> TickSnapshot();

@@ -16,6 +16,7 @@
 #include "logger/logger.h"
 #include "match/match_service.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
 #include "net/client_connection.h"
+#include "protocol/messages.h"   // v4 wire 结构体（Encode 唯一落点）
 #include "protocol/msg_ids.h"
 
 namespace adapters {
@@ -103,12 +104,10 @@ public:
         for (const auto& e : events) {
             switch (e.type) {
             case MT::MatchStart: {
-                std::string p = u32(static_cast<uint32_t>(e.roster.size()));
-                for (const auto& r : e.roster) {
-                    p += u32(r.playerId);
-                    p += lenPrefixed(r.name);
-                    p += static_cast<char>(r.spawnIndex);
-                }
+                sightline::wire::MatchStartMsg msg;               // v4：Encode 同居 wire 头
+                for (const auto& r : e.roster)
+                    msg.roster.push_back({r.playerId, r.name, r.spawnIndex});
+                const std::string p = msg.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     send(fd, protocol::MSG_S2C_MATCH_START, p);
                 LOG_INFO("[出站] MATCH_START 房=" + std::to_string(e.roomId) +
@@ -116,7 +115,7 @@ public:
                 break;
             }
             case MT::EntityLeave: {
-                const std::string p = u32(e.leavePlayerId);
+                const std::string p = sightline::wire::EntityLeaveMsg{e.leavePlayerId}.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     if (lobby_.PlayerIdByFd(fd) != static_cast<int>(e.leavePlayerId))  // 不含当事人
                         send(fd, protocol::MSG_S2C_ENTITY_LEAVE, p);
@@ -126,11 +125,6 @@ public:
             case MT::Snapshot: {
                 // 按接收者编码：滤掉自己的实体（v3 契约——17 不含接收者自己）
                 // ⚠ 计数必须 = 实际写入条数（先滤后数，再写头）——声明的 n 与实体不一致会导致客户端幻影解析
-                const auto f32 = [](float F) {
-                    std::string B(sizeof(float), '\0');
-                    std::memcpy(B.data(), &F, sizeof(float));
-                    return B;
-                };
                 for (int fd : lobby_.RoomMemberFds(e.roomId)) {
                     const int selfPid = lobby_.PlayerIdByFd(fd);
                     std::string body;
@@ -138,12 +132,12 @@ public:
                     for (const auto& S : e.entities) {
                         if (static_cast<int>(S.playerId) == selfPid) continue;
                         ++n;
-                        body += u32(S.playerId);
-                        body += f32(S.x); body += f32(S.y); body += f32(S.z);
-                        body += f32(S.yaw); body += f32(S.pitch);
-                        body += static_cast<char>(S.flags);
+                        // v4：29B/实体（+4B ackedSeq）——Encode 同居 wire 头（契约破例 D4-01）
+                        sightline::wire::EntityStateV2 ent{S.playerId, S.x, S.y, S.z,
+                                                           S.yaw, S.pitch, S.flags, S.ackedSeq};
+                        body += ent.Encode();
                     }
-                    std::string p = u16(static_cast<uint16_t>(n));
+                    std::string p = u16(static_cast<uint16_t>(n));  // 头仍 2B 计数，实体 25→29B
                     p += body;
                     send(fd, protocol::MSG_S2C_ENTITY_STATE, p);
                 }

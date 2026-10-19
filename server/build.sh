@@ -26,6 +26,9 @@ build_test() {
     $CXX $FLAGS tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp \
         -o /tmp/test_match
     /tmp/test_match
+    # shellcheck disable=SC2086
+    $CXX $FLAGS tests/test_wire.cpp -o /tmp/test_wire     # v4 wire 结构体（header-only）
+    /tmp/test_wire
 }
 
 case "${1:-all}" in

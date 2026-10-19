@@ -9,6 +9,7 @@
 #include "lobby/lobby.h"
 #include "logger/logger.h"
 #include "match/match_service.h"
+#include "protocol/messages.h"   // v4 wire 结构体（variant 编解码——业务层禁 include，红线见 messages.h）
 #include "protocol/msg_ids.h"
 
 namespace adapters {
@@ -20,30 +21,40 @@ public:
         : disp_(disp), match_(match), lobby_(lobby), writer_(writer) {}
 
     void Register() {
-        // 16：位置上报——直发版只转发不校验（v3 契约规则 9）
-        disp_.on(protocol::MSG_C2S_MOVE_REPORT, "位置上报",
+        // 19：位置上报 v2（v4 R10——对局期内替代 16）——Parse 集中校验（messages.h 唯一长度守门）
+        disp_.on(protocol::MSG_C2S_PLAYER_INPUT, "位置上报v2",
                  [this](int fd, const std::string& payload) {
-            if (payload.size() != 21) {                     // [12B pos][4B yaw][4B pitch][1B flags] = 21B
-                LOG_WARNING("[位置上报] 非法长度=" + std::to_string(payload.size()) +
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            auto msg = sightline::wire::PlayerInputMsg::Parse(bytes);
+            if (!msg) {
+                LOG_WARNING("[位置上报v2] 非法 payload 长度=" + std::to_string(payload.size()) +
                             " fd=" + std::to_string(fd));
                 return;
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                            // 未登录/不在房：上报无效
-            const auto rdF = [&payload](int O) {
-                float F;
-                std::memcpy(&F, payload.data() + O, sizeof(float));
-                return F;
-            };
             match_.UpdateEntity(static_cast<uint32_t>(pid),
-                                rdF(0), rdF(4), rdF(8), rdF(12), rdF(16),
-                                static_cast<uint8_t>(payload[20]));
+                                msg->x, msg->y, msg->z, msg->yaw, msg->pitch,
+                                msg->flags, msg->seq);
+        });
+
+        // 16：v4 R10 对局期停用——在局者收到 16 视为无效帧丢弃（19 替代）；对局外 16 本就无效（未知 pid 静默）
+        disp_.on(protocol::MSG_C2S_MOVE_REPORT, "位置上报(v4停用)",
+                 [this](int fd, const std::string&) {
+            const int pid = lobby_.PlayerIdByFd(fd);
+            if (pid >= 0 && match_.IsActive(static_cast<std::uint32_t>(pid))) {
+                LOG_WARNING("[位置上报] v4 R10：对局期 16 已停用 fd=" + std::to_string(fd));
+                return;
+            }
         });
 
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
         disp_.on(protocol::MSG_C2S_START_MATCH, "开始对局",
                  [this](int fd, const std::string& payload) {
-            if (!payload.empty()) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            if (!sightline::wire::StartMatchMsg::Parse(bytes)) {   // v4：长度校验进 Parse（空 payload）
                 LOG_WARNING("[开始对局] 非法 payload 长度=" + std::to_string(payload.size()) +
                             " fd=" + std::to_string(fd));
                 return;

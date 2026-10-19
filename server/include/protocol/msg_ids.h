@@ -25,7 +25,8 @@ namespace protocol {
         MSG_S2C_MATCH_START    = 15, // S→C  [4B 玩家数 n]{[4B PlayerId][1B 名长][名字][1B 出生点序号]}×n
         MSG_C2S_MOVE_REPORT    = 16, // C→S  [12B pos xyz f32][4B yaw f32][4B pitch f32][1B flags]（bit0=腾空）
         MSG_S2C_ENTITY_STATE   = 17, // S→C  [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags]}×n（不含接收者自己）
-        MSG_S2C_ENTITY_LEAVE   = 18, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
+        MSG_S2C_ENTITY_LEAVE   = 18,
+    MSG_C2S_PLAYER_INPUT    = 19   // [v4] 位置上报 v2：[4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B——对局期替代 16（R10）, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
     };
 
 } // namespace protocol

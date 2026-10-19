@@ -37,12 +37,13 @@ bool MatchService::IsActive(std::uint32_t playerId) const {
 }
 
 void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float z,
-                                float yaw, float pitch, std::uint8_t flags) {
+                                float yaw, float pitch, std::uint8_t flags, std::uint32_t seq) {
     for (Entity& E : entities_) {
         if (E.playerId == playerId) {
             E.x = x; E.y = y; E.z = z;
             E.yaw = yaw; E.pitch = pitch;
             E.flags = flags;
+            E.ackedSeq = std::max(E.ackedSeq, seq);          // v4：确认序号只进不退（乱序防御）
             E.bHasReport = true;                             // 首次上报：实体激活（此后入快照）
             return;                                          // 只覆盖不校验（直发版原味）
         }
@@ -57,7 +58,7 @@ std::vector<MatchEvent> MatchService::TickSnapshot() {
     E.entities.reserve(entities_.size());
     for (const Entity& Src : entities_) {
         if (!Src.bHasReport) continue;                       // 未上报者不入快照（避免 (0,0,0) 幻影出生）
-        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, Src.flags});
+        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, Src.flags, Src.ackedSeq});
     }
     out.push_back(std::move(E));
     return out;
