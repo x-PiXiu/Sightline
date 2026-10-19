@@ -11,7 +11,7 @@ void USightlineEntityRegistry::ApplyMatchStart(int32 SelfPlayerId, const TArray<
     }
 }
 
-void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, uint32 AckedSeq) {
+void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, int32 AckedSeq) {
     FSightlineEntityState* E = Entities.Find(PlayerId);
     if (!E) return;                                        // 未知实体（未进对局）静默忽略
     E->Pos = Pos;

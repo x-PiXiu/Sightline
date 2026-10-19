@@ -91,7 +91,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             Off += SightlineProtocol::FEntityStateV2::Size;
             Registry->ApplyState(static_cast<int32>(Ent.PlayerId),
                                  FVector(Ent.X, Ent.Y, Ent.Z), Ent.Yaw, Ent.Pitch,
-                                 (Ent.Flags & 0x01) != 0, Ent.AckedSeq);
+                                 (Ent.Flags & 0x01) != 0, static_cast<int32>(Ent.AckedSeq));
             if (CSightlineStatLog.GetValueOnGameThread() != 0)
                 UE_LOG(LogTemp, Log, TEXT("[STAT] PEER t=%.3f pid=%d ack=%u x=%.2f y=%.2f z=%.2f f=%d"),
                        FPlatformTime::Seconds(), static_cast<int32>(Ent.PlayerId), Ent.AckedSeq,

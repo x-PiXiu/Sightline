@@ -1,12 +1,17 @@
-// ClientConnection —— 一条客户端连接的生命周期托管
+// ClientConnection —— 一条客户端连接的生命周期托管（M2 主从 Reactor 形态）
 // 关键点：
-// 1. enable_shared_from_this——事件回调触发时对象必须活着（生命周期由外部 map 持有）
-// 2. 全部操作跑在所属 EventLoop 线程（单线程版 = 主线程）
-// 3. 读循环到 EAGAIN（ET 模式必需；connfd 已由 accept4 设为非阻塞）
-// 4. 消息切帧委托给 adapters 的 FrameCodec——本类只管字节（net 层不知道什么是消息）
+// 1. 构造只存参数；Channel 注册在 Start()——必须在归属 loop 线程调用（updateChannel 有线程断言）
+//    主从分工：对象可在 main 构造（连接表/发送视角），IO（收/发/摘除）全归属 worker 线程
+// 2. send() 任意线程可调：直接 write 快路径 + outBuf 兜底 + EPOLLOUT 动态挂摘（armWriting 经
+//    queueInLoop 投递到归属线程动 epoll——epoll 操作永远不跨线程）
+// 3. handleClose() 在归属线程执行完整收尾（摘 epoll + close fd + channel_.reset()）——
+//    收尾后对象成为"无 Channel 裸对象"，任意线程析构安全（shared_ptr 多线程持有的最后一根稻草）
+// 4. 读循环到 EAGAIN；切帧委托 adapters FrameCodec——net 层不知道什么是消息
 #pragma once
+#include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include "net/event_loop.h"
 #include "net/inet_address.h"
@@ -28,56 +33,112 @@ using common::network::Channel;
         using MessageCallback = std::function<void(const Ptr&, uint16_t msgid, const std::string& payload)>;
         using CloseCallback = std::function<void(const Ptr&)>;
 
-        // 仅由 main（连接表持有者）调用：构造后必须存入 map，否则回调触发时对象已亡
+        // 构造只存参数（Channel 稍后在归属 loop 线程 Start()——对象生命周期与 epoll 注册分家）
         ClientConnection(EventLoop* loop, int connfd, InetAddress peer)
-            : loop_(loop),
-              channel_(new Channel(loop, connfd)),
-              peerAddr_(std::move(peer)) {
-            channel_->setReadCallback([this] { handleRead(); });
-            channel_->setCloseCallback([this] { handleClose(); });
-            channel_->enableReading();
-        }
+            : loop_(loop), fd_(connfd), peerAddr_(std::move(peer)) {}
 
         ~ClientConnection() = default;
+
+        // 在归属 loop 线程调用（main 构造后经 queueInLoop 投递过来）——Channel 注册 + 开读
+        void Start() {
+            if (channel_) return;                            // 防重复（防御）
+            channel_ = std::make_unique<Channel>(loop_, fd_);
+            channel_->setReadCallback([this] { handleRead(); });
+            channel_->setCloseCallback([this] { handleClose(); });
+            channel_->setWriteCallback([this] { handleWrite(); });
+            channel_->enableReading();
+        }
 
         void setMessageCallback(MessageCallback cb) { messageCallback_ = std::move(cb); }
         void setCloseCallback(CloseCallback cb) { closeCallback_ = std::move(cb); }
 
-        // 发送一条完整帧（第 1 期：心跳包 <100B，直接 write；SendBuffer+EPOLLOUT 为演进项）
+        // 任意线程可调（业务 main 发帧；内部保证 epoll 操作只发生在归属线程）
         void send(uint16_t msgid, const std::string& payload) {
             std::string out;
             adapters::FrameCodec::encode(msgid, payload, out);
-            ssize_t n = ::write(channel_->fd(), out.data(), out.size());
-            if (n < 0) {
-                LOG_ERROR(std::string("ClientConnection: write 失败 errno=") + strerror(errno));
-            } else if (static_cast<std::size_t>(n) < out.size()) {
-                // 部分写：第 1 期直接丢弃残余并告警（心跳包极小，实测不应发生）
-                LOG_ERROR("ClientConnection: 部分写 " + std::to_string(n) + "/" +
-                          std::to_string(out.size()) + " —— 出现即触发 SendBuffer 演进项");
+            std::lock_guard<std::mutex> lk(outMutex_);
+            if (outBuf_.empty()) {
+                const ssize_t n = ::write(fd_, out.data(), out.size());
+                if (n > 0) {
+                    if (static_cast<std::size_t>(n) == out.size()) return;      // 快路径：一次发完
+                    outBuf_.append(out.data() + n, out.size() - static_cast<std::size_t>(n));
+                } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    LOG_ERROR(std::string("ClientConnection: write 失败 errno=") + strerror(errno));
+                    return;                                                       // 硬错丢弃（关闭由读路径负责）
+                }                                                                 // EAGAIN：整帧入缓冲等 EPOLLOUT
+            } else {
+                outBuf_.append(out);                                              // 已有积压：顺序追加
             }
+            armWritingLocked();
         }
 
+        EventLoop* ownerLoop() const { return loop_; }
         const InetAddress& peerAddr() const { return peerAddr_; }
-        int fd() const { return channel_->fd(); }   // 连接表索引用
+        int fd() const { return fd_; }                     // 连接表索引（fd 不随 Channel 收尾失效）
 
-        // 断开：禁事件 → 从 epoll 摘除 → 关 fd → 通知持有者清 map
+        // 断开收尾：归属线程执行——摘 epoll → 关 fd → channel_ 置空（此后任意线程析构安全）
+        // ⚠ 立即收尾是禁区：本函数常在 Channel::handleEvent 回调链内被调（对端关闭/读错）——
+        //   立即 reset = 在自己事件回调里释放自己（TSAN heap-use-after-free 实锤，handleEvent 尾部还要写成员）。
+        //   修：queueInLoop 延迟到批次外执行（epoll 批次结束、回调栈弹干净后再动手）。
         void handleClose() {
-            channel_->disableAll();
-            channel_->remove();
-            ::close(channel_->fd());
-            LOG_INFO("ClientConnection: 连接关闭 " + peerAddr_.toIpPort());
-            if (closeCallback_) closeCallback_(shared_from_this());
+            if (bClosed_.exchange(true)) return;            // 双关守卫（异步关与读路径关竞态；防 fd 复用二次 close）
+            loop_->queueInLoop([self = shared_from_this()] {
+                if (self->channel_) {
+                    self->channel_->disableAll();
+                    self->channel_->remove();
+                    self->channel_.reset();
+                }
+                ::close(self->fd_);
+                LOG_INFO("ClientConnection: 连接关闭 " + self->peerAddr_.toIpPort());
+                if (self->closeCallback_) self->closeCallback_(self);
+            });
+        }
+
+        // 任意线程调用的礼貌版：投归属线程执行收尾（KICKED forceClose 等 main 侧路径必须走这里——epoll 不跨线程）
+        void closeAsync() {
+            loop_->queueInLoop([self = shared_from_this()] { self->handleClose(); });
         }
 
     private:
+        // 调用方须持 outMutex_：首次积压时挂 EPOLLOUT（经 queueInLoop 投归属线程——epoll 不跨线程）
+        void armWritingLocked() {
+            if (bWritingArmed_) return;
+            bWritingArmed_ = true;
+            loop_->queueInLoop([self = shared_from_this()] {
+                if (self->channel_) self->channel_->enableWriting();   // 收尾竞态防御
+            });
+        }
+
+        void handleWrite() {                             // 归属 loop 线程（EPOLLOUT 触发）
+            bool bDrained = false;
+            {
+                std::lock_guard<std::mutex> lk(outMutex_);
+                while (!outBuf_.empty()) {
+                    const ssize_t n = ::write(fd_, outBuf_.data(), outBuf_.size());
+                    if (n > 0) {
+                        outBuf_.erase(0, static_cast<std::size_t>(n));
+                        continue;
+                    }
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) return;   // 内核缓冲满：等下次 EPOLLOUT
+                    LOG_ERROR(std::string("ClientConnection: 写硬错 errno=") + strerror(errno));
+                    outBuf_.clear();
+                    break;
+                }
+                bDrained = true;
+            }
+            if (bDrained && bWritingArmed_) {            // 排空：摘 EPOLLOUT（LT 下不摘会被可写态疯狂触发）
+                bWritingArmed_ = false;
+                if (channel_) channel_->disableWriting();
+            }
+        }
+
         void handleRead() {
             char tmp[65536];
             while (true) {
-                ssize_t n = ::read(channel_->fd(), tmp, sizeof tmp);
+                const ssize_t n = ::read(fd_, tmp, sizeof tmp);
                 if (n > 0) {
                     recvBuf_.append(tmp, static_cast<std::size_t>(n));
-                    // 切帧循环：缓冲里可能积了多个完整帧
-                    // 半包留在缓冲（FrameCodec 返回 false 时不消费），下次 read 到齐再切
+                    // 切帧循环：半包留缓冲，下次 read 到齐再切
                     adapters::Frame frame;
                     while (adapters::FrameCodec::tryDecode(recvBuf_, frame)) {
                         if (messageCallback_) messageCallback_(shared_from_this(), frame.msgid, frame.payload);
@@ -85,17 +146,22 @@ using common::network::Channel;
                     continue;
                 }
                 if (n == 0) { handleClose(); return; }                       // 对端正常关闭
-                if (errno == EAGAIN || errno == EWOULDBLOCK) return;         // 读干净了（ET 必须）
+                if (errno == EAGAIN || errno == EWOULDBLOCK) return;         // 读干净了
                 LOG_ERROR(std::string("ClientConnection: read 错误 errno=") + strerror(errno));
                 handleClose();
                 return;
             }
         }
 
-        EventLoop* loop_;
-        std::unique_ptr<Channel> channel_;
+        EventLoop* loop_;                                // 归属 loop（主从：worker 的事件循环）
+        int fd_;                                         // fd 直存（Channel 收尾后仍可安全读）
+        std::unique_ptr<Channel> channel_;               // 归属线程创建/销毁；收尾后置空
         InetAddress peerAddr_;
         net::Buffer recvBuf_;
+        std::mutex outMutex_;                            // 出站缓冲互斥（main 写 / 归属线程排空）
+        std::string outBuf_;                             // 发送积压（EAGAIN 兜底）
+        bool bWritingArmed_ = false;                     // EPOLLOUT 已挂标记
+        std::atomic<bool> bClosed_{false};                // 关闭一次即终（双关守卫——防 fd 复用二次 close）
         MessageCallback messageCallback_;
         CloseCallback closeCallback_;
     };

@@ -18,7 +18,7 @@ struct FSightlineEntityState {
     UPROPERTY(BlueprintReadOnly) float Yaw = 0.f;
     UPROPERTY(BlueprintReadOnly) float Pitch = 0.f;
     UPROPERTY(BlueprintReadOnly) bool bFalling = false;
-    UPROPERTY(BlueprintReadOnly) uint32 AckedSeq = 0;     // v4·R11：服务器已确认输入序号（M3 和解对账基准）
+    UPROPERTY(BlueprintReadOnly) int32 AckedSeq = 0;      // v4·R11：服务器已确认输入序号（M3 和解对账基准；UHT 不支持 uint32 属性，序号窗口内 int32 等价）
     UPROPERTY(BlueprintReadOnly) bool bSelf = false;        // 自己（本地 Pawn 由 GameMode 生成，不重复生成）
 };
 
@@ -39,7 +39,7 @@ public:
     void ApplyMatchStart(int32 SelfPlayerId, const TArray<FSightlineEntityState>& Roster);
 
     /** 17 快照：更新位置/朝向/腾空/ackedSeq → OnEntityUpdated（M4 直发同步的入口；v4 起带对账基准） */
-    void ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, uint32 AckedSeq = 0);
+    void ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, int32 AckedSeq = 0);
 
     /** 18 离场：删除 → OnEntityLeft（未知 PlayerId 静默忽略） */
     void ApplyLeave(int32 PlayerId);

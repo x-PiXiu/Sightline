@@ -168,7 +168,8 @@ private:
         if (auto c = find(fd)) c->send(msgid, payload);  // 连接已死则静默跳过
     }
     void forceClose(int fd) {
-        if (auto c = find(fd)) c->handleClose();         // 触发 closeCallback → 持有者清 map
+        // M2：礼貌关闭——投归属线程执行收尾（epoll 永不跨线程；收尾仍经 closeCallback → Closed 入队 → main tick 清 map）
+        if (auto c = find(fd)) c->closeAsync();
     }
     void broadcastLobby(const std::string& payload) {
         for (int fd : lobby_.LobbySubscribers()) send(fd, protocol::MSG_S2C_ROOM_LIST, payload);
