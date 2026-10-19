@@ -24,13 +24,13 @@
         <mxCell id="s17e" value="4B 俯仰" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="662" y="176" width="86" height="52" as="geometry"/></mxCell>
         <mxCell id="s17f" value="1B&#10;状态" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="748" y="176" width="56" height="52" as="geometry"/></mxCell>
         <mxCell id="s17g" value="4B&#10;ackedSeq&#10;（新增）" style="rounded=0;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2.5;fontSize=12;fontStyle=1;fontColor=#c8161d;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="176" width="86" height="52" as="geometry"/></mxCell>
-        <mxCell id="s17tag" value="25B → 29B/实体 · 契约破例（D4-01 · 待批 P1）" style="text;fontSize=14;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="910" y="192" width="280" height="20" as="geometry"/></mxCell>
+        <mxCell id="s17tag" value="25B → 29B/实体 · 契约破例（D4-01 · 已批）" style="text;fontSize=14;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="910" y="192" width="280" height="20" as="geometry"/></mxCell>
         <mxCell id="c17" value="语义升级（布局不变）：位置/朝向从「转发客户端上报」变为「服务器权威推算值」——省略② 装回点" style="text;fontSize=14;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="236" width="780" height="20" as="geometry"/></mxCell>
 
         <mxCell id="r10" value="R10：对局内 16 号停用（收到即丢弃）—— 19 号替代；1~18 其余布局一个字节不动" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="300" width="680" height="42" as="geometry"/></mxCell>
 
         <mxCell id="mig" value="迁移：一条消息一条迁 · 旧 handler 与 visitor 并存 · msgid 级切换 · 三套单测全程护航" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="380" width="900" height="20" as="geometry"/></mxCell>
-        <mxCell id="legend" value="橙 = C2S 新增　蓝 = S2C 既有　红 = 破例/新增字段　|　草案 v1 · 待批（P1/P5）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="420" width="900" height="24" as="geometry"/></mxCell>
+        <mxCell id="legend" value="橙 = C2S 新增　蓝 = S2C 既有　红 = 破例/新增字段　|　定稿 v1 · 2026-10-19 批" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="420" width="900" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

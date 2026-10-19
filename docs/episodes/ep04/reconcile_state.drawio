@@ -31,7 +31,7 @@
         <mxCell id="hud" value="Debug HUD 实时观测：预测误差（当前/峰值）· 和解次数 · 重放帧数 · 滑块值 · ackedSeq 差" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="120" y="580" width="400" height="60" as="geometry"/></mxCell>
 
         <mxCell id="concl" value="省略②「权威不和解」就此装回：服务器自己算位置，客户端抄了作业、老师批改后重抄一遍" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="120" y="690" width="900" height="44" as="geometry"/></mxCell>
-        <mxCell id="legend" value="橙 = 本地预测（手感侧）　蓝 = 服务器权威（判定侧）　绿 = 无感通过　红 = 和解动作　|　草案 v1 · 待批（P2）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="760" width="1080" height="24" as="geometry"/></mxCell>
+        <mxCell id="legend" value="橙 = 本地预测（手感侧）　蓝 = 服务器权威（判定侧）　绿 = 无感通过　红 = 和解动作　|　定稿 v1 · 2026-10-19 批" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="760" width="1080" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

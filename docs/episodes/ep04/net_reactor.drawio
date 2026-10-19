@@ -29,7 +29,7 @@
         <mxCell id="evolvelbl" value="演进预留（ep12 按压测数据决策）：ET + readv 排干 / lock-free 队列 / 房间亲和绑定" style="text;fontSize=14;fontStyle=1;fontColor=#7f6000;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="330" y="608" width="560" height="20" as="geometry"/></mxCell>
 
         <mxCell id="concl" value="验收：kIoThreads=0/2 双拓扑 smoke 双过 · 业务层 git diff 零出现 · TSAN 无竞争" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="240" y="660" width="720" height="44" as="geometry"/></mxCell>
-        <mxCell id="legend" value="蓝 = main 线程　绿 = IO Worker（新增）　橙 = 业务层（零改动抵押）　黄 = 唯一跨线程门 / 演进预留　|　草案 v1 · 待批" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="740" width="1120" height="24" as="geometry"/></mxCell>
+        <mxCell id="legend" value="蓝 = main 线程　绿 = IO Worker（新增）　橙 = 业务层（零改动抵押）　黄 = 唯一跨线程门 / 演进预留　|　定稿 v1 · 2026-10-19 批" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="740" width="1120" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>
