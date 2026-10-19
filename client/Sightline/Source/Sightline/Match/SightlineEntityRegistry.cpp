@@ -11,13 +11,14 @@ void USightlineEntityRegistry::ApplyMatchStart(int32 SelfPlayerId, const TArray<
     }
 }
 
-void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling) {
+void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, uint32 AckedSeq) {
     FSightlineEntityState* E = Entities.Find(PlayerId);
     if (!E) return;                                        // 未知实体（未进对局）静默忽略
     E->Pos = Pos;
     E->Yaw = Yaw;
     E->Pitch = Pitch;
     E->bFalling = bFalling;
+    E->AckedSeq = FMath::Max(E->AckedSeq, AckedSeq);       // v4·R11：确认序号只进不退（乱序防御）
     OnEntityUpdated.Broadcast(PlayerId);
 }
 

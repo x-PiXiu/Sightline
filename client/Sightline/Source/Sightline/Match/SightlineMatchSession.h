@@ -57,4 +57,5 @@ private:
     TObjectPtr<USightlineEntityRegistry> Registry;
     int32 SelfPlayerId = 0;                            // 登录回执分配，Registry 以此标 bSelf
     bool bInMatch = false;                             // 对局激活：收到 15 置位 / 自己 18 离场或链路死亡清位——16 上报的唯一合法窗口
+    uint32 InputSeq = 0;                               // v4：本地预测序号（19 号；M3 预测/重放的历史锚点）
 };

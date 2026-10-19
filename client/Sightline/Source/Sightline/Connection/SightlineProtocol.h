@@ -26,8 +26,10 @@ namespace SightlineProtocol
         MSG_C2S_START_MATCH   = 14, // C→S  (空 payload)　仅房主、在房中
         MSG_S2C_MATCH_START   = 15, // S→C  [4B 玩家数 n]{[4B PlayerId][1B 名长][名字][1B 出生点序号]}×n
         MSG_C2S_MOVE_REPORT   = 16, // C→S  [12B pos xyz f32][4B yaw f32][4B pitch f32][1B flags]（bit0=腾空）
-        MSG_S2C_ENTITY_STATE  = 17, // S→C  [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags]}×n（不含接收者自己）
+        MSG_S2C_ENTITY_STATE  = 17, // S→C v2 [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags][4B ackedSeq]}×n（29B/实体·不含自己；v4 破例 D4-01）
         MSG_S2C_ENTITY_LEAVE  = 18, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
+        // —— 第 4 期：预测与和解（与 docs/protocol/MSG_IDS.md v4 保持同步）——
+        MSG_C2S_PLAYER_INPUT  = 19, // C→S  [4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B（对局期替代 16·R10）
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid
@@ -91,4 +93,73 @@ namespace SightlineProtocol
         return static_cast<uint32>(In[Offset]) | (static_cast<uint32>(In[Offset + 1]) << 8)
              | (static_cast<uint32>(In[Offset + 2]) << 16) | (static_cast<uint32>(In[Offset + 3]) << 24);
     }
+
+    inline float ReadF32(const TArray<uint8>& In, int32 Offset)
+    {
+        float F;
+        FMemory::Memcpy(&F, In.GetData() + Offset, sizeof(float));
+        return F;
+    }
+
+    // ═══ v4 消息结构体（契约破例 D4-01 已批；与服务端 protocol/messages.h 字节级一致）═══
+    // 纪律：Encode/Parse 与常量同居本头——编码解码不再两地分居（双端漂移土壤铲除）
+
+    /** 19 PLAYER_INPUT（25B）：[4B seq][12B pos][4B yaw][4B pitch][1B flags] */
+    struct FPlayerInput
+    {
+        uint32 Seq = 0;
+        float X = 0.f, Y = 0.f, Z = 0.f;
+        float Yaw = 0.f, Pitch = 0.f;
+        uint8 Flags = 0;
+
+        static constexpr int32 Size = 25;
+
+        TArray<uint8> Encode() const
+        {
+            TArray<uint8> Out;
+            Out.Reserve(Size);
+            const auto AddU32 = [&Out](uint32 V)
+            {
+                for (int32 i = 0; i < 4; ++i) Out.Add(static_cast<uint8>((V >> (8 * i)) & 0xFF));
+            };
+            const auto AddF = [&Out](float F)
+            {
+                uint32 Bits;
+                FMemory::Memcpy(&Bits, &F, sizeof(float));
+                for (int32 i = 0; i < 4; ++i) Out.Add(static_cast<uint8>((Bits >> (8 * i)) & 0xFF));
+            };
+            AddU32(Seq);
+            AddF(X); AddF(Y); AddF(Z);
+            AddF(Yaw); AddF(Pitch);
+            Out.Add(Flags);
+            return Out;
+        }
+    };
+
+    /** 17 号 v2 实体（29B）：[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags][4B ackedSeq] */
+    struct FEntityStateV2
+    {
+        uint32 PlayerId = 0;
+        float X = 0.f, Y = 0.f, Z = 0.f;
+        float Yaw = 0.f, Pitch = 0.f;
+        uint8 Flags = 0;
+        uint32 AckedSeq = 0;      // 服务器已确认输入序号（v4·R11；和解对账基准，M3 消费）
+
+        static constexpr int32 Size = 29;
+
+        // 从 Payload 偏移处解析一条；越界返回 false（调用方整包放弃）
+        static bool Parse(const TArray<uint8>& Payload, int32 Offset, FEntityStateV2& Out)
+        {
+            if (Payload.Num() < Offset + Size) return false;
+            Out.PlayerId   = ReadU32(Payload, Offset);
+            Out.X          = ReadF32(Payload, Offset + 4);
+            Out.Y          = ReadF32(Payload, Offset + 8);
+            Out.Z          = ReadF32(Payload, Offset + 12);
+            Out.Yaw        = ReadF32(Payload, Offset + 16);
+            Out.Pitch      = ReadF32(Payload, Offset + 20);
+            Out.Flags      = Payload[Offset + 24];
+            Out.AckedSeq   = ReadU32(Payload, Offset + 25);
+            return true;
+        }
+    };
 }
