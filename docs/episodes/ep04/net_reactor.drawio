@@ -1,0 +1,36 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="主从Reactor草案v1" id="netreactor">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="第 4 期 · 主从 Reactor（草案 v1）—— IO 搬家，业务不动" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="32" as="geometry"/></mxCell>
+
+        <mxCell id="bandmain" value="" style="rounded=1;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="40" y="70" width="500" height="360" as="geometry"/></mxCell>
+        <mxCell id="bandmain_l" value="main 线程（职责不变 + 只留 accept）" style="text;fontSize=16;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="56" y="78" width="380" height="24" as="geometry"/></mxCell>
+        <mxCell id="b_acc" value="Acceptor 收新连接&#10;→ selectWorker（最少连接计数）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="70" y="112" width="290" height="58" as="geometry"/></mxCell>
+        <mxCell id="b_tick" value="定时器 · 时间轮 · 33ms tick&#10;（timerfd 原样）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="70" y="188" width="290" height="58" as="geometry"/></mxCell>
+        <mxCell id="b_biz" value="业务层：LobbyService / MatchService&#10;单线程串行铁律 · 零锁 · 45×3 单测不碰" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;fontSize=14;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="70" y="264" width="400" height="58" as="geometry"/></mxCell>
+        <mxCell id="b_fw" value="FrameWriter 编码 → 连接 outbound 缓冲&#10;（main 只碰 buffer 不碰 socket）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="70" y="340" width="400" height="58" as="geometry"/></mxCell>
+
+        <mxCell id="bandw" value="" style="rounded=1;fillColor=#f6fbf4;strokeColor=#82b366;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="680" y="70" width="480" height="360" as="geometry"/></mxCell>
+        <mxCell id="bandw_l" value="IO Worker ×N（kIoThreads=0 即单线程同套代码）" style="text;fontSize=16;fontStyle=1;fontColor=#1f6b30;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="696" y="78" width="440" height="24" as="geometry"/></mxCell>
+        <mxCell id="w1" value="Worker-1：独立 EventLoop + 线程&#10;收字节 → TryDecode 切帧 → 投队列&#10;归属连接 EPOLLIN + 动态 EPOLLOUT" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="710" y="116" width="420" height="84" as="geometry"/></mxCell>
+        <mxCell id="w2" value="Worker-2：同构&#10;（连接归属固定 · per-connection 零锁）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="710" y="220" width="420" height="64" as="geometry"/></mxCell>
+        <mxCell id="wnote" value="LT 触发保持 · EPOLLOUT 挂摘=唯一舞步点&#10;连接对象构造/注册/析构全在归属线程" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="710" y="300" width="420" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="bq" value="frame_queue —— 唯一跨线程门（与客户端 AsyncTask 对称）&#10;MPSC（mutex+deque 起步）：Connected / Frame / Closed 控制帧族" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=3;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="240" y="480" width="720" height="64" as="geometry"/></mxCell>
+
+        <mxCell id="e_hand" value="queueInLoop + eventfd&#10;（现成原语交接）" style="endArrow=block;html=1;strokeColor=#1f4e79;strokeWidth=2.5;sketch=1;fontSize=13;fontStyle=1;fontColor=#1f4e79;exitX=1;exitY=0.25;entryX=0;entryY=0.25;" edge="1" parent="1" source="b_acc" target="w1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_push" value="收帧 / Closed 投递" style="endArrow=block;html=1;strokeColor=#82b366;strokeWidth=2.5;sketch=1;fontSize=13;fontColor=#1f6b30;exitX=0.5;exitY=1;entryX=0.85;entryY=0;" edge="1" parent="1" source="w1" target="bq"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_drain" value="33ms tick 统一消费" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;sketch=1;fontSize=13;fontColor=#1f4e79;exitX=0.15;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="bq" target="b_biz"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_send" value="outbound + EPOLLOUT 挂摘" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;sketch=1;fontSize=13;fontColor=#1f4e79;exitX=1;exitY=0.7;entryX=0.1;entryY=0.9;" edge="1" parent="1" source="b_fw" target="w1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="640" y="450"/><mxPoint x="700" y="450"/></Array></mxGeometry></mxCell>
+
+        <mxCell id="evolve" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#d6b656;strokeWidth=2.5;sketch=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="60" y="600" as="sourcePoint"/><mxPoint x="1140" y="600" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="evolvelbl" value="演进预留（ep12 按压测数据决策）：ET + readv 排干 / lock-free 队列 / 房间亲和绑定" style="text;fontSize=14;fontStyle=1;fontColor=#7f6000;align=center;sketch=1;" vertex="1" parent="1"><mxGeometry x="330" y="608" width="560" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="验收：kIoThreads=0/2 双拓扑 smoke 双过 · 业务层 git diff 零出现 · TSAN 无竞争" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="240" y="660" width="720" height="44" as="geometry"/></mxCell>
+        <mxCell id="legend" value="蓝 = main 线程　绿 = IO Worker（新增）　橙 = 业务层（零改动抵押）　黄 = 唯一跨线程门 / 演进预留　|　草案 v1 · 待批" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="740" width="1120" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,38 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="预测和解状态机草案" id="reconcilestate">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1400" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="第 4 期 · 客户端预测与和解状态机（草案 v1）—— 手感先行，权威兑底" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1060" height="32" as="geometry"/></mxCell>
+
+        <mxCell id="s_predict" value="本地预测执行&#10;输入 → 立即移动（手感零等待）&#10;同时入环形缓冲：(seq, 位置, 朝向) × 1s" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="120" y="90" width="420" height="84" as="geometry"/></mxCell>
+        <mxCell id="s_send" value="每输入一帧：PlayerInput{seq}&#10;（19 号 · 25B）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#d79b00;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="620" y="96" width="260" height="64" as="geometry"/></mxCell>
+
+        <mxCell id="s_recv" value="收 17 v2 快照&#10;取该实体权威位 + ackedSeq" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="620" y="250" width="260" height="68" as="geometry"/></mxCell>
+
+        <mxCell id="s_judge" value="三方对账&#10;权威位 vs 本地同 seq 预测位" style="rhombus;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="608" y="386" width="284" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="s_ok" value="误差 &lt; ε（初值 5cm）&#10;无感通过：只更新服务器认知&#10;（网络抖动不触发和解）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2.5;fontSize=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="120" y="400" width="320" height="76" as="geometry"/></mxCell>
+
+        <mxCell id="s_replay" value="回滚 + 重放（Redo）&#10;1) 摆回权威位 + ackedSeq&#10;2) 重放其后的本地输入 → 恢复现场&#10;3) 和解次数 +1 · HUD 实时可见" style="rounded=1;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2.5;fontSize=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="980" y="384" width="300" height="104" as="geometry"/></mxCell>
+
+        <mxCell id="s_lost" value="seq 断档（缓冲无此序号）&#10;朴素兑底：全量回滚到最新权威位" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#c8161d;strokeWidth=2;fontSize=14;sketch=1;" vertex="1" parent="1"><mxGeometry x="612" y="580" width="276" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="e1" value="" style="endArrow=block;html=1;strokeColor=#d79b00;strokeWidth=2.5;sketch=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="s_predict" target="s_send"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="服务器权威推算 → 17 v2 下发（33ms 拍点）" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;sketch=1;fontSize=13;fontColor=#1f4e79;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s_send" target="s_recv"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="750" y="220"/></Array></mxGeometry></mxCell>
+        <mxCell id="e3" value="" style="endArrow=block;html=1;strokeColor=#6c8ebf;strokeWidth=2.5;sketch=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s_recv" target="s_judge"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="&lt; ε" style="endArrow=block;html=1;strokeColor=#82b366;strokeWidth=2.5;sketch=1;fontSize=14;fontStyle=1;fontColor=#1f6b30;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="s_judge" target="s_ok"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="≥ ε" style="endArrow=block;html=1;strokeColor=#c8161d;strokeWidth=2.5;sketch=1;fontSize=14;fontStyle=1;fontColor=#c8161d;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="s_judge" target="s_replay"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="断档" style="endArrow=block;html=1;strokeColor=#c8161d;strokeWidth=2;strokeDashArray=4 3;sketch=1;fontSize=13;fontColor=#c8161d;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s_judge" target="s_lost"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="回到预测（继续手感零等待）" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;fontSize=13;exitX=0.5;exitY=0;entryX=1;entryY=0.5;curved=1;" edge="1" parent="1" source="s_ok" target="s_predict"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="280" y="300"/><mxPoint x="560" y="300"/></Array></mxGeometry></mxCell>
+        <mxCell id="e8" value="重放完毕回预测" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2.5;sketch=1;fontSize=13;exitX=0.5;exitY=0;entryX=1;entryY=0.7;curved=1;" edge="1" parent="1" source="s_replay" target="s_predict"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1130" y="300"/><mxPoint x="570" y="150"/></Array></mxGeometry></mxCell>
+        <mxCell id="e9" value="兑底后回预测" style="endArrow=block;html=1;strokeColor=#555555;strokeWidth=2;sketch=1;fontSize=13;exitX=0.5;exitY=0;entryX=0.5;entryY=1;curved=1;" edge="1" parent="1" source="s_lost" target="s_judge"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="540" y="610"/><mxPoint x="540" y="436"/></Array></mxGeometry></mxCell>
+
+        <mxCell id="hud" value="Debug HUD 实时观测：预测误差（当前/峰值）· 和解次数 · 重放帧数 · 滑块值 · ackedSeq 差" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="120" y="580" width="400" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="省略②「权威不和解」就此装回：服务器自己算位置，客户端抄了作业、老师批改后重抄一遍" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="120" y="690" width="900" height="44" as="geometry"/></mxCell>
+        <mxCell id="legend" value="橙 = 本地预测（手感侧）　蓝 = 服务器权威（判定侧）　绿 = 无感通过　红 = 和解动作　|　草案 v1 · 待批（P2）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="760" width="1080" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

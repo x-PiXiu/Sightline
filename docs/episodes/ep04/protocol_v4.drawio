@@ -1,0 +1,37 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="协议v4草案" id="protocolv4">
+    <mxGraphModel dx="1300" dy="900" grid="0" page="1" pageWidth="1240" pageHeight="480" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="第 4 期契约 v4（草案）—— variant 编解码 + 和解消息" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="14" width="1000" height="32" as="geometry"/></mxCell>
+        <mxCell id="fmt" value="variant 纪律：每消息 Parse/Encode 同居一处 · 唯一 switch = msgid 选 Parse · 长度校验进 Parse · visit 穷尽（漏处理 = 编译错误）" style="text;fontSize=14;fontStyle=1;fontColor=#7f6000;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="50" width="1120" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="b19" value="19" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=17;fontStyle=1;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="92" width="60" height="44" as="geometry"/></mxCell>
+        <mxCell id="n19" value="PlayerInput&#10;位置上报 v2" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="94" width="130" height="40" as="geometry"/></mxCell>
+        <mxCell id="s19a" value="4B seq&#10;预测序号" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="92" width="86" height="44" as="geometry"/></mxCell>
+        <mxCell id="s19b" value="12B 位置" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="346" y="92" width="150" height="44" as="geometry"/></mxCell>
+        <mxCell id="s19c" value="4B 偏航" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="496" y="92" width="90" height="44" as="geometry"/></mxCell>
+        <mxCell id="s19d" value="4B 俯仰" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="586" y="92" width="90" height="44" as="geometry"/></mxCell>
+        <mxCell id="s19e" value="1B 状态" style="rounded=0;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;fontColor=#8a5d00;sketch=1;" vertex="1" parent="1"><mxGeometry x="676" y="92" width="80" height="44" as="geometry"/></mxCell>
+        <mxCell id="s19tag" value="= 25B · 对局期替代 16 号（R10）" style="text;fontSize=14;fontStyle=1;fontColor=#8a5d00;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="780" y="104" width="300" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="b17" value="17" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;fontStyle=1;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="176" width="60" height="52" as="geometry"/></mxCell>
+        <mxCell id="n17" value="ENTITY_STATE&#10;v2 · 每实体 29B" style="text;fontSize=13;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="110" y="180" width="140" height="44" as="geometry"/></mxCell>
+        <mxCell id="s17a" value="2B&#10;数量" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="176" width="60" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17b" value="4B 玩家" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="320" y="176" width="86" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17c" value="12B 位置&#10;（= 服务器权威位）" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="406" y="176" width="170" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17d" value="4B 偏航" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="576" y="176" width="86" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17e" value="4B 俯仰" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="662" y="176" width="86" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17f" value="1B&#10;状态" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontColor=#1f4e79;sketch=1;" vertex="1" parent="1"><mxGeometry x="748" y="176" width="56" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17g" value="4B&#10;ackedSeq&#10;（新增）" style="rounded=0;whiteSpace=wrap;fillColor=#f8f0f0;strokeColor=#c8161d;strokeWidth=2.5;fontSize=12;fontStyle=1;fontColor=#c8161d;sketch=1;" vertex="1" parent="1"><mxGeometry x="804" y="176" width="86" height="52" as="geometry"/></mxCell>
+        <mxCell id="s17tag" value="25B → 29B/实体 · 契约破例（D4-01 · 待批 P1）" style="text;fontSize=14;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="910" y="192" width="280" height="20" as="geometry"/></mxCell>
+        <mxCell id="c17" value="语义升级（布局不变）：位置/朝向从「转发客户端上报」变为「服务器权威推算值」——省略② 装回点" style="text;fontSize=14;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="236" width="780" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="r10" value="R10：对局内 16 号停用（收到即丢弃）—— 19 号替代；1~18 其余布局一个字节不动" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2.5;fontSize=15;fontStyle=1;sketch=1;" vertex="1" parent="1"><mxGeometry x="260" y="300" width="680" height="42" as="geometry"/></mxCell>
+
+        <mxCell id="mig" value="迁移：一条消息一条迁 · 旧 handler 与 visitor 并存 · msgid 级切换 · 三套单测全程护航" style="text;fontSize=14;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="380" width="900" height="20" as="geometry"/></mxCell>
+        <mxCell id="legend" value="橙 = C2S 新增　蓝 = S2C 既有　红 = 破例/新增字段　|　草案 v1 · 待批（P1/P5）" style="text;fontSize=13;fontColor=#555555;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="420" width="900" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
