@@ -13,8 +13,7 @@
 #include <thread>
 #include <vector>
 #include "epoll.h"
-#include "HierarchicalTimingWheel.h"
-// #include "timer_queue.h"
+#include "heap_scheduler.h"
 
 namespace common {
     namespace network {
@@ -44,7 +43,7 @@ namespace common {
             //在下一次事件循环中执行回调
             void queueInLoop(const Functor& cb);
 
-            // 添加定时器接口（透传给时间轮）
+            // 添加定时器接口（透传给定时器堆）
             uint64_t runAfter(int ms, std::function<void()> cb);
             uint64_t runEvery(int ms, std::function<void()> cb);
             void cancelTimer(uint64_t id);
@@ -84,10 +83,11 @@ namespace common {
             std::vector<Functor> pendingFunctors_;  // 待执行回调队列
             std::atomic<bool> callingPendingFunctors_;  // 回调执行标志
 
-            // 时间轮实例
-            std::unique_ptr<timer::HierarchicalTimingWheel> timing_wheel_;
+        // 定时器实例（HeapScheduler 纯最小堆——2026-10-21 移植自毕设档案库：该实现当年即因
+        // 时间轮指针-槽位对齐连环缺陷重构为堆直驱，与本仓轮病理同源；演化史见 heap_scheduler.h）
+        std::unique_ptr<timer::HeapScheduler> heap_scheduler_;
 
-            // 用于时间轮的 timerfd
+            // 用于定时器堆的 timerfd
             int timerFd_; // 使用 timerfd_create 创建的文件描述符
             std::unique_ptr<Channel> timerChannel_; // 用于监听 timerfd 的 Channel
 

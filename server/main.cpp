@@ -7,24 +7,19 @@
 // 业务层零改动抵押：lobby/match 一行不碰（git diff 为证——验收四条之二）
 #include <csignal>
 #include <atomic>
-#include <cerrno>
 #include <chrono>
 #include <cstdlib>
-#include <cstring>
 #include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <unistd.h>
 #include <vector>
-#include <sys/timerfd.h>
 
 #include "logger/logger.h"
 #include "net/event_loop.h"
 #include "net/inet_address.h"
 #include "net/acceptor.h"
-#include "net/channel.h"
 #include "net/client_connection.h"
 #include "adapters/frame_codec.h"
 #include "adapters/lobby_wiring.h"
@@ -142,10 +137,10 @@ int main() {
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
     // 7. 帧驱动：33ms 一帧——消费唯一跨线程门（Frame/Closed 控制帧族）+ 登录宽限清理 + 快照广播
-    //    定时源=内核周期 timerfd 直驱（2026-10-21 修复）。时间轮投递病理实测：runEvery(33) 回调节奏
-    //    呈 1ms 自旋与百毫秒长隔交错（探针均值 0~29ms 乱跳，空闲亦有 103~117ms/整圈 256ms 档），
-    //    对局负载下快照拍距被拉到 ~300ms = 远端拉扯/瞬移的根因。内核周期定时器节奏由内核保证，
-    //    一次只动这一个变量；时间轮本体不动，其病理档案 = ep12 轮/堆数据决策的一手证据。
+    //    定时源沿革：多层时间轮投递病理（1ms 自旋×256ms 整圈交错，快照拍距被拉到 ~300ms=拉扯/瞬移
+    //    根因，探针实测档案见 devlog）→ 2026-10-21 先以内核周期 timerfd 直驱止血 → 同日用户令定案
+    //    「直接改造为纯堆」：TimerHeap 到期真相唯一（堆顶精确装弹，无槽位量化/无整圈轮候/无堆顶滞留），
+    //    帧驱动回归 runEvery 抽象——不再绕过定时器体系。
     std::string lastWorkerSt;                             // 子 reactor 状态行：空串=未打过——首拍自证，变化才再落行
     auto tickBody = [&] {
         std::deque<QueuedEvent> local;                   // swap 出来再处理（锁内零业务）
@@ -197,26 +192,7 @@ int main() {
             loop.quit();
         }
     };
-
-    // 帧驱动定时源：内核周期 timerfd（it_interval=33ms，节奏由内核保证）；Channel 挂 main loop 收到期事件
-    const int tickFd = ::timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
-    if (tickFd < 0) {
-        LOG_ERROR(std::string("帧驱动 timerfd_create 失败: ") + std::strerror(errno));
-        return 1;
-    }
-    struct itimerspec tickIts{};
-    tickIts.it_value.tv_nsec = tickIts.it_interval.tv_nsec = 33L * 1000000L;
-    if (::timerfd_settime(tickFd, 0, &tickIts, nullptr) != 0) {
-        LOG_ERROR(std::string("帧驱动 timerfd_settime 失败: ") + std::strerror(errno));
-        return 1;
-    }
-    common::network::Channel tickChannel(&loop, tickFd);
-    tickChannel.setReadCallback([&] {
-        std::uint64_t expirations = 0;
-        if (::read(tickFd, &expirations, sizeof expirations) == static_cast<ssize_t>(sizeof expirations))
-            tickBody();                                    // 到期次数>1（偶发迟醒）也只补跑一拍——快照本就是最新态
-    });
-    tickChannel.enableReading();
+    loop.runEvery(33, tickBody);                           // 定时源=纯堆定时器（TimerHeap），节奏实测 33.0ms 整
 
     // 8. Acceptor：接客 → 选 worker（最少连接计数 argmin——main 单线程所有权，零锁零原子）
     //    对象 main 构造（连接表/发送视角），Channel 注册投归属线程 Start()（epoll 操作永不跨线程）
@@ -276,10 +252,7 @@ int main() {
              " · 帧队列 · 心跳 · 登录+房间+对局）");
     loop.loop();                                              // 主线程进入事件循环
 
-    // 9. 收尾顺序（Channel 摘除必须归属线程）：先摘帧驱动定时源，再请 worker 关完连接，再停 worker
-    tickChannel.disableAll();
-    tickChannel.remove();
-    ::close(tickFd);
+    // 9. 收尾顺序（Channel 摘除必须归属线程）：先请 worker 关完连接，再停 worker，最后对象析构（无 Channel 裸对象任意线程安全）
     for (auto& kv : connections) kv.second->ownerLoop()->queueInLoop([c = kv.second] { c->handleClose(); });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));   // 等 worker 跑完 close（粗但够用；精确化留给压测期）
     for (auto& w : workers) w->stop();

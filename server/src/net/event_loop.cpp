@@ -66,9 +66,9 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
             wakeupChannel_->setReadCallback([this] { handleRead(); });
             wakeupChannel_->enableReading();
 
-            // 无参构造函数也初始化时间轮
-            timing_wheel_ = std::make_unique<timer::HierarchicalTimingWheel>();
-            timing_wheel_->setAsyncTaskSubmitter(
+            // 定时器（HeapScheduler 纯最小堆——移植自毕设档案库，2026-10-21）
+            heap_scheduler_ = std::make_unique<timer::HeapScheduler>();
+            heap_scheduler_->setAsyncTaskSubmitter(
                 [this](std::function<void()> task) {
                     this->runInLoop(std::move(task));
                 }
@@ -261,8 +261,8 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
         uint64_t EventLoop::runAfter(int ms, std::function<void()> cb) {
             try {
                 assertInLoopThread(); // 确保定时器操作在 loop 线程进行，或确保线程安全
-                if (!timing_wheel_) {
-                    LOG_ERROR("Timing wheel not initialized");
+                if (!heap_scheduler_) {
+                    LOG_ERROR("Timer heap not initialized");
                     return 0; // 🔧 不抛出异常，避免程序崩溃
                 }
 
@@ -271,7 +271,7 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
                     initTimer();
                 }
 
-                return timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
+                return heap_scheduler_->addTimer(std::chrono::milliseconds(ms), std::move(cb));
 
             } catch (const std::exception& e) {
                 LOG_ERROR("Exception in runEvery: " + std::string(e.what()));
@@ -292,7 +292,7 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
                     initTimer();
                 }
 
-                uint64_t timer_id = timing_wheel_->addTimer(std::chrono::milliseconds(ms), std::move(cb), std::chrono::milliseconds(ms));
+                uint64_t timer_id = heap_scheduler_->addTimer(std::chrono::milliseconds(ms), std::move(cb), std::chrono::milliseconds(ms));
                 return timer_id;
 
             } catch (const std::exception& e) {
@@ -305,10 +305,10 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
         }
 
         void EventLoop::cancelTimer(uint64_t id) {
-            //    注意：cancel 可以在非 loop 线程调用，因为 timing_wheel_->cancelTimer 是线程安全的
+            //    注意：cancel 可以在非 loop 线程调用，因为 heap_scheduler_->cancelTimer 是线程安全的
             //    它内部有 mutex 保护 timer_map_
-            if (timing_wheel_) {
-                timing_wheel_->cancelTimer(id);
+            if (heap_scheduler_) {
+                heap_scheduler_->cancelTimer(id);
             }
         }
 
@@ -478,13 +478,13 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
 
             // LOG_DEBUG("[TIMER_FD] ✅ read成功, expirations=" + std::to_string(expirations));
 
-            // 驱动时间轮
-            if (timing_wheel_) {
+            // 驱动定时器堆（弹出全部到期项）
+            if (heap_scheduler_) {
                 // tick 在 loop 线程同步执行——定时器回调不跨线程（逻辑单线程语义）
-                timing_wheel_->tick();
+                heap_scheduler_->tick();
                 resetTimerfd();
             } else {
-                LOG_ERROR("❌ [TIMER_FD] timing_wheel_ is null in handleTimerfdRead()!");
+                LOG_ERROR("❌ [TIMER_FD] heap_scheduler_ is null in handleTimerfdRead()!");
             }
         }
 
@@ -520,8 +520,8 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
         void EventLoop::resetTimerfd() {
             // LOG_DEBUG("[TIMER_FD] resetTimerfd() 被调用");
 
-            if (!timing_wheel_) {
-                LOG_ERROR("[TIMER_FD] ❌ timing_wheel_ is null in resetTimerfd()!");
+            if (!heap_scheduler_) {
+                LOG_ERROR("[TIMER_FD] ❌ heap_scheduler_ is null in resetTimerfd()!");
                 return;
             }
 
@@ -530,7 +530,7 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
                 return;
             }
 
-            int nextExpireMs = timing_wheel_->getNextExpiration(kEpollTimeoutMs);
+            int nextExpireMs = heap_scheduler_->getNextExpiration(kEpollTimeoutMs);
 
             // 边界检查：确保延迟时间合理
             if (nextExpireMs <= 0) {
