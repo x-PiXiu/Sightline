@@ -93,6 +93,11 @@ void ASightlineCharacter::BeginPlay() {
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
+    } else {
+        // 远端=纯运动学木偶（插值驱动，D4-07 amend）：关 CMC 物理——重力/摩擦不再与每帧摆位打架
+        // （首版直设 10Hz 掩盖了这矛盾；插值 60fps 摆位后 CMC 每帧回拉=卡顿感来源之一）
+        GetCharacterMovement()->DisableMovement();
+        GetCharacterMovement()->GravityScale = 0.f;
     }
 }
 
@@ -138,23 +143,27 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
-    // FAnimInputs 聚合：本地=引擎采集（ABP 禁止自己读引擎，§2.4）
-    const FVector Vel = GetVelocity();
-    const float Speed = Vel.Size2D();
-    AnimInputs.Speed = Speed;
-    if (Speed > kSpeedDeadZone) {
-        const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
-        const FVector Dir = Vel.GetSafeNormal2D();
-        float Angle = FMath::RadiansToDegrees(
-            FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
-        if (FVector::DotProduct(GetActorRightVector(), Dir) < 0.f) Angle = -Angle;
-        AnimInputs.DirectionAngle = Angle;   // 0=前 负=左 正=右 —— 符号约定由自建 BS_Unarmed_Move 的 Direction 轴定义（-90 左/+90 右），已与 C++ 对表
-    } else {
-        AnimInputs.DirectionAngle = 0.f;
+    // FAnimInputs 聚合：本地=引擎采集（ABP 禁止自己读引擎，§2.4）。
+    // ⚠ 只许本地走这条——远端引擎速度恒 0（运动学木偶），每帧覆盖会把动画打回 Idle（首版插值踩坑）
+    if (IsPlayerControlled()) {
+        const FVector Vel = GetVelocity();
+        const float Speed = Vel.Size2D();
+        AnimInputs.Speed = Speed;
+        if (Speed > kSpeedDeadZone) {
+            const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+            const FVector Dir = Vel.GetSafeNormal2D();
+            float Angle = FMath::RadiansToDegrees(
+                FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
+            if (FVector::DotProduct(GetActorRightVector(), Dir) < 0.f) Angle = -Angle;
+            AnimInputs.DirectionAngle = Angle;   // 0=前 负=左 正=右 —— 符号约定由自建 BS_Unarmed_Move 的 Direction 轴定义（-90 左/+90 右），已与 C++ 对表
+        } else {
+            AnimInputs.DirectionAngle = 0.f;
+        }
+        AnimInputs.Pitch = GetBaseAimRotation().Pitch;
+        AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
     }
-    AnimInputs.Pitch = GetBaseAimRotation().Pitch;
-    AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
-    // 远端平滑（D4-07 amend）：快照已入样本环，这里每帧取插值位摆变换——本地自机缓冲恒空天然跳过
+    // 远端平滑（D4-07 amend）：快照已入样本环，这里每帧取插值位摆变换 + 用插值帧速度喂动画——
+    // 本地自机缓冲恒空天然跳过
     TickRemoteInterpolation();
     // WeaponType 恒 0（徒手）；30Hz 上报由 ReportTimer → SampleLocalState 承担（D3-17 已接线）
 }
@@ -177,28 +186,11 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
 }
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
-    // 远端路径（D4-07 amend · 2026-10-20）：快照只入样本环，变换由 TickRemoteInterpolation 每帧
-    // 在 (now-150ms) 处插值——10Hz 直设台阶 → 60fps 平滑滑动；首样直摆（进场即到位）。
+    // 远端路径（D4-07 amend · 2026-10-20）：快照只入样本环，变换与动画输入均由
+    // TickRemoteInterpolation 每帧以插值帧速度驱动——60fps 平滑滑动且脚跟着地跑。
     const double Now = FPlatformTime::Seconds();
-    const float Dt = (LastRemoteTime > 0.0) ? static_cast<float>(Now - LastRemoteTime) : 0.f;
-    const FVector Prev = InterpBuffer.Num() > 0 ? InterpBuffer.Last().Pos : Pos;   // 差分基=上一样本（非插值渲染位）
-
-    // 速度/方向 = 样本差分（EMA 低通——D3-02，语义不变），朝向参照用本样本 Yaw（样本空间自洽）
-    const FVector Vel = (Dt > 0.001f) ? (Pos - Prev) / Dt : FVector::ZeroVector;
-    const float Inst = Vel.Size2D();
-    AnimInputs.Speed = FMath::Lerp(AnimInputs.Speed, Inst, 0.5f);
-    if (AnimInputs.Speed > kSpeedDeadZone) {
-        const FVector Dir = Vel.GetSafeNormal2D();
-        const FRotator SampleRot(0.f, Yaw, 0.f);
-        const FVector Fwd = FRotationMatrix(SampleRot).GetUnitAxis(EAxis::X);
-        float Angle = FMath::RadiansToDegrees(
-            FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
-        if (FVector::DotProduct(FRotationMatrix(SampleRot).GetUnitAxis(EAxis::Y), Dir) < 0.f) Angle = -Angle;
-        AnimInputs.DirectionAngle = Angle;
-    }
-    AnimInputs.Pitch = PitchDeg;
+    AnimInputs.Pitch = PitchDeg;                           // 朝向类输入仍 10Hz（ABP 内部平滑）
     AnimInputs.bFalling = bFalling;
-    LastRemoteTime = Now;
 
     const bool bFirst = InterpBuffer.Num() == 0;
     InterpBuffer.Add({Now, Pos, Yaw});
@@ -206,6 +198,8 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     if (bFirst) {                                          // 首样：无历史可插，直摆到位
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
+        LastInterpPos = Pos;
+        LastInterpTime = Now;
     }
 }
 
@@ -229,7 +223,29 @@ void ASightlineCharacter::TickRemoteInterpolation() {
     }
     const double Span = B->TimeSec - A->TimeSec;
     const float Alpha = (Span > 1e-6) ? static_cast<float>((Target - A->TimeSec) / Span) : 1.f;
-    SetActorLocation(FMath::Lerp(A->Pos, B->Pos, Alpha));
+    const FVector NewPos = FMath::Lerp(A->Pos, B->Pos, Alpha);
+    SetActorLocation(NewPos);
     const float Yaw = A->Yaw + FMath::FindDeltaAngleDegrees(A->Yaw, B->Yaw) * Alpha;   // 最短弧
     SetActorRotation(FRotator(0.f, Yaw, 0.f));
+
+    // 动画输入=插值帧速度（60fps 口径）——远端引擎速度恒 0，插值位移差分是唯一真相（§2.4 同款纪律）
+    const double Now = FPlatformTime::Seconds();
+    if (LastInterpTime > 0.0) {
+        const float FrameDt = static_cast<float>(Now - LastInterpTime);
+        const FVector FrameVel = (FrameDt > 0.0005f) ? (NewPos - LastInterpPos) / FrameDt : FVector::ZeroVector;
+        AnimInputs.Speed = FrameVel.Size2D();
+        if (AnimInputs.Speed > kSpeedDeadZone) {
+            const FVector Dir = FrameVel.GetSafeNormal2D();
+            const FRotator YawRot(0.f, Yaw, 0.f);
+            const FVector Fwd = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
+            float Angle = FMath::RadiansToDegrees(
+                FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
+            if (FVector::DotProduct(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Dir) < 0.f) Angle = -Angle;
+            AnimInputs.DirectionAngle = Angle;             // 与本地 Tick 同一符号约定
+        } else {
+            AnimInputs.DirectionAngle = 0.f;
+        }
+    }
+    LastInterpPos = NewPos;
+    LastInterpTime = Now;
 }

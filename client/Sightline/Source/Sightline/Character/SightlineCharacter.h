@@ -103,6 +103,7 @@ private:
 
     TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
     FTimerHandle ReportTimer;
-    double LastRemoteTime = 0.0;                 // 远端差分速度的上一拍时刻（ApplyState 专用）
     TArray<FRemoteSample> InterpBuffer;          // 远端样本环（快照入缓冲，Tick 插值取样）
+    FVector LastInterpPos = FVector::ZeroVector; // 上一帧插值位（动画输入=插值帧速度的差分基）
+    double LastInterpTime = 0.0;                 // 上一帧插值时刻
 };
