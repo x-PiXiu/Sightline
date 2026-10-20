@@ -531,7 +531,6 @@ static constexpr int kEpollTimeoutMs = 100;  // 毕设默认值；timerfd 精准
             }
 
             int nextExpireMs = timing_wheel_->getNextExpiration(kEpollTimeoutMs);
-            // LOG_DEBUG("[TIMER_FD] 下次超时: " + std::to_string(nextExpireMs) + "ms");
 
             // 边界检查：确保延迟时间合理
             if (nextExpireMs <= 0) {
