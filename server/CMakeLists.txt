@@ -18,7 +18,7 @@ add_library(sightline_core STATIC
     src/net/channel.cpp
     src/net/epoll.cpp
     src/net/event_loop.cpp
-    src/net/HierarchicalTimingWheel.cpp
+    src/net/heap_scheduler.cpp
     src/net/inet_address.cpp
     src/net/socket.cpp
     src/logger/logger.cpp
