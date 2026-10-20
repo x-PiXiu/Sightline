@@ -51,10 +51,10 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
     FAnimInputs AnimInputs;
 
-    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：只存目标位姿，插值在 Tick 里做 */
+    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：快照入缓冲，插值在 Tick 里做 */
     void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling);
 
-    /** 覆写引擎速度：远端角色返回插值帧差分速度（驱动 ABP 标准 GetVelocity 节点）；本地角色走 CMC 真速度 */
+    /** 覆写引擎速度：远端角色返回插值速度（驱动 ABP 标准 GetVelocity 节点）；本地角色走 CMC 真速度 */
     virtual FVector GetVelocity() const override {
         return bRemoteActive ? RemoteVelocity : Super::GetVelocity();
     }
@@ -64,15 +64,12 @@ protected:
     virtual void Tick(float DeltaSeconds) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-    /** 第一人称相机：挂头部、跟随控制旋转（无 SpringArm——那是第三人称做法） */
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<UCameraComponent> Camera;
 
-    /** 影子专用网格（M6 补丁）：备用——恢复 OwnerNoSee 隐藏方案时启用 */
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<USkeletalMeshComponent> ShadowMesh;
 
-    /** 输入资产：构造函数按固定路径加载（/Game/Code/Input/...，蓝图工单③创建）；皮肤类槽留蓝图层 */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
     TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
@@ -86,26 +83,28 @@ protected:
     TObjectPtr<UInputAction> JumpAction;
 
 private:
-    void Move(const FInputActionValue& Value);   // WASD 相对视角方向（strafe 战位：角色恒朝视角）
-    void Look(const FInputActionValue& Value);   // 鼠标 → Yaw/Pitch 控制旋转
-    void SampleLocalState();                     // 30Hz：聚合 → 纯结构 → 会话（D3-17，M4）
-    /** M3b 和解落地（订阅会话 OnSelfCorrected）：bFullSnap=true 时 Error 即绝对权威位（断档全量回滚）；
-     *  否则 Error=对账误差向量，渲染位平移——本地预测的后续位移原样保留（位移空间重放） */
+    void Move(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);
+    void SampleLocalState();
     UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
 
-    // —— 远端插值（VInterpTo + 帧差分速度，FPS_Game 已验证方案）——
-    // 快照只存目标位姿；Tick 每帧 VInterpTo 向目标靠拢，速度 = 插值后帧位移 / 帧时间。
-    // 速度天然等于动画系统"看到"的移动速度——同一插值轨迹上的导数，零失配。
+    // —— 远端插值：快照缓冲 + 恒速线性插值 ——
+    // 两个带时间戳的快照，在 (Now - 延迟) 处线性插值。速度 = 位移/时距 = 恒速。
+    // VInterpTo 是指数衰减（先快后慢），恒速运动被映射成锯齿——这是卡顿的根因。
+    struct FSnapshot {
+        double TimeSec = 0.0;
+        FVector Pos = FVector::ZeroVector;
+        float Yaw = 0.f;
+    };
     void TickRemoteInterpolation(float DeltaTime);
 
-    TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
+    TWeakObjectPtr<USightlineMatchSession> MatchSession;
     FTimerHandle ReportTimer;
 
-    // —— 远端插值状态（ApplyState 存目标，Tick 插值 + 算速度）——
-    FVector RemoteTargetPos = FVector::ZeroVector;   // 最新快照位置（插值目标）
-    float   RemoteTargetYaw = 0.f;                   // 最新快照朝向（插值目标）
-    float   RemotePitchTarget = 0.f;                 // 最新快照俯仰（插值目标）
-    bool    bRemoteActive = false;                    // 已收到首个快照（首帧直摆后开始插值）
-    FVector RemoteVelocity = FVector::ZeroVector;    // 插值帧差分速度（GetVelocity 覆写返回此值）
-    FVector SmoothedAnimVel = FVector::ZeroVector;   // 动画输入速度（EMA 平滑——滤 VInterpTo 锯齿波）
+    // —— 远端插值状态 ——
+    FSnapshot SnapA, SnapB;                       // 两点快照（A=旧，B=新）
+    int32 SnapCount = 0;                          // 已收快照数（0/1/2+）
+    float RemotePitchTarget = 0.f;
+    bool  bRemoteActive = false;
+    FVector RemoteVelocity = FVector::ZeroVector; // 恒速插值速度（GetVelocity 覆写返回此值）
 };

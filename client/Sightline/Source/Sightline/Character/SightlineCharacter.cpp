@@ -13,53 +13,46 @@
 #include "UObject/ConstructorHelpers.h"
 
 namespace {
-    // 输入资产固定路径（蓝图工单③创建；路径即契约，改资产位置必须同步这里）
     constexpr const TCHAR* kMappingContextPath = TEXT("/Game/Code/Input/IMC_Default.IMC_Default");
     constexpr const TCHAR* kMoveActionPath     = TEXT("/Game/Code/Input/IA_Move.IA_Move");
     constexpr const TCHAR* kLookActionPath     = TEXT("/Game/Code/Input/IA_Look.IA_Look");
     constexpr const TCHAR* kJumpActionPath     = TEXT("/Game/Code/Input/IA_Jump.IA_Jump");
 
-    // 名册动作判定阈值（°/cm 级）：低于此速度归 Idle；方向角只在此之上计算
     constexpr float kSpeedDeadZone = 5.f;
 
-    // —— 远端插值参数（VInterpTo + 帧差分速度）——
-    constexpr float kRemoteInterpSpeed = 10.f;     // VInterpTo 指数插值速度（时间常数≈100ms，够吸收 10Hz 网络抖动）
-    constexpr float kRemoteRotSpeed   = 10.f;      // 朝向/俯仰插值速度
+    // —— 恒速插值参数 ——
+    constexpr float kInterpDelaySec = 0.1f;    // 渲染延迟 100ms ≈ 1 个快照间隔（吸收网络抖动）
+    constexpr float kRotInterpSpeed = 10.f;    // 朝向/俯仰平滑速度
 }
 
 ASightlineCharacter::ASightlineCharacter() {
-    // strafe 战位：角色朝向 = 控制旋转（FPS 标准），移动不改变朝向（朝向由视角决定）
     bUseControllerRotationYaw = true;
     bUseControllerRotationPitch = false;
     bUseControllerRotationRoll = false;
     GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->MaxWalkSpeed = 400.f;
 
-    // 第一人称相机：头部高度，跟随控制旋转
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(GetCapsuleComponent());
     Camera->SetRelativeLocation(FVector(18.f, 0.f, 82.f));
     Camera->bUsePawnControlRotation = true;
 
-    // 模型朝向对齐：SKM_Manny/Quinn 原生面朝 +Y，胶囊逻辑前向是 +X
     GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 
-    // 输入资产按固定路径加载（缺失仅报日志不崩溃）
     if (GetWorld() && !IsRunningDedicatedServer()) {
         ConstructorHelpers::FObjectFinder<UInputMappingContext> Mctx(kMappingContextPath);
-        if (Mctx.Succeeded()) DefaultMappingContext = Mctx.Object; else UE_LOG(LogTemp, Error, TEXT("[Sightline] 缺 %s"), kMappingContextPath);
+        if (Mctx.Succeeded()) DefaultMappingContext = Mctx.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> Mact(kMoveActionPath);
-        if (Mact.Succeeded()) MoveAction = Mact.Object; else UE_LOG(LogTemp, Error, TEXT("[Sightline] 缺 %s"), kMoveActionPath);
+        if (Mact.Succeeded()) MoveAction = Mact.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> Lact(kLookActionPath);
-        if (Lact.Succeeded()) LookAction = Lact.Object; else UE_LOG(LogTemp, Error, TEXT("[Sightline] 缺 %s"), kLookActionPath);
+        if (Lact.Succeeded()) LookAction = Lact.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> Jact(kJumpActionPath);
-        if (Jact.Succeeded()) JumpAction = Jact.Object; else UE_LOG(LogTemp, Error, TEXT("[Sightline] 缺 %s"), kJumpActionPath);
+        if (Jact.Succeeded()) JumpAction = Jact.Object;
     }
 }
 
 void ASightlineCharacter::BeginPlay() {
     Super::BeginPlay();
-    // 输入映射只挂在被本地玩家操纵的角色上（远端 Pawn 无 Controller，天然跳过）
     const APlayerController* PC = Cast<APlayerController>(Controller);
     if (PC && DefaultMappingContext) {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -67,7 +60,6 @@ void ASightlineCharacter::BeginPlay() {
             Subsystem->AddMappingContext(DefaultMappingContext, 0);
         }
     }
-    // 本地玩家 30Hz 采样上报——远端 Pawn 无 Controller 天然不采样
     if (IsPlayerControlled()) {
         if (USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance()))
             MatchSession = GI->GetMatchSession();
@@ -77,7 +69,6 @@ void ASightlineCharacter::BeginPlay() {
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
     } else {
-        // 远端=纯运动学木偶：关 CMC 物理，避免重力/摩擦与插值摆位打架
         GetCharacterMovement()->DisableMovement();
         GetCharacterMovement()->GravityScale = 0.f;
     }
@@ -117,7 +108,6 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
-    // 本地角色：引擎速度直采（ABP 禁止自己读引擎，§2.4）
     if (IsPlayerControlled()) {
         const FVector Vel = GetVelocity();
         const float Speed = Vel.Size2D();
@@ -134,15 +124,12 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         }
         AnimInputs.Pitch = GetBaseAimRotation().Pitch;
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
-        // 本地对照日志（s.Sightline.StatLog 1 开启）——与 [ANIM] REMOTE 同格式，对比速度/方向角是否一致
-        // 10Hz 节流（%6）：每帧记=每秒数百行压垮 GameThread → 双 PIE 误报 LAG（M6 级联复发实锤）
         if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
             UE_LOG(LogTemp, Log, TEXT("[ANIM] LOCAL  t=%.3f vel=%.1f spd=%.1f dir=%.1f pitch=%.1f"),
                    FPlatformTime::Seconds(), Vel.Size2D(),
                    AnimInputs.Speed, AnimInputs.DirectionAngle, AnimInputs.Pitch);
         }
     }
-    // 远端角色：VInterpTo 插值 + 帧差分速度喂动画
     TickRemoteInterpolation(DeltaSeconds);
 }
 
@@ -162,58 +149,68 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
 }
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
-    // 远端路径：快照只存目标位姿，插值与动画在 TickRemoteInterpolation 里做
-    // 诊断：快照到达间隔与目标跳跃幅度（s.Sightline.AnimDebug 1 开启）
-    if (CSightlineStatLog.GetValueOnGameThread() != 0 && bRemoteActive) {
-        const float Jump = FVector::Dist(Pos, RemoteTargetPos);
-        UE_LOG(LogTemp, Log, TEXT("[ANIM] SNAP   t=%.3f jump=%.1f yaw=%.1f"),
-               FPlatformTime::Seconds(), Jump, Yaw);
-    }
-    RemoteTargetPos = Pos;
-    RemoteTargetYaw = Yaw;
+    const double Now = FPlatformTime::Seconds();
     RemotePitchTarget = PitchDeg;
     AnimInputs.bFalling = bFalling;
 
-    if (!bRemoteActive) {
-        // 首个快照：直摆到位（此时无历史可插，直接吸附避免从出生点"走"过来）
+    if (SnapCount == 0) {
+        // 首个快照：直摆到位 + 作为 SnapA
+        SnapA = {Now, Pos, Yaw};
+        SnapCount = 1;
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
         RemoteVelocity = FVector::ZeroVector;
-        SmoothedAnimVel = FVector::ZeroVector;
         bRemoteActive = true;
+    } else if (SnapCount == 1) {
+        // 第二个快照：入 SnapB，开始插值
+        SnapB = {Now, Pos, Yaw};
+        SnapCount = 2;
+    } else {
+        // 后续快照：A←B，B←新（滑动窗口）
+        SnapA = SnapB;
+        SnapB = {Now, Pos, Yaw};
+    }
+
+    if (CSightlineStatLog.GetValueOnGameThread() != 0) {
+        UE_LOG(LogTemp, Log, TEXT("[ANIM] SNAP   t=%.3f yaw=%.1f"), Now, Yaw);
     }
 }
 
 void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
-    if (!bRemoteActive) return;
+    if (SnapCount < 2) return;
 
-    // —— 位置插值：VInterpTo 指数衰减向目标靠拢（FPS_Game 已验证方案）——
-    // 速度 = 插值后的真实帧位移 / 帧时间——动画播什么速度、角色移多快，是同一组数字，零失配。
+    const double Now = FPlatformTime::Seconds();
+    const double RenderTime = Now - kInterpDelaySec;
+
+    // 恒速线性插值 + 超出区间时外推（防冻结跳变）
+    // 问题：快照间隔 ~500ms >> 渲染延迟 100ms → RenderTime 超出 SnapB.Time → Alpha 饱和到 1.0 → 冻结
+    // 解法：Alpha 允许 > 1（线性外推），但用速度×最大外推时间限幅防过冲
+    const double Span = FMath::Max(1e-6, SnapB.TimeSec - SnapA.TimeSec);
+    const double RawAlpha = (RenderTime - SnapA.TimeSec) / Span;
+    // 外推限幅：最多按当前速度再走 200ms（防急停时过冲穿墙）
+    const float MaxExtrapolation = 0.2f;   // 200ms
+    const float MaxAlpha = 1.0f + static_cast<float>(MaxExtrapolation / Span);
+    const float Alpha = static_cast<float>(FMath::Clamp(RawAlpha, 0.0, MaxAlpha));
+
     const FVector OldLoc = GetActorLocation();
-    const FVector NewLoc = FMath::VInterpTo(OldLoc, RemoteTargetPos, DeltaTime, kRemoteInterpSpeed);
+    const FVector NewLoc = FMath::Lerp(SnapA.Pos, SnapB.Pos, Alpha);
     SetActorLocation(NewLoc);
 
-    // ★ 帧差分速度：驱动动画的核心（覆写 GetVelocity 也返回此值）
-    RemoteVelocity = (DeltaTime > KINDA_SMALL_NUMBER)
-        ? (NewLoc - OldLoc) / DeltaTime
-        : FVector::ZeroVector;
+    // 恒速插值速度 = 位移/时距（与动画天然同步）
+    const FVector NewVel = (SnapB.Pos - SnapA.Pos) / static_cast<float>(Span);
+    RemoteVelocity = NewVel;
 
-    // ★ 动画速度 EMA 平滑：滤 VInterpTo 锯齿波（快照到达→尖峰→衰减→尖峰→…）
-    //   直接喂原始帧差分会让 BS 的 Speed 轴 400→150→400 循环 = 反复触发 Start/Lunge 动画。
-    //   α=0.35（≈2 帧时间常数）：够滤锯齿，Phase lag <2 帧不影响操作感。
-    SmoothedAnimVel = FMath::Lerp(SmoothedAnimVel, RemoteVelocity, 0.35f);
-
-    // —— 朝向插值（最短弧）——
+    // 朝向插值（最短弧）
     const FRotator CurRot = GetActorRotation();
-    const FRotator NewRot = FMath::RInterpTo(CurRot, FRotator(0.f, RemoteTargetYaw, 0.f),
-                                             DeltaTime, kRemoteRotSpeed);
+    const float TargetYaw = SnapA.Yaw + FMath::FindDeltaAngleDegrees(SnapA.Yaw, SnapB.Yaw) * Alpha;
+    const FRotator NewRot = FMath::RInterpTo(CurRot, FRotator(0.f, TargetYaw, 0.f),
+                                             DeltaTime, kRotInterpSpeed);
     SetActorRotation(FRotator(0.f, NewRot.Yaw, 0.f));
 
-    // —— 写入 FAnimInputs（ABP 读这个聚合体）——
-    //   用 SmoothedAnimVel 而非 RawVel：动画输入要平滑，GetVelocity() 才是原始帧差分
-    AnimInputs.Speed = SmoothedAnimVel.Size2D();
+    // 写入 FAnimInputs
+    AnimInputs.Speed = RemoteVelocity.Size2D();
     if (AnimInputs.Speed > kSpeedDeadZone) {
-        const FVector Dir = SmoothedAnimVel.GetSafeNormal2D();
+        const FVector Dir = RemoteVelocity.GetSafeNormal2D();
         const FRotator YawRot(0.f, NewRot.Yaw, 0.f);
         const FVector Fwd = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
         float Angle = FMath::RadiansToDegrees(
@@ -224,19 +221,13 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
         AnimInputs.DirectionAngle = 0.f;
     }
 
-    // 俯仰平滑跟进（10Hz 快照值 → 连续无台阶）
     AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget,
-                                        DeltaTime, kRemoteRotSpeed);
+                                        DeltaTime, kRotInterpSpeed);
 
-    // —— 诊断日志（s.Sightline.StatLog 1 开启；10Hz 节流 %6——每帧记压垮 GameThread 误报 LAG）——
-    // 判读方法：
-    //   rawVel 锯齿 / spd 平滑 → EMA 正常工作
-    //   rawVel 与 spd 都锯齿 → EMA 系数太小
-    //   dir 跳变 ±180 → DirectionAngle 翻转（BS 轴突变）
-    //   dist 不收敛（>10cm） → VInterpTo 追不上目标
+    // 诊断日志
     if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
-        const float Dist = FVector::Dist2D(NewLoc, RemoteTargetPos);
-        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f raw=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
+        const float Dist = FVector::Dist2D(NewLoc, SnapB.Pos);
+        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f vel=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
                FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
                AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
     }
