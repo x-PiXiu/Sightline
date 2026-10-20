@@ -117,13 +117,22 @@ int main() {
         std::deque<QueuedEvent> local;                   // swap 出来再处理（锁内零业务）
         { std::lock_guard<std::mutex> lk(gqMx); local.swap(gq); }
         for (QueuedEvent& ev : local) {
+            // 陈旧事件防护（档二 UAF 根因）：fd 号会被内核复用——事件在队列里排队期间，同号新连接
+            // 可能已接管（业务账在 accept 回调里结清）。指针对不上=属于已死的旧连接：帧丢弃、
+            // 报丧跳过——现主人的连接表/计数/业务状态一根手指都不许碰。
+            const int fd = ev.conn->fd();
+            auto itc = connections.find(fd);
+            if (itc == connections.end() || itc->second != ev.conn) {
+                if (ev.type == QType::Closed)
+                    LOG_INFO("陈旧报丧已丢弃: " + ev.conn->peerAddr().toIpPort());
+                continue;
+            }
             switch (ev.type) {
             case QType::Frame:
-                dispatcher.dispatch(ev.conn->fd(), ev.msgid, ev.payload);
+                dispatcher.dispatch(fd, ev.msgid, ev.payload);
                 break;
             case QType::Closed: {                        // 业务清理只在 main（worker 只报丧，不动业务）
-                const int fd = ev.conn->fd();
-                connections.erase(fd);
+                connections.erase(itc);
                 if (auto it = fdWorker.find(fd); it != fdWorker.end()) {
                     workers[it->second]->connCount--;
                     fdWorker.erase(it);
@@ -151,6 +160,19 @@ int main() {
     //    对象 main 构造（连接表/发送视角），Channel 注册投归属线程 Start()（epoll 操作永不跨线程）
     net::Acceptor acceptor(&loop, common::network::InetAddress(kListenPort));
     acceptor.setNewConnectionCallback([&](int connfd, const common::network::InetAddress& peer) {
+        // fd 复用旧账结清（档二 UAF 根因的前半）：同号旧连接的收尾已在归属线程完成（fd 已关才会
+        // 被内核复用），但它的 Closed 报丧可能还在队列里——先在此结清它的业务账，防止残留会话
+        // 被宽限超时误踢新主人；队列里那条报丧随后会被身份校验判为陈旧丢弃。
+        if (connections.count(connfd)) {
+            matchWiring.HandleDisconnect(connfd);
+            writer.deliver(lobby.Disconnect(connfd));
+            if (auto it = fdWorker.find(connfd); it != fdWorker.end()) {
+                workers[it->second]->connCount--;
+                fdWorker.erase(it);
+            }
+            connections.erase(connfd);
+            LOG_INFO("fd=" + std::to_string(connfd) + " 被新连接复用，旧连接业务账已结清（报丧在途）");
+        }
         int wIdx = -1;
         if (!workers.empty()) {                           // 主从拓扑：argmin 选归属
             int best = 0;

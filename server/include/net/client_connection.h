@@ -54,6 +54,9 @@ using common::network::Channel;
 
         // 任意线程可调（业务 main 发帧；内部保证 epoll 操作只发生在归属线程）
         void send(uint16_t msgid, const std::string& payload) {
+            // bClosed_ 在收尾排队时即置位、::close 在其后的收尾任务里——此刻 fd 尚未关也即将关，
+            // 对端已死，写只是给日志刷 EBADF 洪峰（档二压测实测 6204 行）——直接丢弃
+            if (bClosed_.load(std::memory_order_relaxed)) return;
             std::string out;
             adapters::FrameCodec::encode(msgid, payload, out);
             std::lock_guard<std::mutex> lk(outMutex_);

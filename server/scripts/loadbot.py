@@ -4,6 +4,7 @@
 # 语义: N 个并发连接 → 逐个 LOGIN（唯一名）→ 读 LOGIN_RESULT → 保持 hold 秒（收帧不断）→ 关闭
 # 指标: 成功登录数/失败数/总耗时/登录吞吐；退出码=失败数>0 则 1
 import asyncio, sys, time
+from collections import Counter
 
 HOST, PORT = "127.0.0.1", 18888
 
@@ -58,8 +59,9 @@ async def main():
     dt = time.monotonic() - t0
     print(f"loadbot: N={n} ramp={ramp}s hold={hold}s")
     print(f"  成功={len(ok)} 失败={len(bad)} 总耗时={dt:.1f}s 建连吞吐={len(ok)/max(dt,1e-9):.0f}/s")
-    for e in bad[:5]:
-        print("  ERR", e)
+    for reason, cnt in Counter(bad).most_common():
+        sample = next(e for e in bad if e == reason)
+        print(f"  ERR x{cnt}  {sample[:120]}")
     sys.exit(1 if bad else 0)
 
 asyncio.run(main())
