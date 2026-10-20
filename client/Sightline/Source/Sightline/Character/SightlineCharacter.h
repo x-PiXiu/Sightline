@@ -104,8 +104,7 @@ private:
     TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
     FTimerHandle ReportTimer;
     TArray<FRemoteSample> InterpBuffer;          // 远端样本环（快照入缓冲，Tick 插值取样）
-    FVector LastInterpPos = FVector::ZeroVector; // 上一帧插值位（动画输入=插值帧速度的差分基）
-    double LastInterpTime = 0.0;                 // 上一帧插值时刻
-    FVector SmoothedFrameVel = FVector::ZeroVector; // 插值帧速度单极低通（段界拐点/采样间隔毛刺过滤）
+    double LastInterpTime = 0.0;                 // 上一帧插值时刻（俯仰平滑的 dt 基准）
+    FVector SmoothedFrameVel = FVector::ZeroVector; // 路径解析速度的单极低通（到达抖动残差过滤）
     float RemotePitchTarget = 0.f;               // 远端俯仰目标（10Hz 快照值，Tick 内平滑跟进防台阶）
 };

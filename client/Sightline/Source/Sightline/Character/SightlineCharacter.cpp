@@ -200,7 +200,6 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     if (bFirst) {                                          // 首样：无历史可插，直摆到位
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
-        LastInterpPos = Pos;
         LastInterpTime = Now;
         SmoothedFrameVel = FVector::ZeroVector;
     }
@@ -212,9 +211,9 @@ void ASightlineCharacter::TickRemoteInterpolation() {
     const double Target = Now - kInterpDelaySec;
     const int32 Last = InterpBuffer.Num() - 1;
     FVector NewPos;
+    FVector AnalyticVel = FVector::ZeroVector;              // 路径解析速度（免帧栅拍频）
     float Yaw;
-    if (Target <= InterpBuffer[0].TimeSec) {               // 追不上：贴最老样本
-        // ⚠ 首版 bug：此分支曾拿最老/最新做插值——target≤最老时 alpha≤0 = 沿弦反向外插（进场滑退）
+    if (Target <= InterpBuffer[0].TimeSec) {               // 追不上：贴最老样本（速度归零→EMA 缓落 Idle）
         NewPos = InterpBuffer[0].Pos;
         Yaw = InterpBuffer[0].Yaw;
     } else if (Target >= InterpBuffer[Last].TimeSec) {     // 断流：贴最新样本（渲染延迟只伸不跳）
@@ -225,41 +224,51 @@ void ASightlineCharacter::TickRemoteInterpolation() {
         for (; i >= 0; --i) if (Target >= InterpBuffer[i].TimeSec) break;   // i=左邻样本
         const FRemoteSample& S1 = InterpBuffer[i];
         const FRemoteSample& S2 = InterpBuffer[i + 1];
-        const float T = static_cast<float>((Target - S1.TimeSec) /
-                                           FMath::Max(1e-6, S2.TimeSec - S1.TimeSec));
-        // Catmull-Rom（C1 连续）：折线段界的速度突变=动画跳变的数学根源——样条过点且一阶连续，
-        // 段界速度平滑过渡；端点用邻接样本退化（曲率略降但连续性不破）
-        const FVector& S0 = InterpBuffer[FMath::Max(0, i - 1)].Pos;
-        const FVector& S3 = InterpBuffer[FMath::Min(Last, i + 2)].Pos;
-        const float T2 = T * T, T3 = T2 * T;
-        NewPos = 0.5f * (2.f * S1.Pos + (-S0 + S2.Pos) * T
-                       + (2.f * S0 - 5.f * S1.Pos + 4.f * S2.Pos - S3) * T2
-                       + (-S0 + 3.f * S1.Pos - 3.f * S2.Pos + S3) * T3);
-        Yaw = S1.Yaw + FMath::FindDeltaAngleDegrees(S1.Yaw, S2.Yaw) * T;    // 朝向仍最短弧（strafe 混合吸收）
+        const double SpanD = FMath::Max(1e-6, S2.TimeSec - S1.TimeSec);
+        const float Span = static_cast<float>(SpanD);
+        const float S = static_cast<float>((Target - S1.TimeSec) / SpanD);
+        // 时间参数化三次 Hermite。⚠ Catmull-Rom 的切线假定等距采样——服务器拍频实测 103~117ms 抖动
+        // 下切线失真，速度绕真值振荡（匀减速出现 10 9 8 7 9 8 7 非单调，用户实测症状的数学根源）。
+        // Hermite 切线用真实时距的中心差分：非等距下速度单调正确。
+        const FRemoteSample& S0 = InterpBuffer[FMath::Max(0, i - 1)];
+        const FRemoteSample& S3 = InterpBuffer[FMath::Min(Last, i + 2)];
+        const FVector OneSided = (S2.Pos - S1.Pos) / Span; // 端点退化用单侧差分
+        const FVector M1 = (i > 0)
+            ? (S2.Pos - S0.Pos) / static_cast<float>(FMath::Max(1e-6, S2.TimeSec - S0.TimeSec))
+            : OneSided;
+        const FVector M2 = (i + 2 <= Last)
+            ? (S3.Pos - S1.Pos) / static_cast<float>(FMath::Max(1e-6, S3.TimeSec - S1.TimeSec))
+            : OneSided;
+        const FVector D1 = M1 * Span;                      // 速度×时距=位移域切线
+        const FVector D2 = M2 * Span;
+        const float S2q = S * S, S3q = S2q * S;
+        NewPos = (2.f * S3q - 3.f * S2q + 1.f) * S1.Pos + (S3q - 2.f * S2q + S) * D1
+               + (-2.f * S3q + 3.f * S2q) * S2.Pos + (S3q - S2q) * D2;
+        // 动画速度=曲线解析导数（对时间）——帧差分≈导数但带帧栅拍频；解析式在段界 C1 连续，
+        // 速度从根源上连续，匀减速即单调 10→9→8→…→0
+        AnalyticVel = ((6.f * S2q - 6.f * S) * S1.Pos + (3.f * S2q - 4.f * S + 1.f) * D1
+                     + (-6.f * S2q + 6.f) * S2.Pos + (3.f * S2q - 2.f * S) * D2) / Span;
+        Yaw = S1.Yaw + FMath::FindDeltaAngleDegrees(S1.Yaw, S2.Yaw) * S;    // 朝向仍最短弧（strafe 吸收）
     }
     SetActorLocation(NewPos);
     SetActorRotation(FRotator(0.f, Yaw, 0.f));
 
-    // 动画输入=插值帧速度经单极低通（向量过滤，无角度绕环问题）——样条残余曲率突变/采样间隔
-    // 不均的毛刺全部抹平；远端引擎速度恒 0，位移差分是唯一真相（§2.4 同款纪律）
-    if (LastInterpTime > 0.0) {
-        const float FrameDt = static_cast<float>(Now - LastInterpTime);
-        const FVector FrameVel = (FrameDt > 0.0005f) ? (NewPos - LastInterpPos) / FrameDt : FVector::ZeroVector;
-        SmoothedFrameVel = FMath::Lerp(SmoothedFrameVel, FrameVel, kVelSmoothAlpha);
-        AnimInputs.Speed = SmoothedFrameVel.Size2D();
-        if (AnimInputs.Speed > kSpeedDeadZone) {
-            const FVector Dir = SmoothedFrameVel.GetSafeNormal2D();
-            const FRotator YawRot(0.f, Yaw, 0.f);
-            const FVector Fwd = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
-            float Angle = FMath::RadiansToDegrees(
-                FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
-            if (FVector::DotProduct(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Dir) < 0.f) Angle = -Angle;
-            AnimInputs.DirectionAngle = Angle;             // 与本地 Tick 同一符号约定
-        } else {
-            AnimInputs.DirectionAngle = 0.f;
-        }
-        AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget, FrameDt, kPitchInterpSpeed);
+    // 动画输入：解析速度经单极低通（吸收到达抖动残差；向量过滤无角度绕环问题）
+    SmoothedFrameVel = FMath::Lerp(SmoothedFrameVel, AnalyticVel, kVelSmoothAlpha);
+    AnimInputs.Speed = SmoothedFrameVel.Size2D();
+    if (AnimInputs.Speed > kSpeedDeadZone) {
+        const FVector Dir = SmoothedFrameVel.GetSafeNormal2D();
+        const FRotator YawRot(0.f, Yaw, 0.f);
+        const FVector Fwd = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
+        float Angle = FMath::RadiansToDegrees(
+            FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
+        if (FVector::DotProduct(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Dir) < 0.f) Angle = -Angle;
+        AnimInputs.DirectionAngle = Angle;                 // 与本地 Tick 同一符号约定
+    } else {
+        AnimInputs.DirectionAngle = 0.f;
     }
-    LastInterpPos = NewPos;
+    AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget,
+                                        static_cast<float>(Now - LastInterpTime > 0.0 ? Now - LastInterpTime : 0.016),
+                                        kPitchInterpSpeed);
     LastInterpTime = Now;
 }
