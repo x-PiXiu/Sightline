@@ -111,4 +111,5 @@ private:
     float RemotePitchTarget = 0.f;
     bool  bRemoteActive = false;
     FVector RemoteVelocity = FVector::ZeroVector; // 恒速插值速度（GetVelocity 覆写返回此值）
+    FVector SmoothedRemoteVel = FVector::ZeroVector; // 段速度低通态（发端间隔抖动过滤，τ≈160ms）
 };

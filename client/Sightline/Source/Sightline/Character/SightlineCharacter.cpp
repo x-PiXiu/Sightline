@@ -161,6 +161,7 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
         RemoteVelocity = FVector::ZeroVector;
+        SmoothedRemoteVel = FVector::ZeroVector;
         bRemoteActive = true;
     } else if (SnapCount == 1) {
         // 第二个快照：入 SnapB，开始插值
@@ -204,7 +205,12 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     const int32 DAck = SnapB.Ack - SnapA.Ack;
     if (DAck > 0) {
         const FVector SegVel = (SnapB.Pos - SnapA.Pos) * (30.0f / static_cast<float>(DAck));
-        RemoteVelocity = SegVel.GetClampedToMaxSize(450.f);   // 行走上限 400 + 余量，残余毛刺兜底
+        // 发端上报间隔实测 20~46ms 抖（双 PIE 时间片量化 World 定时器）——单段估计误差比
+        // 33.3/间隔 ∈[0.6,1.4]，匀速跑也会出 450/279/67 乱序=BS 轴直立↔俯冲横跳的残余病根。
+        // 向量单极低通（τ≈160ms）抹平间隔抖动；钳到 MaxWalkSpeed 420——BS 顶格（冲刺姿态）
+        // 从此不被误触。
+        SmoothedRemoteVel = FMath::Lerp(SmoothedRemoteVel, SegVel, 0.1f);
+        RemoteVelocity = SmoothedRemoteVel.GetClampedToMaxSize(420.f);
     }
 
     // 朝向插值（最短弧）
