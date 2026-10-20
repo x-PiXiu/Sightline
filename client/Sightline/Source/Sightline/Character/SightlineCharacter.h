@@ -86,6 +86,9 @@ private:
     void Move(const FInputActionValue& Value);   // WASD 相对视角方向（strafe 战位：角色恒朝视角）
     void Look(const FInputActionValue& Value);   // 鼠标 → Yaw/Pitch 控制旋转
     void SampleLocalState();                     // 30Hz：聚合 → 纯结构 → 会话（D3-17，M4）
+    /** M3b 和解落地（订阅会话 OnSelfCorrected）：bFullSnap=true 时 Error 即绝对权威位（断档全量回滚）；
+     *  否则 Error=对账误差向量，渲染位平移——本地预测的后续位移原样保留（位移空间重放） */
+    UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
 
     TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
     FTimerHandle ReportTimer;

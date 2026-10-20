@@ -22,6 +22,7 @@ using namespace SightlineProtocol;
 namespace
 {
     constexpr int32  kHudMessageKey   = 1;        // 覆盖式刷新（同一 key）
+    constexpr int32  kReconcileHudKey = 2;        // M3c 和解 HUD（对局期第二行）
     constexpr float  kHeartbeatPeriod = 1.0f;     // 1s 一跳
     constexpr double kLagThresholdMs  = 3000.0;   // 3s 无 ACK = LAG
     constexpr double kReconnectAfterLagMs = 5000.0;  // LAG 持续 5s 不恢复 → 主动断线自动重连
@@ -95,6 +96,17 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         const FColor Color = bConnected ? (bLag ? FColor::Orange : FColor::Green) : FColor::Red;
         GEngine->AddOnScreenDebugMessage(kHudMessageKey, 0.f, Color,
             FString::Printf(TEXT("%s   ping=%ums   seq=%u"), *Status, LastPingMs, HeartbeatSeq));
+    }
+
+    // M3c 和解 HUD（演示基建第二件套 · D4-08）：对局激活才显示——
+    // 预测误差（当前/峰值）· 和解次数 · 重放帧数 · ack 差（管线深度）· 滑块值
+    if (GEngine && MatchSession && MatchSession->IsInMatch())
+    {
+        GEngine->AddOnScreenDebugMessage(kReconcileHudKey, 0.f, FColor::Cyan,
+            FString::Printf(TEXT("[和解] 误差 %.1fcm(峰 %.1f)   和解 %d 次   重放 %d 帧   ack差 %u   滑块 %dms"),
+                MatchSession->GetErrCurrent(), MatchSession->GetErrPeak(),
+                MatchSession->GetReconcileCount(), MatchSession->GetReplayFrames(),
+                MatchSession->GetAckGap(), LastInboundDelayMs));
     }
 
     // 第 3 期：切对局关卡后延迟批量生成远端角色（0.6s 守门 = 等 OpenLevel 加载落定，M3 简化；
@@ -269,6 +281,7 @@ void USightlineGameInstance::EnsureUIMouseCursor()
 void USightlineGameInstance::SetInboundDelayMs(int32 Ms)
 {
     if (Connection) Connection->SetInboundDelayMs(Ms);    // 延迟队列本体在连接适配器（D3-11）
+    LastInboundDelayMs = Ms;                              // M3c：和解 HUD 的滑块值显示源
     if (CSightlineStatLog.GetValueOnGameThread() != 0)
         UE_LOG(LogSightline, Log, TEXT("[STAT] DELAY t=%.3f ms=%d"), FPlatformTime::Seconds(), Ms);
 }

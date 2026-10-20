@@ -123,14 +123,14 @@ public:
                 break;
             }
             case MT::Snapshot: {
-                // 按接收者编码：滤掉自己的实体（v3 契约——17 不含接收者自己）
-                // ⚠ 计数必须 = 实际写入条数（先滤后数，再写头）——声明的 n 与实体不一致会导致客户端幻影解析
+                // 按接收者编码。v4.1（M3b 和解对账）：**含接收者自己**——自实体的权威位+ackedSeq
+                // 即客户端回滚/重放的对账基准（R12 权威收回后，自实体=老师批改后的标准答案）；
+                // v3 直发转发版的滤自己废止（契约 v4.1 登记；设计草案和解状态机的必要输入）
+                // ⚠ 计数必须 = 实际写入条数（数清再写头）——声明的 n 与实体不一致会导致客户端幻影解析
                 for (int fd : lobby_.RoomMemberFds(e.roomId)) {
-                    const int selfPid = lobby_.PlayerIdByFd(fd);
                     std::string body;
                     int n = 0;
                     for (const auto& S : e.entities) {
-                        if (static_cast<int>(S.playerId) == selfPid) continue;
                         ++n;
                         // v4：29B/实体（+4B ackedSeq）——Encode 同居 wire 头（契约破例 D4-01）
                         sightline::wire::EntityStateV2 ent{S.playerId, S.x, S.y, S.z,

@@ -71,6 +71,7 @@ private:
     bool bInArena = false;                    // 当前在对局关卡（离开房间 → 切回大厅世界）
     bool bPendingArenaSpawn = false;          // 切图后批量生成远端角色（0.6s 守门，M3 简化）
     double PendingArenaSpawnAt = 0.0;
+    int32 LastInboundDelayMs = 0;             // M3c：滑块值留底（和解 HUD 显示用；透传连接的同时自存一份）
 
 public:
     // —— 界面装配（混合模式：WBP 蓝图放皮，逻辑在 UI/SightlineUIWidgets）——

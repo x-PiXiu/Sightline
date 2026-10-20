@@ -84,9 +84,11 @@ void ASightlineCharacter::BeginPlay() {
     if (IsPlayerControlled()) {
         if (USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance()))
             MatchSession = GI->GetMatchSession();
-        if (MatchSession.IsValid())
+        if (MatchSession.IsValid()) {
+            MatchSession->OnSelfCorrected.AddDynamic(this, &ASightlineCharacter::OnSelfCorrected);  // M3b 和解订阅
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
+        }
     }
 }
 
@@ -159,6 +161,13 @@ void ASightlineCharacter::SampleLocalState() {
     S.Pitch = AnimInputs.Pitch;
     S.bFalling = AnimInputs.bFalling;
     MatchSession->ReportLocalState(S);                       // 纯结构过界，组帧在会话层（D3-17）
+}
+
+void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullSnap) {
+    // M3b 和解落地：瞬移摆正——CMC 以新位置为基准继续本地预测（TeleportPhysics 不带速度惩罚）；
+    // 朝向不纠正（服务器存末次上报即权威，无对账分歧）。30Hz 上报下一拍即以修正位入缓冲/发包。
+    const FVector Target = bFullSnap ? Error : GetActorLocation() + Error;
+    SetActorLocation(Target, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
