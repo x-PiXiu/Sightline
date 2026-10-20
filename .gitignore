@@ -6,6 +6,7 @@ logs/
 server/loadbot/loadbot
 server/sightline_server
 server/sightline_server_asan
+server/sightline_server_tsan
 
 # ===== client (UE5)：只提交源码与工程配置，其余（素材/生成物）全部排除 =====
 # 工程在 client/Sightline/ 子目录（两层白名单：先放行子目录，再放行内容）

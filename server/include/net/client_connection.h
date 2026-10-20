@@ -56,10 +56,13 @@ using common::network::Channel;
         void send(uint16_t msgid, const std::string& payload) {
             // bClosed_ 在收尾排队时即置位、::close 在其后的收尾任务里——此刻 fd 尚未关也即将关，
             // 对端已死，写只是给日志刷 EBADF 洪峰（档二压测实测 6204 行）——直接丢弃
-            if (bClosed_.load(std::memory_order_relaxed)) return;
+            if (bClosed_.load(std::memory_order_relaxed)) return;   // 快路径：死连接省一次组帧
             std::string out;
             adapters::FrameCodec::encode(msgid, payload, out);
             std::lock_guard<std::mutex> lk(outMutex_);
+            // 锁内终检（TSAN 补跑实锤的 TOCTOU 残窗）：与收尾任务的 ::close 同锁互斥——
+            // 写要么完整落在活 fd 上，要么零系统调用退场；跨线程 close/write 同 fd 的 POSIX 未定义态归零
+            if (bClosed_.load(std::memory_order_relaxed)) return;
             if (outBuf_.empty()) {
                 const ssize_t n = ::write(fd_, out.data(), out.size());
                 if (n > 0) {
@@ -91,7 +94,13 @@ using common::network::Channel;
                     self->channel_->remove();
                     self->channel_.reset();
                 }
-                ::close(self->fd_);
+                {
+                    // ::close 与 send 的写同锁互斥（TSAN 补跑实锤：2000 并发下 close/write 同 fd
+                    // 跨线程竞争——Linux 上已解析的 write 通常安全，但属 POSIX 未定义；同锁后归零。
+                    // bClosed_ 置位先于本任务，锁内 send 见 true 即退——顺序与互斥双保险）
+                    std::lock_guard<std::mutex> lk(self->outMutex_);
+                    ::close(self->fd_);
+                }
                 LOG_INFO("ClientConnection: 连接关闭 " + self->peerAddr_.toIpPort());
                 if (self->closeCallback_) self->closeCallback_(self);
             });
