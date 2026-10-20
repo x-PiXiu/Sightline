@@ -47,12 +47,17 @@ class SIGHTLINE_API ASightlineCharacter : public ACharacter {
 public:
     ASightlineCharacter();
 
-    /** 动画输入（ABP_Mannequin 经 Cast 读取；本地 Tick 聚合 / 远端 ApplyState 喂） */
+    /** 动画输入（ABP_Mannequin 经 Cast 读取；本地 Tick 聚合 / 远端 Tick 插值喂） */
     UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
     FAnimInputs AnimInputs;
 
-    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：直设位置/朝向 + 差分速度喂 FAnimInputs（M4） */
+    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：只存目标位姿，插值在 Tick 里做 */
     void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling);
+
+    /** 覆写引擎速度：远端角色返回插值帧差分速度（驱动 ABP 标准 GetVelocity 节点）；本地角色走 CMC 真速度 */
+    virtual FVector GetVelocity() const override {
+        return bRemoteActive ? RemoteVelocity : Super::GetVelocity();
+    }
 
 protected:
     virtual void BeginPlay() override;
@@ -63,9 +68,7 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<UCameraComponent> Camera;
 
-    /** 影子专用网格（M6 补丁）：OwnerNoSee 连影子一起藏，第一人称失去地面参照——
-     *  双组件方案：本体对他人可见（OwnerNoSee 对本地隐藏），影子组件只对本地投影（本体不可见）。
-     *  资产/动画在 BeginPlay 从 Mesh 拷贝——BP 子类零额外步骤 */
+    /** 影子专用网格（M6 补丁）：备用——恢复 OwnerNoSee 隐藏方案时启用 */
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<USkeletalMeshComponent> ShadowMesh;
 
@@ -90,21 +93,18 @@ private:
      *  否则 Error=对账误差向量，渲染位平移——本地预测的后续位移原样保留（位移空间重放） */
     UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
 
-    // —— 远端插值缓冲（用户令 2026-10-20：ep04 必须交付平滑感——D4-07「远端直设」裁决 amend）——
-    // 快照只入缓冲，变换每帧在 (now-插值延迟) 处两点夹取插值；TCP 有序到达=无需乱序/丢包处理。
-    // 本地自机不经 ApplyState（v4.1 自实体走对账），缓冲恒空——插值天然只作用于远端。
-    struct FRemoteSample {
-        double TimeSec = 0.0;                          // 本地接收时刻（插值基准钟）
-        FVector Pos = FVector::ZeroVector;
-        float Yaw = 0.f;
-    };
-    /** 每帧远端插值：目标时刻=now-延迟 → 缓冲夹取 → 位置线性 + 朝向最短弧 */
-    void TickRemoteInterpolation();
+    // —— 远端插值（VInterpTo + 帧差分速度，FPS_Game 已验证方案）——
+    // 快照只存目标位姿；Tick 每帧 VInterpTo 向目标靠拢，速度 = 插值后帧位移 / 帧时间。
+    // 速度天然等于动画系统"看到"的移动速度——同一插值轨迹上的导数，零失配。
+    void TickRemoteInterpolation(float DeltaTime);
 
     TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
     FTimerHandle ReportTimer;
-    TArray<FRemoteSample> InterpBuffer;          // 远端样本环（快照入缓冲，Tick 插值取样）
-    double LastInterpTime = 0.0;                 // 上一帧插值时刻（俯仰平滑的 dt 基准）
-    FVector SmoothedFrameVel = FVector::ZeroVector; // 路径解析速度的单极低通（到达抖动残差过滤）
-    float RemotePitchTarget = 0.f;               // 远端俯仰目标（10Hz 快照值，Tick 内平滑跟进防台阶）
+
+    // —— 远端插值状态（ApplyState 存目标，Tick 插值 + 算速度）——
+    FVector RemoteTargetPos = FVector::ZeroVector;   // 最新快照位置（插值目标）
+    float   RemoteTargetYaw = 0.f;                   // 最新快照朝向（插值目标）
+    float   RemotePitchTarget = 0.f;                 // 最新快照俯仰（插值目标）
+    bool    bRemoteActive = false;                    // 已收到首个快照（首帧直摆后开始插值）
+    FVector RemoteVelocity = FVector::ZeroVector;    // 插值帧差分速度（GetVelocity 覆写返回此值）
 };
