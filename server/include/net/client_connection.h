@@ -47,6 +47,8 @@ using common::network::Channel;
             channel_->setCloseCallback([this] { handleClose(); });
             channel_->setWriteCallback([this] { handleWrite(); });
             channel_->enableReading();
+            // 跨线程交接的实证：本行出现在哪个线程，fd 就归了哪个子 reactor（DEBUG 级，风暴不刷屏）
+            LOG_DEBUG("ClientConnection: fd=" + std::to_string(fd_) + " 已在归属线程注册 epoll（读已开）");
         }
 
         void setMessageCallback(MessageCallback cb) { messageCallback_ = std::move(cb); }

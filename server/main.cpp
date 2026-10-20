@@ -50,7 +50,14 @@ namespace {
         std::thread               th;
         std::atomic<int>          connCount{0};       // 连接计数（选择用；main 唯一读写者=零竞态）
 
-        void start() { th = std::thread([this] { loop.loop(); }); }   // loop() 内绑定线程亲和
+        // loop() 内绑定线程亲和；就绪/退出各报一行——子 reactor 活性的第一手日志证据
+        void start(const std::string& name) {
+            th = std::thread([this, name] {
+                LOG_INFO("[Worker] " + name + " EventLoop 就绪（线程已绑定，开始收帧）");
+                loop.loop();
+                LOG_INFO("[Worker] " + name + " EventLoop 退出");
+            });
+        }
         void stop()  { loop.quit(); if (th.joinable()) th.join(); }
     };
 
@@ -92,7 +99,7 @@ int main() {
     std::vector<std::unique_ptr<Worker>> workers;
     for (int i = 0; i < kIoThreads; ++i) {
         workers.push_back(std::make_unique<Worker>());
-        workers.back()->start();
+        workers.back()->start("worker-" + std::to_string(i));
     }
 
     // 4. main 事件循环（accept/定时器/业务永远在这条线程——单线程串行铁律）
@@ -113,6 +120,7 @@ int main() {
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
     // 7. 帧驱动：33ms 一帧——消费唯一跨线程门（Frame/Closed 控制帧族）+ 登录宽限清理 + 快照广播
+    int tickCount = 0;                                    // 子 reactor 活性心跳：~1s 一行 worker 在线计数
     loop.runEvery(33, [&] {
         std::deque<QueuedEvent> local;                   // swap 出来再处理（锁内零业务）
         { std::lock_guard<std::mutex> lk(gqMx); local.swap(gq); }
@@ -147,6 +155,15 @@ int main() {
         }
         writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
         writer.deliverMatch(match.TickSnapshot());           // 33ms 实体快照广播（17v2，不含自机）
+
+        // 子 reactor 活性心跳（~1s 一行，低频不刷屏）：每 worker 在线计数——帧在跑、连接有主，抬眼可验
+        if (++tickCount % 30 == 0) {
+            std::string st = "[Worker 状态]";
+            for (int i = 0; i < static_cast<int>(workers.size()); ++i)
+                st += " worker-" + std::to_string(i) + " 在线=" + std::to_string(workers[i]->connCount.load());
+            st += " 总在线=" + std::to_string(connections.size());
+            LOG_INFO(st);
+        }
 
         // 优雅关闭（D2-14/D3-19）：关服语义在用例，main 只搬运——广播 KICKED(3) 后退出事件循环
         if (gShutdownRequested) {
