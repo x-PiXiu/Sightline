@@ -21,6 +21,10 @@ namespace {
 
     // 名册动作判定阈值（°/cm 级）：低于此速度归 Idle；方向角只在此之上计算
     constexpr float kSpeedDeadZone = 5.f;
+
+    // —— 远端插值（D4-07 amend · 用户令 2026-10-20）——
+    constexpr float kInterpDelaySec = 0.15f;     // 渲染延迟 150ms≈1.5 个快照间隔（10Hz 拍下留抖动余量）
+    constexpr int32 kInterpBufMax = 16;          // 样本环上限（10Hz×1.6s 冗余）
 }
 
 ASightlineCharacter::ASightlineCharacter() {
@@ -150,6 +154,8 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
     }
     AnimInputs.Pitch = GetBaseAimRotation().Pitch;
     AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
+    // 远端平滑（D4-07 amend）：快照已入样本环，这里每帧取插值位摆变换——本地自机缓冲恒空天然跳过
+    TickRemoteInterpolation();
     // WeaponType 恒 0（徒手）；30Hz 上报由 ReportTimer → SampleLocalState 承担（D3-17 已接线）
 }
 
@@ -171,26 +177,59 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
 }
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
+    // 远端路径（D4-07 amend · 2026-10-20）：快照只入样本环，变换由 TickRemoteInterpolation 每帧
+    // 在 (now-150ms) 处插值——10Hz 直设台阶 → 60fps 平滑滑动；首样直摆（进场即到位）。
     const double Now = FPlatformTime::Seconds();
     const float Dt = (LastRemoteTime > 0.0) ? static_cast<float>(Now - LastRemoteTime) : 0.f;
-    const FVector Prev = GetActorLocation();
-    SetActorLocation(Pos);
-    SetActorRotation(FRotator(0.f, Yaw, 0.f));               // 远端无 Controller：直接摆朝向
+    const FVector Prev = InterpBuffer.Num() > 0 ? InterpBuffer.Last().Pos : Pos;   // 差分基=上一样本（非插值渲染位）
 
-    // 速度/方向 = 位置差分（EMA 低通——D3-02），与本地 Tick 同一套 FAnimInputs 语义：
-    // 远端不读引擎速度（直设不产生物理速度，§2.4），差分就是唯一真相
+    // 速度/方向 = 样本差分（EMA 低通——D3-02，语义不变），朝向参照用本样本 Yaw（样本空间自洽）
     const FVector Vel = (Dt > 0.001f) ? (Pos - Prev) / Dt : FVector::ZeroVector;
     const float Inst = Vel.Size2D();
     AnimInputs.Speed = FMath::Lerp(AnimInputs.Speed, Inst, 0.5f);
     if (AnimInputs.Speed > kSpeedDeadZone) {
         const FVector Dir = Vel.GetSafeNormal2D();
-        const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+        const FRotator SampleRot(0.f, Yaw, 0.f);
+        const FVector Fwd = FRotationMatrix(SampleRot).GetUnitAxis(EAxis::X);
         float Angle = FMath::RadiansToDegrees(
             FMath::Acos(FMath::Clamp(FVector::DotProduct(Fwd, Dir), -1.f, 1.f)));
-        if (FVector::DotProduct(GetActorRightVector(), Dir) < 0.f) Angle = -Angle;
+        if (FVector::DotProduct(FRotationMatrix(SampleRot).GetUnitAxis(EAxis::Y), Dir) < 0.f) Angle = -Angle;
         AnimInputs.DirectionAngle = Angle;
     }
     AnimInputs.Pitch = PitchDeg;
     AnimInputs.bFalling = bFalling;
     LastRemoteTime = Now;
+
+    const bool bFirst = InterpBuffer.Num() == 0;
+    InterpBuffer.Add({Now, Pos, Yaw});
+    while (InterpBuffer.Num() > kInterpBufMax) InterpBuffer.RemoveAt(0);
+    if (bFirst) {                                          // 首样：无历史可插，直摆到位
+        SetActorLocation(Pos);
+        SetActorRotation(FRotator(0.f, Yaw, 0.f));
+    }
+}
+
+void ASightlineCharacter::TickRemoteInterpolation() {
+    if (InterpBuffer.Num() < 2) return;                    // 无/单样本：无可插（单样本已直摆）
+    const double Target = FPlatformTime::Seconds() - kInterpDelaySec;
+    const FRemoteSample& Oldest = InterpBuffer[0];
+    const FRemoteSample& Newest = InterpBuffer.Last();
+    // 两端夹取：追不上（卡顿恢复）贴最老样本；断流（对端停更）贴最新样本——渲染延迟只伸不跳
+    const FRemoteSample* A = nullptr;
+    const FRemoteSample* B = nullptr;
+    if (Target <= Oldest.TimeSec) { A = &Oldest; B = &Newest; }
+    else if (Target >= Newest.TimeSec) { A = &Newest; B = &Newest; }
+    else {
+        for (int32 i = InterpBuffer.Num() - 2; i >= 0; --i) {
+            if (Target >= InterpBuffer[i].TimeSec && Target <= InterpBuffer[i + 1].TimeSec) {
+                A = &InterpBuffer[i]; B = &InterpBuffer[i + 1]; break;
+            }
+        }
+        if (!A) return;
+    }
+    const double Span = B->TimeSec - A->TimeSec;
+    const float Alpha = (Span > 1e-6) ? static_cast<float>((Target - A->TimeSec) / Span) : 1.f;
+    SetActorLocation(FMath::Lerp(A->Pos, B->Pos, Alpha));
+    const float Yaw = A->Yaw + FMath::FindDeltaAngleDegrees(A->Yaw, B->Yaw) * Alpha;   // 最短弧
+    SetActorRotation(FRotator(0.f, Yaw, 0.f));
 }

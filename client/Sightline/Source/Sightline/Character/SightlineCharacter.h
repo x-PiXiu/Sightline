@@ -90,7 +90,19 @@ private:
      *  否则 Error=对账误差向量，渲染位平移——本地预测的后续位移原样保留（位移空间重放） */
     UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
 
+    // —— 远端插值缓冲（用户令 2026-10-20：ep04 必须交付平滑感——D4-07「远端直设」裁决 amend）——
+    // 快照只入缓冲，变换每帧在 (now-插值延迟) 处两点夹取插值；TCP 有序到达=无需乱序/丢包处理。
+    // 本地自机不经 ApplyState（v4.1 自实体走对账），缓冲恒空——插值天然只作用于远端。
+    struct FRemoteSample {
+        double TimeSec = 0.0;                          // 本地接收时刻（插值基准钟）
+        FVector Pos = FVector::ZeroVector;
+        float Yaw = 0.f;
+    };
+    /** 每帧远端插值：目标时刻=now-延迟 → 缓冲夹取 → 位置线性 + 朝向最短弧 */
+    void TickRemoteInterpolation();
+
     TWeakObjectPtr<USightlineMatchSession> MatchSession;   // 上报出口（本地玩家绑定；远端为空不采样）
     FTimerHandle ReportTimer;
     double LastRemoteTime = 0.0;                 // 远端差分速度的上一拍时刻（ApplyState 专用）
+    TArray<FRemoteSample> InterpBuffer;          // 远端样本环（快照入缓冲，Tick 插值取样）
 };
