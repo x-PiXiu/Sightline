@@ -106,4 +106,6 @@ private:
     TArray<FRemoteSample> InterpBuffer;          // 远端样本环（快照入缓冲，Tick 插值取样）
     FVector LastInterpPos = FVector::ZeroVector; // 上一帧插值位（动画输入=插值帧速度的差分基）
     double LastInterpTime = 0.0;                 // 上一帧插值时刻
+    FVector SmoothedFrameVel = FVector::ZeroVector; // 插值帧速度单极低通（段界拐点/采样间隔毛刺过滤）
+    float RemotePitchTarget = 0.f;               // 远端俯仰目标（10Hz 快照值，Tick 内平滑跟进防台阶）
 };
