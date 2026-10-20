@@ -1,5 +1,6 @@
 // SightlineMatchSession 实现 —— 意图发包 + 15/17/18 解析喂 Registry
 #include "Match/SightlineMatchSession.h"
+#include "Match/SightlineReconcile.h"   // 纯决策逻辑（可脱引擎单测）
 #include "Sightline.h"
 #include <cstring>
 #include "Connection/SightlineSendPort.h"
@@ -50,10 +51,13 @@ void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
     Conn->Send(SightlineProtocol::MSG_C2S_PLAYER_INPUT, In.Encode());
     // M3b：入环形缓冲——(seq,pos,yaw)×1s，对账/重放的本地底账（与发出的字节同源同 seq）
     InputHistory.Add({In.Seq, S.Pos, S.Yaw});
-    while (InputHistory.Num() > kInputHistoryCap ||
-           (InputHistory.Num() > kInputHistoryTarget &&
-            static_cast<int32>(In.Seq - InputHistory[0].Seq) > kInputHistoryTarget))
-        InputHistory.RemoveAt(0);
+    // 批量淘汰（一次 RemoveAt(Index,Count) 搬移 vs 逐条 RemoveAt(0) 的 O(n²)——30Hz×64 条高频路径）
+    int32 EvictCount = 0;
+    while (InputHistory.Num() - EvictCount > kInputHistoryCap ||
+           (InputHistory.Num() - EvictCount > kInputHistoryTarget &&
+            static_cast<int32>(In.Seq - InputHistory[EvictCount].Seq) > kInputHistoryTarget))
+        ++EvictCount;
+    if (EvictCount > 0) InputHistory.RemoveAt(0, EvictCount);
     // KPI② 误差日志（发送端真实轨迹；对齐锚 = MATCH_START 行，离线按 t0 对齐）
     if (CSightlineStatLog.GetValueOnGameThread() != 0)
         UE_LOG(LogTemp, Log, TEXT("[STAT] SELF t=%.3f pid=%d seq=%u x=%.2f y=%.2f z=%.2f yaw=%.1f pitch=%.1f f=%d"),
@@ -131,37 +135,46 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
 }
 
 // —— M3b 三方对账（设计草案 §2.3 + reconcile_state 定稿状态机）——
-// 权威位（服务器按输入自推+钳制）vs 本地同 seq 预测位（环形缓冲存根）：
-//   < ε 无感通过（网络抖动不触发和解）｜≥ ε 回滚+重放｜断档 全量回滚兑底
+// 决策逻辑在 SightlineReconcile.h（纯函数，可脱引擎单测）；本函数只做副作用（委托/统计/日志）。
+// 权威位 vs 本地同 seq 预测位：< ε 无感｜≥ ε 回滚+重放｜断档 全量回滚兜底
 void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthPos) {
     LastAckedSeq = AckedSeq;
-    const int32 Idx = InputHistory.IndexOfByPredicate(
-        [AckedSeq](const FInputSample& S) { return S.Seq == AckedSeq; });
 
-    if (Idx == INDEX_NONE) {
-        // seq 断档（缓冲中无此序号）→ 朴素兑底：全量回滚到最新权威位（预测弃置，重放 0 帧）
-        ErrCurrentCm = InputHistory.Num() > 0 ? (AuthPos - InputHistory.Last().Pos).Size() : 0.0;
-        ErrPeakCm = FMath::Max(ErrPeakCm, ErrCurrentCm);
+    // FInputSample → 纯 InputSample 转换（≤64 条，开销可忽略）
+    TArray<sightline::reconcile::InputSample> Pure;
+    Pure.Reserve(InputHistory.Num());
+    for (const FInputSample& S : InputHistory)
+        Pure.Add({S.Seq, static_cast<float>(S.Pos.X), static_cast<float>(S.Pos.Y), static_cast<float>(S.Pos.Z)});
+
+    const auto D = sightline::reconcile::Evaluate(
+        static_cast<float>(AuthPos.X), static_cast<float>(AuthPos.Y), static_cast<float>(AuthPos.Z),
+        Pure.GetData(), Pure.Num(), AckedSeq, kReconcileEpsilonCm);
+
+    ErrCurrentCm = D.errCm;
+    ErrPeakCm = FMath::Max(ErrPeakCm, ErrCurrentCm);
+    ReplayFrames = D.replayFrames;
+
+    switch (D.action) {
+    case sightline::reconcile::Decision::Action::None:
+        // 无感通过：只更新服务器认知，不碰 Pawn
+        break;
+
+    case sightline::reconcile::Decision::Action::FullSnap:
         ++ReconcileCount;
-        ReplayFrames = 0;
         OnSelfCorrected.Broadcast(AuthPos, /*bFullSnap=*/true);
         if (CSightlineStatLog.GetValueOnGameThread() != 0)
             UE_LOG(LogTemp, Log, TEXT("[STAT] RECON t=%.3f ack=%u err=%.2f replays=0 full=1"),
                    FPlatformTime::Seconds(), AckedSeq, ErrCurrentCm);
-        return;
+        break;
+
+    case sightline::reconcile::Decision::Action::ErrorTranslate:
+        ++ReconcileCount;
+        // 回滚 + 重放（位移空间）：渲染位 += 误差向量——纯平移运动下与"摆回权威位再逐输入重放"
+        // 数学等价且不与 CMC 相搏；穿墙/碰撞级的逐帧输入重放不在本期范围（按需后置）
+        OnSelfCorrected.Broadcast(FVector(D.errorX, D.errorY, D.errorZ), /*bFullSnap=*/false);
+        if (CSightlineStatLog.GetValueOnGameThread() != 0)
+            UE_LOG(LogTemp, Log, TEXT("[STAT] RECON t=%.3f ack=%u err=%.2f replays=%d full=0"),
+                   FPlatformTime::Seconds(), AckedSeq, ErrCurrentCm, ReplayFrames);
+        break;
     }
-
-    const FVector Err = AuthPos - InputHistory[Idx].Pos;   // 对账误差向量（权威 - 本地同 seq 预测位）
-    ErrCurrentCm = Err.Size();
-    ErrPeakCm = FMath::Max(ErrPeakCm, ErrCurrentCm);
-    ReplayFrames = InputHistory.Num() - 1 - Idx;            // 其后本地输入帧数 = 重放量（HUD 可见）
-    if (ErrCurrentCm < kReconcileEpsilonCm) return;         // 无感通过：只更新服务器认知，不碰 Pawn
-
-    ++ReconcileCount;
-    // 回滚 + 重放（位移空间）：渲染位 += 误差向量——纯平移运动下与"摆回权威位再逐输入重放"
-    // 数学等价且不与 CMC 相搏；穿墙/碰撞级的逐帧输入重放不在本期范围（按需后置）
-    OnSelfCorrected.Broadcast(Err, /*bFullSnap=*/false);
-    if (CSightlineStatLog.GetValueOnGameThread() != 0)
-        UE_LOG(LogTemp, Log, TEXT("[STAT] RECON t=%.3f ack=%u err=%.2f replays=%d full=0"),
-               FPlatformTime::Seconds(), AckedSeq, ErrCurrentCm, ReplayFrames);
 }

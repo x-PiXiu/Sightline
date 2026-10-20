@@ -9,6 +9,7 @@
 #include "GameInstance/SightlineGameInstance.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace {
@@ -133,6 +134,12 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         }
         AnimInputs.Pitch = GetBaseAimRotation().Pitch;
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
+        // 本地对照日志（s.Sightline.AnimDebug 1 开启）——与 [ANIM] REMOTE 同格式，对比速度/方向角是否一致
+        if (CSightlineStatLog.GetValueOnGameThread() != 0) {
+            UE_LOG(LogTemp, Log, TEXT("[ANIM] LOCAL  t=%.3f vel=%.1f spd=%.1f dir=%.1f pitch=%.1f"),
+                   FPlatformTime::Seconds(), Vel.Size2D(),
+                   AnimInputs.Speed, AnimInputs.DirectionAngle, AnimInputs.Pitch);
+        }
     }
     // 远端角色：VInterpTo 插值 + 帧差分速度喂动画
     TickRemoteInterpolation(DeltaSeconds);
@@ -155,6 +162,12 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
     // 远端路径：快照只存目标位姿，插值与动画在 TickRemoteInterpolation 里做
+    // 诊断：快照到达间隔与目标跳跃幅度（s.Sightline.AnimDebug 1 开启）
+    if (CSightlineStatLog.GetValueOnGameThread() != 0 && bRemoteActive) {
+        const float Jump = FVector::Dist(Pos, RemoteTargetPos);
+        UE_LOG(LogTemp, Log, TEXT("[ANIM] SNAP   t=%.3f jump=%.1f yaw=%.1f"),
+               FPlatformTime::Seconds(), Jump, Yaw);
+    }
     RemoteTargetPos = Pos;
     RemoteTargetYaw = Yaw;
     RemotePitchTarget = PitchDeg;
@@ -206,4 +219,15 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     // 俯仰平滑跟进（10Hz 快照值 → 连续无台阶）
     AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget,
                                         DeltaTime, kRemoteRotSpeed);
+
+    // —— 诊断日志（s.Sightline.AnimDebug 1 开启）——
+    // 判读方法：
+    //   位置问题 → DistToTarget 不收敛（持续 >10cm）或 Vel 毛刺尖峰
+    //   动画问题 → Vel/Speed 平滑但 Dir 跳变（±180 翻转=BS 轴突变=俯冲/抽搐根因）
+    if (CSightlineStatLog.GetValueOnGameThread() != 0) {
+        const float Dist = FVector::Dist2D(NewLoc, RemoteTargetPos);
+        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f vel=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
+               FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
+               AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
+    }
 }

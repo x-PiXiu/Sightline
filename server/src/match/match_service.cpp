@@ -55,7 +55,10 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             E.bHasReport = true;                             // 实体激活（此后入快照）
         } else {
             float dx = x - E.lx, dy = y - E.ly, dz = z - E.lz;   // 客户端声明的本拍位移
-            const float bound = kMaxSpeedUuPerSec * kMaxInputGapSec;
+            // seq 间隙感知：丢帧时 dx 含多帧位移，bound 按实际间隔倍数放大（cap 3x 防刷）
+            const std::uint32_t gap = (seq > E.ackedSeq) ? (seq - E.ackedSeq) : 1u;
+            const float gapScale = std::min(static_cast<float>(gap), 3.0f);
+            const float bound = kMaxSpeedUuPerSec * kMaxInputGapSec * gapScale;
             const float len2 = dx * dx + dy * dy + dz * dz;
             if (len2 > bound * bound) {                      // 超界钳回界上：保方向弃模长（传送黑客打不动权威位）
                 const float k = bound / std::sqrt(len2);
