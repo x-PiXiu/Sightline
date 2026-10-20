@@ -107,4 +107,5 @@ private:
     float   RemotePitchTarget = 0.f;                 // 最新快照俯仰（插值目标）
     bool    bRemoteActive = false;                    // 已收到首个快照（首帧直摆后开始插值）
     FVector RemoteVelocity = FVector::ZeroVector;    // 插值帧差分速度（GetVelocity 覆写返回此值）
+    FVector SmoothedAnimVel = FVector::ZeroVector;   // 动画输入速度（EMA 平滑——滤 VInterpTo 锯齿波）
 };

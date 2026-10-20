@@ -179,6 +179,7 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
         RemoteVelocity = FVector::ZeroVector;
+        SmoothedAnimVel = FVector::ZeroVector;
         bRemoteActive = true;
     }
 }
@@ -197,6 +198,11 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
         ? (NewLoc - OldLoc) / DeltaTime
         : FVector::ZeroVector;
 
+    // ★ 动画速度 EMA 平滑：滤 VInterpTo 锯齿波（快照到达→尖峰→衰减→尖峰→…）
+    //   直接喂原始帧差分会让 BS 的 Speed 轴 400→150→400 循环 = 反复触发 Start/Lunge 动画。
+    //   α=0.35（≈2 帧时间常数）：够滤锯齿，Phase lag <2 帧不影响操作感。
+    SmoothedAnimVel = FMath::Lerp(SmoothedAnimVel, RemoteVelocity, 0.35f);
+
     // —— 朝向插值（最短弧）——
     const FRotator CurRot = GetActorRotation();
     const FRotator NewRot = FMath::RInterpTo(CurRot, FRotator(0.f, RemoteTargetYaw, 0.f),
@@ -204,9 +210,10 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     SetActorRotation(FRotator(0.f, NewRot.Yaw, 0.f));
 
     // —— 写入 FAnimInputs（ABP 读这个聚合体）——
-    AnimInputs.Speed = RemoteVelocity.Size2D();
+    //   用 SmoothedAnimVel 而非 RawVel：动画输入要平滑，GetVelocity() 才是原始帧差分
+    AnimInputs.Speed = SmoothedAnimVel.Size2D();
     if (AnimInputs.Speed > kSpeedDeadZone) {
-        const FVector Dir = RemoteVelocity.GetSafeNormal2D();
+        const FVector Dir = SmoothedAnimVel.GetSafeNormal2D();
         const FRotator YawRot(0.f, NewRot.Yaw, 0.f);
         const FVector Fwd = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
         float Angle = FMath::RadiansToDegrees(
@@ -223,11 +230,13 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
 
     // —— 诊断日志（s.Sightline.StatLog 1 开启；10Hz 节流 %6——每帧记压垮 GameThread 误报 LAG）——
     // 判读方法：
-    //   位置问题 → DistToTarget 不收敛（持续 >10cm）或 Vel 毛刺尖峰
-    //   动画问题 → Vel/Speed 平滑但 Dir 跳变（±180 翻转=BS 轴突变=俯冲/抽搐根因）
+    //   rawVel 锯齿 / spd 平滑 → EMA 正常工作
+    //   rawVel 与 spd 都锯齿 → EMA 系数太小
+    //   dir 跳变 ±180 → DirectionAngle 翻转（BS 轴突变）
+    //   dist 不收敛（>10cm） → VInterpTo 追不上目标
     if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
         const float Dist = FVector::Dist2D(NewLoc, RemoteTargetPos);
-        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f vel=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
+        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f raw=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
                FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
                AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
     }
