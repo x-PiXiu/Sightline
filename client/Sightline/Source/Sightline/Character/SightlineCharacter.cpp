@@ -134,8 +134,9 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         }
         AnimInputs.Pitch = GetBaseAimRotation().Pitch;
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
-        // 本地对照日志（s.Sightline.AnimDebug 1 开启）——与 [ANIM] REMOTE 同格式，对比速度/方向角是否一致
-        if (CSightlineStatLog.GetValueOnGameThread() != 0) {
+        // 本地对照日志（s.Sightline.StatLog 1 开启）——与 [ANIM] REMOTE 同格式，对比速度/方向角是否一致
+        // 10Hz 节流（%6）：每帧记=每秒数百行压垮 GameThread → 双 PIE 误报 LAG（M6 级联复发实锤）
+        if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
             UE_LOG(LogTemp, Log, TEXT("[ANIM] LOCAL  t=%.3f vel=%.1f spd=%.1f dir=%.1f pitch=%.1f"),
                    FPlatformTime::Seconds(), Vel.Size2D(),
                    AnimInputs.Speed, AnimInputs.DirectionAngle, AnimInputs.Pitch);
@@ -220,11 +221,11 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget,
                                         DeltaTime, kRemoteRotSpeed);
 
-    // —— 诊断日志（s.Sightline.AnimDebug 1 开启）——
+    // —— 诊断日志（s.Sightline.StatLog 1 开启；10Hz 节流 %6——每帧记压垮 GameThread 误报 LAG）——
     // 判读方法：
     //   位置问题 → DistToTarget 不收敛（持续 >10cm）或 Vel 毛刺尖峰
     //   动画问题 → Vel/Speed 平滑但 Dir 跳变（±180 翻转=BS 轴突变=俯冲/抽搐根因）
-    if (CSightlineStatLog.GetValueOnGameThread() != 0) {
+    if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
         const float Dist = FVector::Dist2D(NewLoc, RemoteTargetPos);
         UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f vel=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
                FPlatformTime::Seconds(), RemoteVelocity.Size2D(),

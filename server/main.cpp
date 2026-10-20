@@ -85,7 +85,16 @@ int main() {
     // 1. 日志装配
     common::logger::Logger::getInstance().addSink(
         std::make_unique<common::logger::ConsoleSink>());
-    common::logger::Logger::getInstance().setLogLevel(common::logger::LogLevel::DEBUG);   // 业务 debug 可见；心跳已在 TRACE 不刷屏
+    // 日志级别环境可调（SIGHTLINE_LOG_LEVEL=INFO/DEBUG/TRACE，默认 DEBUG）——
+    // 联调/压测开 INFO：[收帧·位置上报v2] 等 DEBUG 行自动隐藏，异步日志队列压力立减（30Hz×客户端 每秒数十行）
+    common::logger::LogLevel lvl = common::logger::LogLevel::DEBUG;
+    if (const char* env = std::getenv("SIGHTLINE_LOG_LEVEL")) {
+        const std::string lv(env);
+        if (lv == "TRACE") lvl = common::logger::LogLevel::TRACE;
+        else if (lv == "INFO" || lv == "info") lvl = common::logger::LogLevel::INFO;
+        else if (lv == "WARN" || lv == "warn") lvl = common::logger::LogLevel::WARN;
+    }
+    common::logger::Logger::getInstance().setLogLevel(lvl);
     common::logger::Logger::getInstance().setAsyncLogging(true);   // 异步日志：终端冻结（选中文本/拖窗口）不再卡事件循环——双端 LAG 级联根因（M6 实锤）
     LOG_DEBUG("[自检] 日志级别=DEBUG，本行可见即 debug 通路正常");
 
