@@ -18,14 +18,16 @@ struct RosterEntry {
     std::uint8_t  spawnIndex = 0;
 };
 
-/** 在局实体状态（直发版服务器只暂存不校验——"故意做错"，v3 契约规则 9） */
+/** 在局实体状态。v4（M3 · R12 位置权威收回）：x/y/z = 服务器权威推算位
+ *  （=上次权威位 + 钳制后增量，首报=上报位）——不再是"转发上报值"的朴素版记账 */
 struct Entity {
     std::uint32_t playerId = 0;
-    float x = 0.f, y = 0.f, z = 0.f;
-    float yaw = 0.f, pitch = 0.f;
+    float x = 0.f, y = 0.f, z = 0.f;   // 权威位（快照推的就是它；诚实路径与上报值恒等，钳制后分叉）
+    float yaw = 0.f, pitch = 0.f;      // 朝向无动力学模型：末次上报即权威
     std::uint8_t flags = 0;            // bit0=腾空
-    std::uint32_t ackedSeq = 0;        // 已确认的最新输入序号（v4 · R11；权威推算 M3 落地，本期布局先行）
+    std::uint32_t ackedSeq = 0;        // 已确认的最新输入序号（v4 · R11）
     bool bHasReport = false;           // 首次上报前不入快照（位置未知的玩家不进世界）
+    float lx = 0.f, ly = 0.f, lz = 0.f; // 上次上报位（增量基准——权威增量=本次上报-上次上报）
 };
 
 /** 快照项（17 载荷的一行） */
@@ -58,9 +60,10 @@ public:
     /** 该玩家是否已在局中（对局期重复 START 的幂等判断由客户端切图状态兜底，此查询供日志/调试） */
     bool IsActive(std::uint32_t playerId) const;
 
-    // —— M4：实体位置暂存与快照组装 ——
-    /** 16/19 上报入库（只覆盖不校验；未知 pid 静默忽略——不在局者上报无效）
-     *  v4：seq = 19 号输入序号，入库取 max 作为 ackedSeq（R11；权威推算 M3 落地） */
+    // —— M4：实体位置暂存与快照组装；M3：权威推算 ——
+    /** 19 号输入入库（v4 · R12 权威收回）：最小合法性钳制（本拍位移超界钳回——保和解完整性的
+     *  最小版，完整反作弊 ep08）→ 服务器按输入自推权威位（上次权威+钳制增量）→ 存权威位+ackedSeq；
+     *  未知 pid 静默忽略（不在局者上报无效）。16 号对局期由适配层拒收（R10），不进此函数 */
     void UpdateEntity(std::uint32_t playerId, float x, float y, float z,
                       float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0);
 

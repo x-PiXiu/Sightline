@@ -4,6 +4,7 @@
 #include "match/match_service.h"
 #include "lobby/lobby.h"
 
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -102,6 +103,30 @@ int main() {
     ev = m.TickSnapshot();
     CHECK(ev.size() == 1 && ev[0].entities.size() == 1
           && ev[0].entities[0].playerId == 401);            // 乙离场后：快照只剩甲
+
+    stage("M3 权威推算：首报即真值 / 诚实路径恒等 / 超界钳回 / ackedSeq 只进不退");
+    std::vector<RosterEntry> rosterM3 = {{501, "pred", 0}, {502, "cheat", 0}};
+    ev = m.StartMatch(31, rosterM3);
+    CHECK(ev.size() == 1);
+    m.UpdateEntity(501, 0.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1);   // 首报：权威=上报位
+    m.UpdateEntity(502, 0.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1);
+    // 诚实路径：位移 16.5uu（≈500uu/s×33ms 拍）< 界 100uu → 权威与上报恒等
+    m.UpdateEntity(501, 16.5f, 0.f, 100.f, 90.f, 0.f, 0x00, 2);
+    // 超界路径：瞬移声明 400uu → 钳回界上（保方向弃模长）
+    m.UpdateEntity(502, 400.f, 0.f, 100.f, 0.f, 0.f, 0x00, 2);
+    ev = m.TickSnapshot();
+    CHECK(ev.size() == 1 && ev[0].entities.size() == 2);
+    CHECK(ev[0].entities[0].playerId == 501);
+    CHECK(ev[0].entities[0].x == 16.5f && ev[0].entities[0].ackedSeq == 2);
+    CHECK(ev[0].entities[0].yaw == 90.f);                    // 朝向末次上报即权威
+    CHECK(ev[0].entities[1].playerId == 502);
+    CHECK(std::fabs(ev[0].entities[1].x - 100.f) < 0.01f);   // 权威=100uu 界上，不是上报的 400
+    CHECK(ev[0].entities[1].ackedSeq == 2);
+    // 越序输入：seq 回退不改 ackedSeq；位移 3.5uu 诚实照算（权威继续跟声明轨迹）
+    m.UpdateEntity(501, 20.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1);
+    ev = m.TickSnapshot();
+    CHECK(ev[0].entities[0].ackedSeq == 2);                 // 只进不退
+    CHECK(ev[0].entities[0].x == 20.f);
 
     stage("D3-15 过桥编排：lobby 纯查询 → match（模拟 wireMatch 组合）");
     LobbyService lobby;
