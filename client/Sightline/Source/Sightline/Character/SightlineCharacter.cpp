@@ -21,7 +21,8 @@ namespace {
     constexpr float kSpeedDeadZone = 5.f;
 
     // —— 恒速插值参数 ——
-    constexpr float kInterpDelaySec = 0.1f;    // 渲染延迟 100ms ≈ 1 个快照间隔（吸收网络抖动）
+    constexpr float kInterpDelaySec = 0.025f;  // 渲染延迟 25ms < 快照间隔 33ms——渲染点落在 AB 窗口内真插值
+                                               // （100ms 是 300ms 时代遗留：间隔回 33ms 后 Alpha 恒 0=30Hz 跳格）
     constexpr float kRotInterpSpeed = 10.f;    // 朝向/俯仰平滑速度
 }
 
@@ -148,14 +149,14 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
     SetActorLocation(Target, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
-void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling) {
+void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, int32 AckedSeq) {
     const double Now = FPlatformTime::Seconds();
     RemotePitchTarget = PitchDeg;
     AnimInputs.bFalling = bFalling;
 
     if (SnapCount == 0) {
         // 首个快照：直摆到位 + 作为 SnapA
-        SnapA = {Now, Pos, Yaw};
+        SnapA = {Now, Pos, Yaw, AckedSeq};
         SnapCount = 1;
         SetActorLocation(Pos);
         SetActorRotation(FRotator(0.f, Yaw, 0.f));
@@ -163,12 +164,12 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
         bRemoteActive = true;
     } else if (SnapCount == 1) {
         // 第二个快照：入 SnapB，开始插值
-        SnapB = {Now, Pos, Yaw};
+        SnapB = {Now, Pos, Yaw, AckedSeq};
         SnapCount = 2;
     } else {
         // 后续快照：A←B，B←新（滑动窗口）
         SnapA = SnapB;
-        SnapB = {Now, Pos, Yaw};
+        SnapB = {Now, Pos, Yaw, AckedSeq};
     }
 
     if (CSightlineStatLog.GetValueOnGameThread() != 0) {
@@ -183,8 +184,8 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     const double RenderTime = Now - kInterpDelaySec;
 
     // 恒速线性插值 + 超出区间时外推（防冻结跳变）
-    // 问题：快照间隔 ~500ms >> 渲染延迟 100ms → RenderTime 超出 SnapB.Time → Alpha 饱和到 1.0 → 冻结
-    // 解法：Alpha 允许 > 1（线性外推），但用速度×最大外推时间限幅防过冲
+    // 正常：渲染点落在 [SnapA, SnapB] 窗口内（延迟 25ms < 间隔 33ms）。快照迟到时渲染点
+    // 超出 SnapB → Alpha 允许 > 1 线性外推，速度×最大外推时间限幅防过冲。
     const double Span = FMath::Max(1e-6, SnapB.TimeSec - SnapA.TimeSec);
     const double RawAlpha = (RenderTime - SnapA.TimeSec) / Span;
     // 外推限幅：最多按当前速度再走 200ms（防急停时过冲穿墙）
@@ -196,9 +197,15 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     const FVector NewLoc = FMath::Lerp(SnapA.Pos, SnapB.Pos, Alpha);
     SetActorLocation(NewLoc);
 
-    // 恒速插值速度 = 位移/时距（与动画天然同步）
-    const FVector NewVel = (SnapB.Pos - SnapA.Pos) / static_cast<float>(Span);
-    RemoteVelocity = NewVel;
+    // 恒速插值速度 = 位移 / Δack 拍（发端 30Hz 时钟口径——与动画天然同步且免疫到达抖动）。
+    // ⚠ 分母必须用 ack 差：服务器 tick 与客户端输入两个时钟采样撞拍/跳拍（日志实锤 ack 重复、
+    //   跳号），接收时距当分母=段速度 0↔800 来回摆=BS Speed 轴直立↔俯冲切换的根因。
+    //   Δack=0（同输入被两拍采样）：保持上一拍速度不置零（否则动画闪回 Idle）。
+    const int32 DAck = SnapB.Ack - SnapA.Ack;
+    if (DAck > 0) {
+        const FVector SegVel = (SnapB.Pos - SnapA.Pos) * (30.0f / static_cast<float>(DAck));
+        RemoteVelocity = SegVel.GetClampedToMaxSize(450.f);   // 行走上限 400 + 余量，残余毛刺兜底
+    }
 
     // 朝向插值（最短弧）
     const FRotator CurRot = GetActorRotation();

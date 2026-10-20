@@ -51,8 +51,9 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
     FAnimInputs AnimInputs;
 
-    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：快照入缓冲，插值在 Tick 里做 */
-    void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling);
+    /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：快照入缓冲，插值在 Tick 里做。
+     *  AckedSeq=服务器确认序号——速度的发端时间基准（Δack×输入拍），免疫到达抖动 */
+    void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, int32 AckedSeq = 0);
 
     /** 覆写引擎速度：远端角色返回插值速度（驱动 ABP 标准 GetVelocity 节点）；本地角色走 CMC 真速度 */
     virtual FVector GetVelocity() const override {
@@ -89,12 +90,15 @@ private:
     UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
 
     // —— 远端插值：快照缓冲 + 恒速线性插值 ——
-    // 两个带时间戳的快照，在 (Now - 延迟) 处线性插值。速度 = 位移/时距 = 恒速。
-    // VInterpTo 是指数衰减（先快后慢），恒速运动被映射成锯齿——这是卡顿的根因。
+    // 两个带时间戳的快照，在 (Now - 延迟) 处线性插值。速度=位移/Δack 拍（发端时钟口径）。
+    // ⚠ 速度分母用 ack 差不用接收时距——服务器 tick 与客户端输入两个时钟的采样撞拍/跳拍
+    //   （日志实锤 ack 重复 1864→1864、跳号 1855→1857），接收时距当分母=速度 0↔800 来回摆
+    //   =BS Speed 轴直立↔俯冲切换的根因。
     struct FSnapshot {
         double TimeSec = 0.0;
         FVector Pos = FVector::ZeroVector;
         float Yaw = 0.f;
+        int32 Ack = 0;                             // 该快照的 ackedSeq（速度时间基准用）
     };
     void TickRemoteInterpolation(float DeltaTime);
 

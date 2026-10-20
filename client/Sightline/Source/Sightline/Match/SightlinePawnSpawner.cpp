@@ -23,7 +23,7 @@ void USightlinePawnSpawner::HandleEntityUpdated(int32 PlayerId) {
     if (E.bSelf) return;                                    // 本地 Pawn 不吃网络位姿
     if (TWeakObjectPtr<APawn>* P = Live.Find(PlayerId)) {
         if (ASightlineCharacter* C = Cast<ASightlineCharacter>(P->Get()))
-            C->ApplyState(E.Pos, E.Yaw, E.Pitch, E.bFalling);   // 直设位置 + 喂 FAnimInputs（M4）
+            C->ApplyState(E.Pos, E.Yaw, E.Pitch, E.bFalling, E.AckedSeq);   // 快照入环 + ack 时间基准（速度算段速）
     }
     // 未生成的快照（SpawnAll 之前到达）——状态已在 Registry，生成时自然带最新
 }

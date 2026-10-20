@@ -156,7 +156,10 @@ void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthP
 
     switch (D.action) {
     case sightline::reconcile::Decision::Action::None:
-        // 无感通过：只更新服务器认知，不碰 Pawn
+        // 无感通过：只更新服务器认知，不碰 Pawn。
+        // HUD「重放帧数」语义=实际重放量——ε 内没有任何东西被重放，归零。
+        // （此前恒显 1-2 帧=管线深度误标：30Hz 上报的在途输入数，健康管线的正常水位）
+        ReplayFrames = 0;
         break;
 
     case sightline::reconcile::Decision::Action::FullSnap:
