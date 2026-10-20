@@ -29,7 +29,15 @@
 #include "protocol/msg_ids.h"
 
 namespace {
-    constexpr uint16_t kListenPort = 18888;   // 8888 被系统 iphlpsvc 占用，2026-10-15 换 18888（实现细节，不入契约）
+    // 8888 被系统 iphlpsvc 占用，2026-10-15 换 18888（实现细节，不入契约）；
+    // SIGHTLINE_PORT 可覆盖——同机多实例/联调并存免改码（与 SIGHTLINE_IO_THREADS 同族）
+    std::uint16_t listenPort() {
+        if (const char* env = std::getenv("SIGHTLINE_PORT")) {
+            const int p = std::atoi(env);
+            if (p > 0 && p < 65536) return static_cast<std::uint16_t>(p);
+        }
+        return 18888;
+    }
 
     std::atomic<bool> gShutdownRequested{false};      // 信号只置位；广播在帧驱动里做（信号处理器内不做复杂动作）
 
@@ -120,7 +128,7 @@ int main() {
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
     // 7. 帧驱动：33ms 一帧——消费唯一跨线程门（Frame/Closed 控制帧族）+ 登录宽限清理 + 快照广播
-    int tickCount = 0;                                    // 子 reactor 活性心跳：~1s 一行 worker 在线计数
+    std::string lastWorkerSt;                             // 子 reactor 状态行：空串=未打过——首拍自证，变化才再落行
     loop.runEvery(33, [&] {
         std::deque<QueuedEvent> local;                   // swap 出来再处理（锁内零业务）
         { std::lock_guard<std::mutex> lk(gqMx); local.swap(gq); }
@@ -156,14 +164,13 @@ int main() {
         writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
         writer.deliverMatch(match.TickSnapshot());           // 33ms 实体快照广播（17v2，不含自机）
 
-        // 子 reactor 活性心跳（~1s 一行，低频不刷屏）：每 worker 在线计数——帧在跑、连接有主，抬眼可验
-        if (++tickCount % 30 == 0) {
-            std::string st = "[Worker 状态]";
-            for (int i = 0; i < static_cast<int>(workers.size()); ++i)
-                st += " worker-" + std::to_string(i) + " 在线=" + std::to_string(workers[i]->connCount.load());
-            st += " 总在线=" + std::to_string(connections.size());
-            LOG_INFO(st);
-        }
+        // 子 reactor 状态行：首拍一行（开机自证"帧循环在跑、计数管线通"）+ 计数变化才再落行——
+        // 空闲零噪音，连接进出/均分变化各有存照（逐连接明细另有 新连接/连接关闭 行，此行只管账面）
+        std::string st = "[Worker 状态]";
+        for (int i = 0; i < static_cast<int>(workers.size()); ++i)
+            st += " worker-" + std::to_string(i) + " 在线=" + std::to_string(workers[i]->connCount.load());
+        st += " 总在线=" + std::to_string(connections.size());
+        if (st != lastWorkerSt) { LOG_INFO(st); lastWorkerSt = st; }
 
         // 优雅关闭（D2-14/D3-19）：关服语义在用例，main 只搬运——广播 KICKED(3) 后退出事件循环
         if (gShutdownRequested) {
@@ -175,7 +182,7 @@ int main() {
 
     // 8. Acceptor：接客 → 选 worker（最少连接计数 argmin——main 单线程所有权，零锁零原子）
     //    对象 main 构造（连接表/发送视角），Channel 注册投归属线程 Start()（epoll 操作永不跨线程）
-    net::Acceptor acceptor(&loop, common::network::InetAddress(kListenPort));
+    net::Acceptor acceptor(&loop, common::network::InetAddress(listenPort()));
     acceptor.setNewConnectionCallback([&](int connfd, const common::network::InetAddress& peer) {
         // fd 复用旧账结清（档二 UAF 根因的前半）：同号旧连接的收尾已在归属线程完成（fd 已关才会
         // 被内核复用），但它的 Closed 报丧可能还在队列里——先在此结清它的业务账，防止残留会话
@@ -225,7 +232,7 @@ int main() {
                  " 在线=" + std::to_string(connections.size()));
     });
 
-    LOG_INFO("Sightline 服务器启动，监听 :" + std::to_string(kListenPort) + "（" +
+    LOG_INFO("Sightline 服务器启动，监听 :" + std::to_string(listenPort()) + "（" +
              (workers.empty() ? "单线程拓扑"
                               : ("主从 Reactor · IO workers=" + std::to_string(workers.size()))) +
              " · 帧队列 · 心跳 · 登录+房间+对局）");

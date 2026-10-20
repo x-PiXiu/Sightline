@@ -6,7 +6,8 @@
 import asyncio, sys, time
 from collections import Counter
 
-HOST, PORT = "127.0.0.1", 18888
+HOST = "127.0.0.1"
+PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 18888
 
 def frame(msgid: int, payload: bytes = b"") -> bytes:
     ln = 2 + len(payload)
