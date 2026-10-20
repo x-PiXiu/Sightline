@@ -206,11 +206,13 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
     if (DAck > 0) {
         const FVector SegVel = (SnapB.Pos - SnapA.Pos) * (30.0f / static_cast<float>(DAck));
         // 发端上报间隔实测 20~46ms 抖（双 PIE 时间片量化 World 定时器）——单段估计误差比
-        // 33.3/间隔 ∈[0.6,1.4]，匀速跑也会出 450/279/67 乱序=BS 轴直立↔俯冲横跳的残余病根。
-        // 向量单极低通（τ≈160ms）抹平间隔抖动；钳到 MaxWalkSpeed 420——BS 顶格（冲刺姿态）
-        // 从此不被误触。
-        SmoothedRemoteVel = FMath::Lerp(SmoothedRemoteVel, SegVel, 0.1f);
-        RemoteVelocity = SmoothedRemoteVel.GetClampedToMaxSize(420.f);
+        // 33.3/间隔 ∈[0.6,1.4]，匀速跑也会出 450/279/67 乱序=BS 轴直立↔俯冲横跳。
+        // 非对称低通：升速慢 α0.1（滤抖动）/降速快 α0.25（停步 250ms 落 Idle——
+        // 均匀 α 的指数尾巴会让跑动动画停后拖 1.4s，实测"停了还跑几秒"的根源）。
+        const float Alpha = (SegVel.Size2D() < SmoothedRemoteVel.Size2D()) ? 0.25f : 0.1f;
+        SmoothedRemoteVel = FMath::Lerp(SmoothedRemoteVel, SegVel, Alpha);
+        if (SmoothedRemoteVel.Size2D() < 15.f) SmoothedRemoteVel = FVector::ZeroVector;   // 底部斩断：低速尾巴无物理意义
+        RemoteVelocity = SmoothedRemoteVel.GetClampedToMaxSize(420.f);   // 钳到 MaxWalkSpeed——BS 顶格不被误触
     }
 
     // 朝向插值（最短弧）
