@@ -1,0 +1,167 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="业务时序②账号与房间" id="seq02lobby">
+    <mxGraphModel dx="1560" dy="1000" grid="0" page="1" pageWidth="1560" pageHeight="2620" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="业务时序 ② · 账号与房间（登录 · 建房 · 进房 · 离房）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="22" width="1100" height="34" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="ep04 · 标准 UML · 函数名级" style="text;fontSize=15;fontColor=#666666;align=right;" vertex="1" parent="1"><mxGeometry x="1160" y="28" width="350" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="band1" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="190" width="1290" height="475" as="geometry"/></mxCell>
+        <mxCell id="band2" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="680" width="1290" height="330" as="geometry"/></mxCell>
+        <mxCell id="band3" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="1025" width="1290" height="550" as="geometry"/></mxCell>
+        <mxCell id="band4" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="1590" width="1290" height="700" as="geometry"/></mxCell>
+
+        <mxCell id="ph1" value="① 登录" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="197" width="220" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph2" value="② 建房" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="687" width="220" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph3" value="③ 进房 · 房间列表推送" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="1032" width="340" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph4" value="④ 离房 · 被踢 · 断线" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="1597" width="320" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="l0" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="172" as="sourcePoint"/><mxPoint x="175" y="2280" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l1" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="172" as="sourcePoint"/><mxPoint x="525" y="2280" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l2" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="172" as="sourcePoint"/><mxPoint x="875" y="2280" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l3" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="172" as="sourcePoint"/><mxPoint x="1225" y="2280" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="h0" value="ULoginWidgetBase /&#10;ULobbyWidgetBase /&#10;URoomWidgetBase&#10;UI 层 · 输入与展示" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="50" y="80" width="250" height="88" as="geometry"/></mxCell>
+        <mxCell id="h1" value="ULobbySession&#10;用例层 · 大厅会话状态机" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="400" y="80" width="250" height="88" as="geometry"/></mxCell>
+        <mxCell id="h2" value="ISendPort&#10;发送端口 · 只发建议" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="750" y="80" width="250" height="88" as="geometry"/></mxCell>
+        <mxCell id="h3" value="Server&#10;权威侧 · 房间状态权威" style="rounded=0;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1100" y="80" width="250" height="88" as="geometry"/></mxCell>
+
+        <mxCell id="a1" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="232" as="sourcePoint"/><mxPoint x="175" y="262" as="targetPoint"/><Array as="points"><mxPoint x="265" y="232"/><mxPoint x="265" y="262"/></Array></mxGeometry></mxCell>
+        <mxCell id="a1l" value="OnLoginClicked()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="234" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a2" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="302" as="sourcePoint"/><mxPoint x="525" y="302" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="a2l" value="Login(PlayerName)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="240" y="270" width="220" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a3" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="338" as="sourcePoint"/><mxPoint x="525" y="368" as="targetPoint"/><Array as="points"><mxPoint x="615" y="338"/><mxPoint x="615" y="368"/></Array></mxGeometry></mxCell>
+        <mxCell id="a3l" value="SendLenPrefixedName(MSG_C2S_LOGIN, Name)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="630" y="340" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a4" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="404" as="sourcePoint"/><mxPoint x="875" y="404" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="a4l" value="Send(MSG_C2S_LOGIN, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="540" y="372" width="320" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a5" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="450" as="sourcePoint"/><mxPoint x="525" y="450" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="a5l" value="OnFrame(5, MSG_S2C_LOGIN_RESULT)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="665" y="418" width="420" height="26" as="geometry"/></mxCell>
+        <mxCell id="a5n" value="经 GameInstance 转发 · 帧由 AsyncTask 门投回游戏线程" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="665" y="454" width="420" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="a6" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="510" as="sourcePoint"/><mxPoint x="525" y="540" as="targetPoint"/><Array as="points"><mxPoint x="615" y="510"/><mxPoint x="615" y="540"/></Array></mxGeometry></mxCell>
+        <mxCell id="a6l" value="Model.bLoggedIn = true ; PlayerId 写入" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="630" y="512" width="400" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a7" style="edgeStyle=none;strokeColor=#d6b656;strokeWidth=2;endArrow=open;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="580" as="sourcePoint"/><mxPoint x="175" y="580" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="a7l" value="OnLoginResult.Broadcast(bSuccess, PlayerId, Message)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="120" y="548" width="460" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="a8" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="616" as="sourcePoint"/><mxPoint x="175" y="646" as="targetPoint"/><Array as="points"><mxPoint x="265" y="616"/><mxPoint x="265" y="646"/></Array></mxGeometry></mxCell>
+        <mxCell id="a8l" value="HandleLoginResult(bSuccess, PlayerId, Message)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="618" width="440" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="b1" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="724" as="sourcePoint"/><mxPoint x="175" y="754" as="targetPoint"/><Array as="points"><mxPoint x="265" y="724"/><mxPoint x="265" y="754"/></Array></mxGeometry></mxCell>
+        <mxCell id="b1l" value="OnCreateClicked()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="726" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="b2" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="794" as="sourcePoint"/><mxPoint x="525" y="794" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="b2l" value="CreateRoom(RoomName)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="235" y="762" width="230" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="b3" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="840" as="sourcePoint"/><mxPoint x="875" y="840" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="b3l" value="SendIntent(MSG_C2S_CREATE_ROOM, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="510" y="798" width="380" height="26" as="geometry"/></mxCell>
+        <mxCell id="b3n" value="SendIntent = 只发包，客户端只发建议" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="510" y="844" width="380" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="b4" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="910" as="sourcePoint"/><mxPoint x="525" y="910" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="b4l" value="OnFrame(7, MSG_S2C_CREATE_RESULT)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="665" y="878" width="420" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="b5" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="946" as="sourcePoint"/><mxPoint x="525" y="976" as="targetPoint"/><Array as="points"><mxPoint x="615" y="946"/><mxPoint x="615" y="976"/></Array></mxGeometry></mxCell>
+        <mxCell id="b5l" value="OnActionFailed.Broadcast(Reason)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="630" y="948" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="b5n" value="失败分支 · 成功则静默等待服务器推送" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="630" y="980" width="420" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="c1" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1070" as="sourcePoint"/><mxPoint x="175" y="1100" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1070"/><mxPoint x="265" y="1100"/></Array></mxGeometry></mxCell>
+        <mxCell id="c1l" value="OnJoinClicked()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="1072" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c2" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1140" as="sourcePoint"/><mxPoint x="525" y="1140" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c2l" value="JoinRoom(RoomId)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="255" y="1108" width="190" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c3" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1186" as="sourcePoint"/><mxPoint x="875" y="1186" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c3l" value="SendIntent(MSG_C2S_JOIN_ROOM, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="525" y="1154" width="350" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c4" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="1232" as="sourcePoint"/><mxPoint x="525" y="1232" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c4l" value="OnFrame(11, MSG_S2C_ROOM_LIST)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="675" y="1200" width="400" height="26" as="geometry"/></mxCell>
+        <mxCell id="c4n" value="一切房间状态以服务器推送为准（权威原则）" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="675" y="1236" width="420" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="c5" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1294" as="sourcePoint"/><mxPoint x="525" y="1324" as="targetPoint"/><Array as="points"><mxPoint x="615" y="1294"/><mxPoint x="615" y="1324"/></Array></mxGeometry></mxCell>
+        <mxCell id="c5l" value="OnRoomListChanged.Broadcast(Rooms)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="630" y="1296" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c6" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1360" as="sourcePoint"/><mxPoint x="175" y="1390" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1360"/><mxPoint x="265" y="1390"/></Array></mxGeometry></mxCell>
+        <mxCell id="c6l" value="HandleRoomListChanged(Rooms)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="1362" width="360" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c7" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="1426" as="sourcePoint"/><mxPoint x="525" y="1426" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c7l" value="OnFrame(12, MSG_S2C_ROOM_STATE)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="675" y="1394" width="400" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c8" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1462" as="sourcePoint"/><mxPoint x="525" y="1492" as="targetPoint"/><Array as="points"><mxPoint x="615" y="1462"/><mxPoint x="615" y="1492"/></Array></mxGeometry></mxCell>
+        <mxCell id="c8l" value="OnRoomStateChanged.Broadcast(RoomId, HostName, Members)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="630" y="1464" width="490" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="c9" style="endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1528" as="sourcePoint"/><mxPoint x="175" y="1558" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1528"/><mxPoint x="265" y="1558"/></Array></mxGeometry></mxCell>
+        <mxCell id="c9l" value="HandleRoomStateChanged(RoomId, HostName, Members)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="1530" width="460" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="altF" value="" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#666666;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="80" y="1635" width="1260" height="645" as="geometry"/></mxCell>
+        <mxCell id="altT" value="alt" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="80" y="1635" width="110" height="36" as="geometry"/></mxCell>
+        <mxCell id="condA" value="［A］ 主动离房" style="text;fontSize=15;fontStyle=1;fontColor=#82b366;align=left;" vertex="1" parent="1"><mxGeometry x="220" y="1640" width="260" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d1" style="endArrow=block;endFill=1;strokeColor=#82b366;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1685" as="sourcePoint"/><mxPoint x="175" y="1715" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1685"/><mxPoint x="265" y="1715"/></Array></mxGeometry></mxCell>
+        <mxCell id="d1l" value="OnLeaveClicked()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#82b366;" vertex="1" parent="1"><mxGeometry x="278" y="1687" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d2" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1755" as="sourcePoint"/><mxPoint x="525" y="1755" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d2l" value="LeaveRoom()" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#82b366;" vertex="1" parent="1"><mxGeometry x="270" y="1723" width="160" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d3" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1801" as="sourcePoint"/><mxPoint x="875" y="1801" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d3l" value="SendIntent(MSG_C2S_LEAVE_ROOM)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#82b366;" vertex="1" parent="1"><mxGeometry x="530" y="1769" width="340" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="altDiv" style="endArrow=none;dashed=1;strokeColor=#666666;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="80" y="1841" as="sourcePoint"/><mxPoint x="1340" y="1841" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="condB" value="［B］ 被踢 / 断线" style="text;fontSize=15;fontStyle=1;fontColor=#990000;align=left;" vertex="1" parent="1"><mxGeometry x="220" y="1848" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d4" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="1889" as="sourcePoint"/><mxPoint x="525" y="1889" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d4l" value="OnFrame(13, MSG_S2C_KICKED)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="675" y="1857" width="400" height="26" as="geometry"/></mxCell>
+        <mxCell id="d4n" value="KICKED 原因码 1顶号 / 2登录超时 / 3服务器关闭" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="675" y="1893" width="460" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="d5" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1929" as="sourcePoint"/><mxPoint x="525" y="1959" as="targetPoint"/><Array as="points"><mxPoint x="615" y="1929"/><mxPoint x="615" y="1959"/></Array></mxGeometry></mxCell>
+        <mxCell id="d5l" value="ResetModel()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="630" y="1931" width="240" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d6" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=open;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1999" as="sourcePoint"/><mxPoint x="175" y="1999" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="d6l" value="OnKicked.Broadcast(ReasonCode)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="195" y="1967" width="310" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d7" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="2035" as="sourcePoint"/><mxPoint x="175" y="2065" as="targetPoint"/><Array as="points"><mxPoint x="265" y="2035"/><mxPoint x="265" y="2065"/></Array></mxGeometry></mxCell>
+        <mxCell id="d7l" value="HandleKicked(ReasonCode)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="278" y="2037" width="330" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="subT" value="或：链路丢失（被动断线）" style="text;fontSize=15;fontColor=#666666;align=left;" vertex="1" parent="1"><mxGeometry x="220" y="2074" width="300" height="26" as="geometry"/></mxCell>
+        <mxCell id="subDiv" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="100" y="2106" as="sourcePoint"/><mxPoint x="1320" y="2106" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="d8" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="2142" as="sourcePoint"/><mxPoint x="525" y="2172" as="targetPoint"/><Array as="points"><mxPoint x="615" y="2142"/><mxPoint x="615" y="2172"/></Array></mxGeometry></mxCell>
+        <mxCell id="d8l" value="NotifyLinkLost() → ResetModel()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="630" y="2144" width="340" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="d9" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;edgeStyle=none;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="2208" as="sourcePoint"/><mxPoint x="525" y="2238" as="targetPoint"/><Array as="points"><mxPoint x="615" y="2208"/><mxPoint x="615" y="2238"/></Array></mxGeometry></mxCell>
+        <mxCell id="d9l" value="OnLobbyLinkLost.Broadcast()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="630" y="2210" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="d9n" value="UI 清房间页 · 回大厅" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="630" y="2242" width="380" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="读法：左灰 = UI 层，黄 = 用例层 ULobbySession（唯一客户端状态所有者），右蓝 = 权威服务器。&#10;四段走完「登录 → 建房 → 进房/推送 → 离房/被踢/断线」；房间状态一切以服务器推送为准，客户端只发建议；&#10;Session 通过动态委托（虚线 Broadcast）通知 UI，UI 只在 Handle* 里刷新表现，不反向改 Model。" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=16;fontStyle=1;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="50" y="2315" width="1000" height="96" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="" style="rounded=0;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#999999;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1090" y="2315" width="270" height="260" as="geometry"/></mxCell>
+        <mxCell id="legendT" value="图例" style="text;fontSize=16;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="1108" y="2327" width="80" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k1" value="" style="rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1110" y="2359" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k1t" value="用例层 ULobbySession" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2355" width="200" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k2" value="" style="rounded=0;fillColor=#f5f5f5;strokeColor=#999999;" vertex="1" parent="1"><mxGeometry x="1110" y="2389" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k2t" value="UI 层 / ISendPort" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2385" width="200" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k3" value="" style="rounded=0;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="1110" y="2419" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k3t" value="服务器权威" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2415" width="200" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k4" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="1110" y="2449" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k4t" value="实线 = 同步调用" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2445" width="200" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k5" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#d6b656;dashed=1;dashPattern=8 4;" vertex="1" parent="1"><mxGeometry x="1110" y="2479" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k5t" value="虚线 = 委托 Broadcast" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2475" width="200" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k6" value="" style="rounded=0;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="1110" y="2509" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k6t" value="绿 = 主动离房正常分支" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2505" width="210" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="k7" value="" style="rounded=0;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1110" y="2539" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="k7t" value="红 = 被踢 / 断线异常" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="2535" width="210" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

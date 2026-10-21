@@ -1,0 +1,158 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="业务时序③对局移动同步" id="seq03match">
+    <mxGraphModel dx="1800" dy="1200" grid="0" page="1" pageWidth="2100" pageHeight="2870" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="业务时序 ③ · 对局移动同步（第 3 期朴素同步）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="22" width="1100" height="34" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="ep04 · 标准 UML · 函数名级" style="text;fontSize=15;fontColor=#666666;align=right;" vertex="1" parent="1"><mxGeometry x="1650" y="28" width="350" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="band1" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="185" width="2000" height="950" as="geometry"/></mxCell>
+        <mxCell id="band2" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="1165" width="2000" height="345" as="geometry"/></mxCell>
+        <mxCell id="band3" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="1540" width="2000" height="555" as="geometry"/></mxCell>
+        <mxCell id="band4" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="2125" width="2000" height="405" as="geometry"/></mxCell>
+
+        <mxCell id="ph1" value="① 开局（房主点开始）" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="192" width="260" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph2" value="② 本地 30Hz 上报" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="1172" width="240" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph3" value="③ 远端快照下发（30Hz）" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="1547" width="280" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph4" value="④ 成员离场" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="2132" width="200" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="l0" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="165" y="152" as="sourcePoint"/><mxPoint x="165" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l1" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="405" y="152" as="sourcePoint"/><mxPoint x="405" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l2" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="152" as="sourcePoint"/><mxPoint x="645" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l3" style="endArrow=none;dashed=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="885" y="152" as="sourcePoint"/><mxPoint x="885" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l4" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="152" as="sourcePoint"/><mxPoint x="1125" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l5" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1365" y="152" as="sourcePoint"/><mxPoint x="1365" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l6" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1605" y="152" as="sourcePoint"/><mxPoint x="1605" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l7" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1845" y="152" as="sourcePoint"/><mxPoint x="1845" y="2530" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="h0" value="URoomWidgetBase&#10;UI · 房间界面" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="55" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h1" value="USightlineGameInstance&#10;应用层 · 切图/生成" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="295" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h2" value="USightlineMatchSession&#10;用例层 · 组帧/分发" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="535" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h3" value="USightlineEntityRegistry&#10;纯实体态 · 可单测" style="rounded=0;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="775" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h4" value="USightlinePawnSpawner&#10;效果适配器 · Pawn" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1015" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h5" value="ASightlineCharacter&#10;角色 · 采样/插值" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1255" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h6" value="FSightlineConnection&#10;传输层 · Send" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1495" y="95" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="h7" value="Server&#10;权威侧" style="rounded=0;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1735" y="95" width="220" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="m1" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="165" y="230" as="sourcePoint"/><mxPoint x="165" y="260" as="targetPoint"/><Array as="points"><mxPoint x="255" y="230"/><mxPoint x="255" y="260"/></Array></mxGeometry></mxCell>
+        <mxCell id="m1l" value="OnStartMatchClicked()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="270" y="232" width="240" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m2" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="165" y="312" as="sourcePoint"/><mxPoint x="645" y="312" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m2l" value="StartMatch()" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="305" y="280" width="200" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m3" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="372" as="sourcePoint"/><mxPoint x="1605" y="372" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m3l" value="Send(MSG_C2S_START_MATCH, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="945" y="340" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="m3n" value="14 号 · 空 payload" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1005" y="377" width="240" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m4" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1845" y="440" as="sourcePoint"/><mxPoint x="645" y="440" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m4l" value="OnFrame(15, MSG_S2C_MATCH_START)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1055" y="408" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m5" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="488" as="sourcePoint"/><mxPoint x="645" y="518" as="targetPoint"/><Array as="points"><mxPoint x="735" y="488"/><mxPoint x="735" y="518"/></Array></mxGeometry></mxCell>
+        <mxCell id="m5l" value="bInMatch = true ; InputHistory.Reset()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="750" y="490" width="360" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m6" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="576" as="sourcePoint"/><mxPoint x="885" y="576" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m6l" value="ApplyMatchStart(SelfPlayerId, Roster)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="595" y="544" width="340" height="26" as="geometry"/></mxCell>
+        <mxCell id="m6n" value="Registry 零 UWorld 依赖，可纯单测" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="620" y="581" width="290" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m7" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="885" y="632" as="sourcePoint"/><mxPoint x="885" y="662" as="targetPoint"/><Array as="points"><mxPoint x="975" y="632"/><mxPoint x="975" y="662"/></Array></mxGeometry></mxCell>
+        <mxCell id="m7l" value="清场重建 Entities" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="990" y="634" width="220" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m8" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="885" y="678" as="sourcePoint"/><mxPoint x="885" y="708" as="targetPoint"/><Array as="points"><mxPoint x="975" y="678"/><mxPoint x="975" y="708"/></Array></mxGeometry></mxCell>
+        <mxCell id="m8l" value="OnEntitySpawned.Broadcast(PlayerId)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="990" y="680" width="330" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m9" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=open;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="766" as="sourcePoint"/><mxPoint x="405" y="766" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m9l" value="OnMatchStarted.Broadcast()" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="385" y="734" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m10" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="405" y="812" as="sourcePoint"/><mxPoint x="405" y="842" as="targetPoint"/><Array as="points"><mxPoint x="495" y="812"/><mxPoint x="495" y="842"/></Array></mxGeometry></mxCell>
+        <mxCell id="m10l" value="HandleMatchStarted()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="510" y="814" width="250" height="26" as="geometry"/></mxCell>
+        <mxCell id="m10n" value="→ OpenLevel + bPendingArenaSpawn = true" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="510" y="842" width="340" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m11" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="405" y="902" as="sourcePoint"/><mxPoint x="1125" y="902" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m11l" value="SpawnAllRemote(World, RemoteClass)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="595" y="870" width="340" height="26" as="geometry"/></mxCell>
+        <mxCell id="m11n" value="bSelf 跳过——本地 Pawn 由 GameMode 生成" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="625" y="907" width="360" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m12" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="962" as="sourcePoint"/><mxPoint x="1125" y="992" as="targetPoint"/><Array as="points"><mxPoint x="1215" y="962"/><mxPoint x="1215" y="992"/></Array></mxGeometry></mxCell>
+        <mxCell id="m12l" value="FindSpawnStart(World, SpawnIndex)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1230" y="964" width="310" height="26" as="geometry"/></mxCell>
+        <mxCell id="m12n" value="出生点三重匹配：内部名 / Tag / Label" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1230" y="992" width="320" height="22" as="geometry"/></mxCell>
+        <mxCell id="m12n2" value="出生点 = Spawn_{序号+1}（v3 契约规则 7）" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1230" y="1018" width="340" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m13" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="1086" as="sourcePoint"/><mxPoint x="1365" y="1086" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m13l" value="SpawnActor" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1165" y="1054" width="160" height="26" as="geometry"/></mxCell>
+        <mxCell id="m13n" value="生成远端角色" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1165" y="1091" width="160" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m14" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1365" y="1225" as="sourcePoint"/><mxPoint x="1365" y="1255" as="targetPoint"/><Array as="points"><mxPoint x="1455" y="1225"/><mxPoint x="1455" y="1255"/></Array></mxGeometry></mxCell>
+        <mxCell id="m14l" value="SampleLocalState()" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1470" y="1227" width="240" height="26" as="geometry"/></mxCell>
+        <mxCell id="m14n" value="FTimer 30Hz · 采 Pos/Yaw/Pitch/bFalling" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1470" y="1255" width="330" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m15" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1365" y="1320" as="sourcePoint"/><mxPoint x="645" y="1320" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m15l" value="ReportLocalState(S)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="885" y="1288" width="240" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m16" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="1372" as="sourcePoint"/><mxPoint x="645" y="1402" as="targetPoint"/><Array as="points"><mxPoint x="735" y="1372"/><mxPoint x="735" y="1402"/></Array></mxGeometry></mxCell>
+        <mxCell id="m16l" value="组帧 [12B pos][4B yaw][4B pitch][1B flags]" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="750" y="1374" width="400" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m17" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="1462" as="sourcePoint"/><mxPoint x="1605" y="1462" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m17l" value="Send(MSG_C2S_MOVE_REPORT, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="945" y="1430" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="m17n" value="16 号 · 30Hz 段状态上行" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1005" y="1467" width="240" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m18" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1845" y="1598" as="sourcePoint"/><mxPoint x="645" y="1598" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m18l" value="OnFrame(17, MSG_S2C_ENTITY_STATE)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1055" y="1566" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m19" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="1648" as="sourcePoint"/><mxPoint x="645" y="1678" as="targetPoint"/><Array as="points"><mxPoint x="735" y="1648"/><mxPoint x="735" y="1678"/></Array></mxGeometry></mxCell>
+        <mxCell id="m19l" value="FEntityStateV2::Parse(Payload, Off, Ent)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="750" y="1650" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="m19n" value="29B/实体" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="750" y="1678" width="140" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m20" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="1742" as="sourcePoint"/><mxPoint x="885" y="1742" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m20l" value="ApplyState(Pid, Pos, Yaw, Pitch, bFalling, AckedSeq)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="555" y="1710" width="420" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m21" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="885" y="1788" as="sourcePoint"/><mxPoint x="885" y="1818" as="targetPoint"/><Array as="points"><mxPoint x="975" y="1788"/><mxPoint x="975" y="1818"/></Array></mxGeometry></mxCell>
+        <mxCell id="m21l" value="OnEntityUpdated.Broadcast(PlayerId)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="990" y="1790" width="330" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m22" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="1838" as="sourcePoint"/><mxPoint x="1125" y="1868" as="targetPoint"/><Array as="points"><mxPoint x="1215" y="1838"/><mxPoint x="1215" y="1868"/></Array></mxGeometry></mxCell>
+        <mxCell id="m22l" value="HandleEntityUpdated(PlayerId)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1230" y="1840" width="290" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m23" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="1928" as="sourcePoint"/><mxPoint x="1365" y="1928" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m23l" value="ApplyState(Pos, Yaw, PitchDeg, bFalling, AckedSeq)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1045" y="1896" width="400" height="26" as="geometry"/></mxCell>
+        <mxCell id="m23n" value="速度分母用 ack 差不用接收时距" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1100" y="1933" width="300" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m24" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1365" y="1988" as="sourcePoint"/><mxPoint x="1365" y="2018" as="targetPoint"/><Array as="points"><mxPoint x="1455" y="1988"/><mxPoint x="1455" y="2018"/></Array></mxGeometry></mxCell>
+        <mxCell id="m24l" value="TickRemoteInterpolation(DeltaTime)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1470" y="1990" width="340" height="26" as="geometry"/></mxCell>
+        <mxCell id="m24n" value="两点快照 + 恒速线性插值" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1470" y="2018" width="250" height="22" as="geometry"/></mxCell>
+        <mxCell id="m24n2" value="kInterpDelaySec = 25ms" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1470" y="2044" width="220" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="optF" value="" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#999999;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="530" y="2165" width="1430" height="330" as="geometry"/></mxCell>
+        <mxCell id="optT" value="opt&#10;［成员离场］" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="530" y="2165" width="150" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="m25" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1845" y="2265" as="sourcePoint"/><mxPoint x="645" y="2265" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m25l" value="OnFrame(18, MSG_S2C_ENTITY_LEAVE)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1055" y="2233" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m26" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="645" y="2321" as="sourcePoint"/><mxPoint x="885" y="2321" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m26l" value="ApplyLeave(Pid)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="665" y="2289" width="200" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m27" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="885" y="2367" as="sourcePoint"/><mxPoint x="885" y="2397" as="targetPoint"/><Array as="points"><mxPoint x="975" y="2367"/><mxPoint x="975" y="2397"/></Array></mxGeometry></mxCell>
+        <mxCell id="m27l" value="OnEntityLeft.Broadcast(Pid)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="990" y="2369" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m28" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1125" y="2417" as="sourcePoint"/><mxPoint x="1125" y="2447" as="targetPoint"/><Array as="points"><mxPoint x="1215" y="2417"/><mxPoint x="1215" y="2447"/></Array></mxGeometry></mxCell>
+        <mxCell id="m28l" value="HandleEntityLeft(Pid)" style="text;fontSize=15;fontStyle=1;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1230" y="2419" width="250" height="26" as="geometry"/></mxCell>
+        <mxCell id="m28n" value="→ Destroy() 对端角色 · Live.Remove" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1230" y="2447" width="310" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="读法：黄=客户端应用/用例/角色，绿=纯实体态（零 UWorld 可单测），灰=UI/装配/传输，蓝=权威。一条流走完「开局 → 30Hz 上报 → 快照下发 → 成员离场」；&#10;本地只采样发段状态（21B），远端位姿全由 Registry 快照喂入——Registry 是唯一状态源，Spawner/Character 只负责生成与插值显示。" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=16;fontStyle=1;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="50" y="2570" width="1400" height="92" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="" style="rounded=0;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#999999;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1500" y="2570" width="250" height="236" as="geometry"/></mxCell>
+        <mxCell id="legendT" value="图例" style="text;fontSize=16;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="1518" y="2582" width="80" height="24" as="geometry"/></mxCell>
+        <mxCell id="c1" value="" style="rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1520" y="2614" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c1t" value="客户端应用层" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2610" width="180" height="24" as="geometry"/></mxCell>
+        <mxCell id="c2" value="" style="rounded=0;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="1520" y="2646" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c2t" value="纯逻辑 / 纯态" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2642" width="180" height="24" as="geometry"/></mxCell>
+        <mxCell id="c3" value="" style="rounded=0;fillColor=#f5f5f5;strokeColor=#999999;" vertex="1" parent="1"><mxGeometry x="1520" y="2678" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c3t" value="UI / 装配 / 传输" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2674" width="180" height="24" as="geometry"/></mxCell>
+        <mxCell id="c4" value="" style="rounded=0;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="1520" y="2710" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c4t" value="服务器权威" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2706" width="180" height="24" as="geometry"/></mxCell>
+        <mxCell id="c5" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="1520" y="2742" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c5t" value="实线 = 同步调用" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2738" width="180" height="24" as="geometry"/></mxCell>
+        <mxCell id="c6" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#666666;dashed=1;dashPattern=8 4;" vertex="1" parent="1"><mxGeometry x="1520" y="2774" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c6t" value="虚线 = Broadcast / 委托" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1556" y="2770" width="190" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

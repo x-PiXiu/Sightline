@@ -1,0 +1,116 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="业务时序①链路与连接" id="seq01link">
+    <mxGraphModel dx="1560" dy="1000" grid="0" page="1" pageWidth="1560" pageHeight="1850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="业务时序 ① · 链路与连接管理（收发 · 心跳 · 重连）" style="text;fontSize=24;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="50" y="22" width="1100" height="34" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="ep04 · 标准 UML · 函数名级" style="text;fontSize=15;fontColor=#666666;align=right;" vertex="1" parent="1"><mxGeometry x="1160" y="28" width="350" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="band1" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="185" width="1290" height="215" as="geometry"/></mxCell>
+        <mxCell id="band2" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="415" width="1290" height="395" as="geometry"/></mxCell>
+        <mxCell id="band3" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="825" width="1290" height="340" as="geometry"/></mxCell>
+        <mxCell id="band4" value="" style="rounded=0;whiteSpace=wrap;fillColor=#fafafa;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="50" y="1185" width="1290" height="380" as="geometry"/></mxCell>
+
+        <mxCell id="ph1" value="① 连接建立" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="192" width="220" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph2" value="② 收帧 · 粘包切帧 · 损伤注入" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="422" width="380" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph3" value="③ 心跳 · ping 掐表" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="832" width="300" height="26" as="geometry"/></mxCell>
+        <mxCell id="ph4" value="④ LAG 判定 · 断线重连" style="text;fontSize=17;fontStyle=1;fontColor=#0288d1;align=left;" vertex="1" parent="1"><mxGeometry x="66" y="1192" width="320" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="l0" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="152" as="sourcePoint"/><mxPoint x="175" y="1580" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l1" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="152" as="sourcePoint"/><mxPoint x="525" y="1580" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l2" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="152" as="sourcePoint"/><mxPoint x="875" y="1580" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="l3" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="152" as="sourcePoint"/><mxPoint x="1225" y="1580" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="h0" value="USightlineGameInstance&#10;应用层 · 状态机" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="70" y="95" width="210" height="56" as="geometry"/></mxCell>
+        <mxCell id="h1" value="FSightlineConnection&#10;传输层 · Socket" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="420" y="95" width="210" height="56" as="geometry"/></mxCell>
+        <mxCell id="h2" value="FSightlineReceiver&#10;接收线程 · FRunnable" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="770" y="95" width="210" height="56" as="geometry"/></mxCell>
+        <mxCell id="h3" value="Server&#10;权威侧" style="rounded=0;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1120" y="95" width="210" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="m1" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="228" as="sourcePoint"/><mxPoint x="525" y="228" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m1l" value="Connect(Host, Port)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="225" y="196" width="250" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m2" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="278" as="sourcePoint"/><mxPoint x="525" y="316" as="targetPoint"/><Array as="points"><mxPoint x="615" y="278"/><mxPoint x="615" y="316"/></Array></mxGeometry></mxCell>
+        <mxCell id="m2l" value="CreateSocket(NAME_Stream)" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="628" y="282" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m3" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="332" as="sourcePoint"/><mxPoint x="525" y="364" as="targetPoint"/><Array as="points"><mxPoint x="615" y="332"/><mxPoint x="615" y="364"/></Array></mxGeometry></mxCell>
+        <mxCell id="m3l" value="SetNonBlocking(true)" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="628" y="334" width="240" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m4" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="374" as="sourcePoint"/><mxPoint x="525" y="398" as="targetPoint"/><Array as="points"><mxPoint x="615" y="374"/><mxPoint x="615" y="398"/></Array></mxGeometry></mxCell>
+        <mxCell id="m4l" value="Socket-&gt;Connect(Addr)  非阻塞" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="628" y="372" width="300" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m5" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="458" as="sourcePoint"/><mxPoint x="875" y="458" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m5l" value="TCP 字节流（可粘包）" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="925" y="426" width="260" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m6" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="500" as="sourcePoint"/><mxPoint x="875" y="530" as="targetPoint"/><Array as="points"><mxPoint x="965" y="500"/><mxPoint x="965" y="530"/></Array></mxGeometry></mxCell>
+        <mxCell id="m6l" value="HasPendingData() -&gt; Recv()" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="978" y="502" width="280" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m7" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="546" as="sourcePoint"/><mxPoint x="875" y="576" as="targetPoint"/><Array as="points"><mxPoint x="965" y="546"/><mxPoint x="965" y="576"/></Array></mxGeometry></mxCell>
+        <mxCell id="m7l" value="SightlineProtocol::TryDecode(Buffer, Frame)" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="978" y="540" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="m7n" value="粘包批次逐帧切出 · FFrame 复用前必 Reset" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="978" y="576" width="360" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="optF" value="" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#999999;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="760" y="614" width="680" height="138" as="geometry"/></mxCell>
+        <mxCell id="optT" value="opt&#10;［损伤滑块］" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=14;fontStyle=1;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="1"><mxGeometry x="760" y="614" width="150" height="56" as="geometry"/></mxCell>
+        <mxCell id="m8" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="692" as="sourcePoint"/><mxPoint x="875" y="722" as="targetPoint"/><Array as="points"><mxPoint x="1000" y="692"/><mxPoint x="1000" y="722"/></Array></mxGeometry></mxCell>
+        <mxCell id="m8l" value="DelayQueue.push_back({DeliverAtMs, Frame})" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="1013" y="686" width="380" height="26" as="geometry"/></mxCell>
+        <mxCell id="m8n" value="SetInboundDelayMs(Ms) 原子 · 抖动有界随机游走" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="1013" y="722" width="380" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m9" style="edgeStyle=none;strokeColor=#0288d1;strokeWidth=2;endArrow=open;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="875" y="790" as="sourcePoint"/><mxPoint x="175" y="790" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m9l" value="AsyncTask(GameThread)  →  OnFrameReceived(MsgId, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="290" y="758" width="500" height="26" as="geometry"/></mxCell>
+        <mxCell id="m9n" value="唯一跨线程门 · 值拷贝投递" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="390" y="794" width="300" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m10" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="868" as="sourcePoint"/><mxPoint x="175" y="898" as="targetPoint"/><Array as="points"><mxPoint x="265" y="868"/><mxPoint x="265" y="898"/></Array></mxGeometry></mxCell>
+        <mxCell id="m10l" value="HandleTick(DeltaTime) → HandleHeartbeatTick()" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="864" width="390" height="26" as="geometry"/></mxCell>
+        <mxCell id="m10n" value="FTSTicker 承载（World 级 Timer 随切图死亡）" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="278" y="896" width="390" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="m11" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="954" as="sourcePoint"/><mxPoint x="525" y="954" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m11l" value="Send(MSG_C2S_HEARTBEAT, Payload)" style="text;fontSize=15;fontStyle=1;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="215" y="924" width="330" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m12" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1012" as="sourcePoint"/><mxPoint x="1225" y="1012" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m12l" value="Socket-&gt;Send(Encode(MsgId, Payload))" style="text;fontSize=15;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="660" y="980" width="360" height="26" as="geometry"/></mxCell>
+        <mxCell id="m12n" value="PendingHeartbeats.Add(seq, MonotonicMs())" style="text;fontSize=14;align=center;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="660" y="1018" width="360" height="20" as="geometry"/></mxCell>
+
+        <mxCell id="m13" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1225" y="1086" as="sourcePoint"/><mxPoint x="175" y="1086" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m13l" value="MSG_S2C_HEARTBEAT_ACK  →  OnFrameReceived(3, Payload)" style="text;fontSize=15;align=center;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="430" y="1054" width="540" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m14" style="edgeStyle=none;strokeColor=#333333;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1126" as="sourcePoint"/><mxPoint x="175" y="1156" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1126"/><mxPoint x="265" y="1156"/></Array></mxGeometry></mxCell>
+        <mxCell id="m14l" value="LastPingMs = Now − PendingHeartbeats[seq]" style="text;fontSize=15;align=left;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="278" y="1128" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="altF" value="" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#666666;strokeWidth=2;" vertex="1" parent="1"><mxGeometry x="80" y="1235" width="1260" height="345" as="geometry"/></mxCell>
+        <mxCell id="altT" value="alt" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1"><mxGeometry x="80" y="1235" width="110" height="36" as="geometry"/></mxCell>
+        <mxCell id="condA" value="［A］ 下行帧到达 → 链路活性" style="text;fontSize=15;fontStyle=1;fontColor=#82b366;align=left;" vertex="1" parent="1"><mxGeometry x="220" y="1240" width="320" height="26" as="geometry"/></mxCell>
+        <mxCell id="condB" value="［B］ 超时 / 断开" style="text;fontSize=15;fontStyle=1;fontColor=#990000;align=left;" vertex="1" parent="1"><mxGeometry x="220" y="1382" width="220" height="26" as="geometry"/></mxCell>
+        <mxCell id="altDiv" style="endArrow=none;dashed=1;strokeColor=#666666;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="80" y="1372" as="sourcePoint"/><mxPoint x="1340" y="1372" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="m15" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1300" as="sourcePoint"/><mxPoint x="175" y="1330" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1300"/><mxPoint x="265" y="1330"/></Array></mxGeometry></mxCell>
+        <mxCell id="m15l" value="LastAckMonotonicMs = MonotonicMs()  ;  bLag = false" style="text;fontSize=15;align=left;fontColor=#82b366;" vertex="1" parent="1"><mxGeometry x="278" y="1296" width="450" height="26" as="geometry"/></mxCell>
+        <mxCell id="m15n" value="LAG 解除 · 任何下行帧都算活性（17 快照在流时不得误判）" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="278" y="1330" width="520" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="m17" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="525" y="1432" as="sourcePoint"/><mxPoint x="175" y="1432" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="m17l" value="OnDisconnected(Reason)" style="text;fontSize=15;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="480" y="1400" width="240" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m16" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1462" as="sourcePoint"/><mxPoint x="175" y="1492" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1462"/><mxPoint x="265" y="1492"/></Array></mxGeometry></mxCell>
+        <mxCell id="m16l" value="bLag = true  ;  OnConnectionLost(Reason)" style="text;fontSize=15;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="278" y="1464" width="380" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="m18" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="175" y="1510" as="sourcePoint"/><mxPoint x="175" y="1540" as="targetPoint"/><Array as="points"><mxPoint x="265" y="1510"/><mxPoint x="265" y="1540"/></Array></mxGeometry></mxCell>
+        <mxCell id="m18l" value="ScheduleReconnect() → ReconnectAtMonotonicMs" style="text;fontSize=15;align=left;fontColor=#990000;" vertex="1" parent="1"><mxGeometry x="278" y="1506" width="410" height="26" as="geometry"/></mxCell>
+        <mxCell id="m18n" value="到点调 Connect() 重试 · bShuttingDown 期间禁止自动重连" style="text;fontSize=14;align=left;fontColor=#888888;" vertex="1" parent="1"><mxGeometry x="278" y="1542" width="470" height="22" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="读法：左黄=客户端应用层，右蓝=权威服务器，灰=传输装配。一条线走完「建连 → 收帧 → 心跳 → 重连」四段；&#10;唯一的跨线程边界是 AsyncTask 那条蓝色虚线，其余全在游戏线程或接收线程内部。" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=16;fontStyle=1;align=left;spacing=14;" vertex="1" parent="1"><mxGeometry x="50" y="1615" width="1000" height="92" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="" style="rounded=0;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#999999;align=left;spacing=12;" vertex="1" parent="1"><mxGeometry x="1090" y="1615" width="250" height="196" as="geometry"/></mxCell>
+        <mxCell id="legendT" value="图例" style="text;fontSize=16;fontStyle=1;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="1108" y="1627" width="80" height="24" as="geometry"/></mxCell>
+        <mxCell id="c1" value="" style="rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1110" y="1659" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c1t" value="客户端应用层" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="1655" width="170" height="24" as="geometry"/></mxCell>
+        <mxCell id="c2" value="" style="rounded=0;fillColor=#f5f5f5;strokeColor=#999999;" vertex="1" parent="1"><mxGeometry x="1110" y="1691" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c2t" value="传输 / 装配层" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="1687" width="170" height="24" as="geometry"/></mxCell>
+        <mxCell id="c3" value="" style="rounded=0;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="1110" y="1723" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c3t" value="服务器权威" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="1719" width="170" height="24" as="geometry"/></mxCell>
+        <mxCell id="c4" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#333333;" vertex="1" parent="1"><mxGeometry x="1110" y="1755" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c4t" value="实线 = 同步调用" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="1751" width="170" height="24" as="geometry"/></mxCell>
+        <mxCell id="c5" value="" style="rounded=0;fillColor=#ffffff;strokeColor=#0288d1;dashed=1;dashPattern=8 4;" vertex="1" parent="1"><mxGeometry x="1110" y="1787" width="26" height="18" as="geometry"/></mxCell>
+        <mxCell id="c5t" value="虚线 = 跨线程 / 回调" style="text;fontSize=15;align=left;" vertex="1" parent="1"><mxGeometry x="1146" y="1783" width="180" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
