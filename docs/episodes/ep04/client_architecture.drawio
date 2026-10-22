@@ -1,0 +1,50 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="客户端架构v4·第4期" id="clientarchv4">
+    <mxGraphModel dx="1400" dy="900" grid="0" page="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Sightline 客户端架构（第 4 期 · v4）—— 在第 3 期骨架上生长" style="text;fontSize=22;fontStyle=1;fontColor=#333333;align=left;sketch=1;" vertex="1" parent="1"><mxGeometry x="40" y="16" width="1000" height="34" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="草案 v1 · 2026-10-22（红粗边=本期新增，淡化=既有复用）" style="text;fontSize=14;fontColor=#666666;align=right;" vertex="1" parent="1"><mxGeometry x="980" y="20" width="380" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="bandui" value="" style="rounded=1;fillColor=#f9f9f9;strokeColor=#999999;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="80" width="1300" height="80" as="geometry"/></mxCell>
+        <mxCell id="bandui_l" value="UI（UMG 皮 · 蓝图零逻辑）" style="text;fontSize=16;fontStyle=1;fontColor=#555555;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="88" width="300" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_ui" value="三界面 WBP（登录 / 大厅 / 房间）· 未改动" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#999999;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="80" y="106" width="480" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="bandgi" value="" style="rounded=1;fillColor=#f8fbff;strokeColor=#6c8ebf;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="180" width="1300" height="100" as="geometry"/></mxCell>
+        <mxCell id="bandgi_l" value="GameInstance（装配根 · 生命周期锚）" style="text;fontSize=16;fontStyle=1;fontColor=#1f4e79;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="188" width="380" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_route" value="帧路由&#10;1/3→心跳 · 15/17/18→对局" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="80" y="208" width="330" height="60" as="geometry"/></mxCell>
+        <mxCell id="c_hb" value="心跳 · LAG · 重连&#10;FTSTicker（切图不死）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="430" y="208" width="330" height="60" as="geometry"/></mxCell>
+        <mxCell id="c_hud" value="和解 HUD（新增）&#10;误差 · 和解次数 · 重放 · ack差 · 滑块" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="780" y="208" width="380" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="bandsess" value="" style="rounded=1;fillColor=#fffaf2;strokeColor=#d79b00;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="300" width="1300" height="120" as="geometry"/></mxCell>
+        <mxCell id="bandsess_l" value="会话层（用例）" style="text;fontSize=16;fontStyle=1;fontColor=#7f6000;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="308" width="200" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_lobbyS" value="LobbySession&#10;登录 / 房间（未改动）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#d79b00;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="80" y="328" width="300" height="60" as="geometry"/></mxCell>
+        <mxCell id="c_matchS" value="MatchSession（增强）&#10;19 上报 30Hz · 环形缓冲 1s&#10;ReconcileSelf 对账 → 委托" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="400" y="324" width="400" height="84" as="geometry"/></mxCell>
+        <mxCell id="c_rec" value="SightlineReconcile.h 纯决策头（新）&#10;零 UE 依赖 · 三方对账判定&#10;20 断言脱引擎单测" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="840" y="324" width="430" height="84" as="geometry"/></mxCell>
+
+        <mxCell id="banddata" value="" style="rounded=1;fillColor=#f6fbf4;strokeColor=#82b366;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="440" width="1300" height="95" as="geometry"/></mxCell>
+        <mxCell id="banddata_l" value="数据 / 适配" style="text;fontSize=16;fontStyle=1;fontColor=#1f6b30;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="448" width="160" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_reg" value="Registry 纯态 + 委托&#10;+ AckedSeq 字段（v4.1）" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="80" y="466" width="400" height="56" as="geometry"/></mxCell>
+        <mxCell id="c_spawner" value="PawnSpawner 效果适配&#10;状态变化 → 生成 / 销毁 / 摆位（透传 AckedSeq）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#82b366;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="520" y="466" width="440" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="bandchar" value="" style="rounded=1;fillColor=#fff5f5;strokeColor=#c8161d;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="555" width="1300" height="180" as="geometry"/></mxCell>
+        <mxCell id="bandchar_l" value="Character（表现层 · 本地与远端一体）" style="text;fontSize=16;fontStyle=1;fontColor=#c8161d;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="563" width="400" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_local" value="本地：预测先行&#10;CMC 真速度 · 30Hz 上报" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#c8161d;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="80" y="583" width="300" height="64" as="geometry"/></mxCell>
+        <mxCell id="c_interp" value="远端插值（新增）&#10;双快照恒速线性 + 限幅外推 200ms&#10;速度 = 位移×30/Δack（发端时钟口径）&#10;非对称低通 α升0.1/降0.25 · 钳 420" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=14;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="400" y="583" width="430" height="88" as="geometry"/></mxCell>
+        <mxCell id="c_mono" value="远端 = 运动学木偶&#10;关 CMC 重力 / 摩擦" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="850" y="583" width="250" height="64" as="geometry"/></mxCell>
+        <mxCell id="c_getv" value="GetVelocity 覆写&#10;ABP 读插值速度" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=15;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="1120" y="583" width="200" height="64" as="geometry"/></mxCell>
+        <mxCell id="c_corr" value="OnSelfCorrected 瞬移落地：TeleportPhysics · 位移空间平移（本地预测后续位移原样保留）" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#c8161d;strokeWidth=3;fontSize=14;sketch=1;curveFitting=1;jiggle=2" vertex="1" parent="1"><mxGeometry x="400" y="685" width="430" height="40" as="geometry"/></mxCell>
+        <mxCell id="c_anim" value="动画输入：Speed / DirectionAngle ← 平滑速度&#10;（本地=引擎直采 · 远端=插值速度）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#c8161d;fontSize=14;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="850" y="685" width="470" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="bandconn" value="" style="rounded=1;fillColor=#f9f9f9;strokeColor=#999999;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="40" y="755" width="1300" height="80" as="geometry"/></mxCell>
+        <mxCell id="bandconn_l" value="Connection（传输层 · 谦卑对象）" style="text;fontSize=16;fontStyle=1;fontColor=#555555;align=left;sketch=1;opacity=30" vertex="1" parent="1"><mxGeometry x="56" y="763" width="330" height="24" as="geometry"/></mxCell>
+        <mxCell id="c_conn" value="接收线程 → AsyncTask 唯一跨线程门 · M5 延迟队列（未改动）" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#999999;fontSize=15;sketch=1;curveFitting=1;jiggle=2;opacity=30" vertex="1" parent="1"><mxGeometry x="80" y="781" width="620" height="44" as="geometry"/></mxCell>
+
+        <mxCell id="c_deleg" style="edgeStyle=none;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;dashed=1;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="408" as="sourcePoint"/><mxPoint x="500" y="685" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="c_deleg_l" value="OnSelfCorrected 委托&#10;（会话不认识 Pawn，事件反转）" style="text;fontSize=13;fontColor=#666666;align=left;" vertex="1" parent="1"><mxGeometry x="508" y="530" width="260" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="legend_t" value="图例：红粗边 = 第 4 期新增　　淡化 = 既有复用　　金色虚线 = 委托事件（依赖倒置）" style="text;fontSize=15;fontColor=#333333;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="855" width="900" height="24" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
