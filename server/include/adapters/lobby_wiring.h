@@ -82,7 +82,11 @@ public:
                     payload += u32(r.roomId) + char(r.memberCount)
                              + lenPrefixed(r.roomName) + lenPrefixed(r.hostName);
                 }
-                broadcastLobby(payload);                // 发给所有"已登录未进房"连接
+                if (e.fd > 0) {
+                    send(e.fd, protocol::MSG_S2C_ROOM_LIST, payload);  // fd>0：登录首照单发（非广播）
+                } else {
+                    broadcastLobby(payload);            // fd=0：房间变化 → 所有"已登录未进房"连接
+                }
                 break;
             }
             case ET::RoomStatePush: {

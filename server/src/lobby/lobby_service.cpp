@@ -114,7 +114,8 @@ std::vector<Event> LobbyService::Login(int fd, const std::string& name) {
     Event ok{EvType::LoginOk, fd, p.playerId};
     out.push_back(ok);
     Event list{EvType::RoomListPush};                   // 新大厅订阅者的首次全量快照
-    list.rooms = Snapshot();
+    list.fd = fd;                                       // 单发给新订阅者（fd≠0=unicast；登录不改房间列表，
+    list.rooms = Snapshot();                            //  广播是对端无关的冗余——5k 并发实测 O(N²) 拖垮登录，2026-10-23 修）
     list.count = list.rooms.size();
     out.push_back(std::move(list));
     return out;
