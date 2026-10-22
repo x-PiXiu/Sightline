@@ -1,0 +1,37 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="和解时序图上镜版" id="t3_seq">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="和解时序——手感先行，权威兜底" style="text;fontSize=38;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="40" width="1000" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="时序图上镜版 · 草案 v1 · 2026-10-23" style="text;fontSize=18;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1440" y="52" width="410" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="cliHead" value="UE 客户端 · 手感侧" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="360" y="120" width="420" height="66" as="geometry"/></mxCell>
+        <mxCell id="srvHead" value="服务器 · 判定侧" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=24;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1180" y="120" width="420" height="66" as="geometry"/></mxCell>
+        <mxCell id="cliLife" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="570" y="186" as="sourcePoint"/><mxPoint x="570" y="880" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="srvLife" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1390" y="186" as="sourcePoint"/><mxPoint x="1390" y="520" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="srvLife2" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1390" y="600" as="sourcePoint"/><mxPoint x="1390" y="880" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="cliBox1" value="本地预测执行&#10;按键当场动 · 输入入底账" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="330" y="220" width="480" height="90" as="geometry"/></mxCell>
+        <mxCell id="msg1" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="570" y="360" as="sourcePoint"/><mxPoint x="1390" y="360" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="msg1lab" value="19 号 · 只报意图（seq）· 30Hz" style="text;fontSize=21;align=center;fontColor=#333333;labelBackgroundColor=#ffffff;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="700" y="322" width="380" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="srvBox" value="权威推算（裁决方=服务器）&#10;权威位 = 上次权威位 + 钳后增量&#10;界 = 1 米/条" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1150" y="390" width="480" height="110" as="geometry"/></mxCell>
+        <mxCell id="cheat" value="瞬移声明：钳回界上&#10;（第 8 期防作弊的砖）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=19;fontColor=#990000;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1150" y="520" width="480" height="80" as="geometry"/></mxCell>
+        <mxCell id="cheatConn" style="endArrow=none;dashed=1;strokeColor=#b85450;strokeWidth=2;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1390" y="500" as="sourcePoint"/><mxPoint x="1390" y="520" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="msg2" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1390" y="650" as="sourcePoint"/><mxPoint x="570" y="650" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="msg2lab" value="17 号 v2 · 权威位 + ackedSeq · 33ms 一拍 · 含自己" style="text;fontSize=21;align=center;fontColor=#333333;labelBackgroundColor=#ffffff;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="640" y="610" width="500" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="cliBox2" value="拿 ackedSeq 翻底账 → 三分支：ε 内无感 / 超 ε 重放 / 断档兜底" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="330" y="680" width="480" height="90" as="geometry"/></mxCell>
+
+        <mxCell id="retEdge" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=3;endArrow=block;endFill=1;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cliBox2" target="cliBox1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="200" y="725"/><mxPoint x="200" y="265"/></Array></mxGeometry></mxCell>
+        <mxCell id="retLab" value="回到预测&#10;手感零等待" style="text;fontSize=20;fontStyle=1;fontColor=#333333;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="55" y="470" width="135" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="客户端抄作业，服务器批改——手感先行，权威兜底" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=30;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="930" width="1780" height="80" as="geometry"/></mxCell>
+        <mxCell id="foot" value="全图版（三分支展开 · 图例）见 reconcile_sequence.drawio（定稿 v1 · 2026-10-20 批 · 契约 v4.1 含己）" style="text;fontSize=15;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1020" width="1200" height="30" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,39 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="三部曲总览" id="t0_overview">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="第 4 期 · 三部曲——两副药，治两种卡" style="text;fontSize=40;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="44" width="1300" height="64" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="上镜总览 · 草案 v1 · 2026-10-23" style="text;fontSize=18;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1470" y="56" width="380" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="lg1c" value="" style="rounded=0;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1120" y="114" width="28" height="20" as="geometry"/></mxCell>
+        <mxCell id="lg1t" value="客户端手感侧" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1156" y="108" width="160" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg2c" value="" style="rounded=0;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="1"><mxGeometry x="1340" y="114" width="28" height="20" as="geometry"/></mxCell>
+        <mxCell id="lg2t" value="服务器判定侧" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1376" y="108" width="160" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg3c" value="" style="rounded=0;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1560" y="114" width="28" height="20" as="geometry"/></mxCell>
+        <mxCell id="lg3t" value="病灶 / 非法" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1596" y="108" width="140" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="sick" value="ep03 的 150ms，其实是两种卡：自己——按键到动隔着一个来回；别人——快照一格一格，抽搐瞬移" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=24;fontColor=#990000;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="170" width="1780" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="h1" value="① 预测 · 手感不等网络" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="296" width="540" height="42" as="geometry"/></mxCell>
+        <mxCell id="c1" value="按键当场动，这一步不等任何人&#10;输入照发——账，先记下" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="345" width="540" height="285" as="geometry"/></mxCell>
+        <mxCell id="h2" value="② 和解 · 权威兜底" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="690" y="296" width="540" height="42" as="geometry"/></mxCell>
+        <mxCell id="c2" value="拿确认号翻底账，三方对账&#10;误差超 5 厘米：摆回重抄" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="690" y="345" width="540" height="285" as="geometry"/></mxCell>
+        <mxCell id="h3" value="③ 插值 · 眼睛不追消息" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1310" y="296" width="540" height="42" as="geometry"/></mxCell>
+        <mxCell id="c3" value="快照连成一条线&#10;渲染点沿线匀速滑" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1310" y="345" width="540" height="285" as="geometry"/></mxCell>
+
+        <mxCell id="pairArrow" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pairArrow2" value="" style="edgeStyle=none;strokeColor=#d6b656;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="c2" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="grp1" value="治自己的手感——同一条输入的两段旅程" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#333333;fontSize=22;fontStyle=1;align=center;dashed=0;" vertex="1" parent="1"><mxGeometry x="70" y="650" width="1160" height="62" as="geometry"/></mxCell>
+        <mxCell id="grp2" value="治别人的眼睛" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#333333;fontSize=22;fontStyle=1;align=center;dashed=0;" vertex="1" parent="1"><mxGeometry x="1310" y="650" width="540" height="62" as="geometry"/></mxCell>
+
+        <mxCell id="srv" value="服务器 = 批改部（本期配角）：权威推算 · 一条输入最多认 1 米 · 33ms 一拍——细节全在时序图（t3），正片一句带过&#10;这周它铲了三颗雷：并发风暴崩溃、线程间竞争、登录冗余广播（压测上量当场撞出）——45×3 单测全程没红" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=22;align=left;spacingLeft=20;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="740" width="1780" height="130" as="geometry"/></mxCell>
+
+        <mxCell id="banner" value="手感不等网络，权威批改兑底，眼睛不追消息——三部曲，一期交齐" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=30;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="915" width="1780" height="80" as="geometry"/></mxCell>
+        <mxCell id="foot" value="图=代码：预测/和解 SightlineMatchSession · 插值 SightlineCharacter · 界 100uu/条 match_service" style="text;fontSize=15;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1005" width="1200" height="30" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
