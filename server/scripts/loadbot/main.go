@@ -518,6 +518,29 @@ func main() {
 		dsts, *nLobby, *matchN, *matchN / *group, *group, *ramp, *mramp, *hold, *hz)
 	t0 := time.Now()
 
+	// 实时进度播报（每 5s 一行）——LoadLog04 动画复放的"实时日志"素材源（2026-10-23）
+	stopTick := make(chan struct{})
+	var tickWg sync.WaitGroup
+	tickWg.Add(1)
+	go func() {
+		defer tickWg.Done()
+		tk := time.NewTicker(5 * time.Second)
+		defer tk.Stop()
+		for {
+			select {
+			case <-tk.C:
+				fmt.Printf("  [t+%.0fs] conn %d/%d · login %d/%d · mstart %d/%d · input %d · snap %d\n",
+					time.Since(t0).Seconds(),
+					atomic.LoadInt64(&c.connOK), atomic.LoadInt64(&c.connFail),
+					atomic.LoadInt64(&c.loginOK), atomic.LoadInt64(&c.loginFail),
+					atomic.LoadInt64(&c.matchStartOK), atomic.LoadInt64(&c.matchStartFail),
+					atomic.LoadInt64(&c.sentInputs), atomic.LoadInt64(&c.snapFrames))
+			case <-stopTick:
+				return
+			}
+		}
+	}()
+
 	// —— 阶段 1：对局连接 + 开局（房间列表推送只打到少数未进房连接，避开 O(N²) 风暴）——
 	var wg sync.WaitGroup
 	if *matchN > 0 {
@@ -561,6 +584,9 @@ func main() {
 	_ = lobbyDeadline // 保持窗口锚点：lobbyBot 内部 deadline 已各自计算；此处等全部退出
 	lWg.Wait()
 	wg.Wait()
+
+	close(stopTick)
+	tickWg.Wait()
 
 	dt := time.Since(t0)
 	fmt.Printf("[loadbot v2] 总耗时 %.1fs\n", dt.Seconds())

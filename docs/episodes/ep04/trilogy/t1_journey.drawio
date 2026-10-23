@@ -18,7 +18,7 @@
         <mxCell id="e23" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="750" y="250" as="sourcePoint"/><mxPoint x="830" y="250" as="targetPoint"/></mxGeometry></mxCell>
         <mxCell id="e34" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1130" y="250" as="sourcePoint"/><mxPoint x="1210" y="250" as="targetPoint"/></mxGeometry></mxCell>
 
-        <mxCell id="srv" value="服务器 · 批改部（唯一出场）&#10;权威位 = 上次权威位 + 钳后增量&#10;界 = 1 米/条 · 瞬移钳回" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=20;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1590" y="180" width="260" height="160" as="geometry"/></mxCell>
+        <mxCell id="srv" value="服务器权威（唯一出场）&#10;权威位 = 上次权威位 + 钳后增量&#10;界 = 1 米/条 · 瞬移钳回" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=20;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1590" y="180" width="260" height="160" as="geometry"/></mxCell>
         <mxCell id="eUp" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=3;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="f4" target="srv"><mxGeometry relative="1" as="geometry"/></mxCell>
 
         <mxCell id="f5" value="快照回来 · 17 号 v2&#10;权威位 + ackedSeq（33ms 拍）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1210" y="440" width="320" height="130" as="geometry"/></mxCell>
