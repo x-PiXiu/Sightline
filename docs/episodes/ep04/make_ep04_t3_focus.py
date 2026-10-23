@@ -138,10 +138,13 @@ def build(cur_groups):
         cur = g in cur_groups
         for cell in GROUPS[g]:
             if cur:
-                cell = re.sub(r"strokeWidth=[\d.]+", "strokeWidth=5", cell) \
-                    if "strokeWidth=" in cell and "endArrow=" not in cell else cell
+                # 箭头/横幅：样式里已有 strokeWidth → 原位替换；语义框：默认无该 token → 插进 style 属性内
                 if "endArrow=" in cell:
                     cell = re.sub(r"strokeWidth=[\d.]+", "strokeWidth=6", cell)
+                elif "fillColor=#f7f4ee" in cell:
+                    cell = re.sub(r"strokeWidth=[\d.]+", "strokeWidth=5", cell)
+                else:
+                    cell = re.sub(r'(style="[^"]*)"', r"\1;strokeWidth=5\"", cell, count=1)
             if dim:
                 cell = cell.replace('style="', 'style="opacity=35;textOpacity=35;', 1)
             cells.append(cell)
