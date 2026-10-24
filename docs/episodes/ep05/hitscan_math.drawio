@@ -1,0 +1,63 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="hitscan求交示意" id="hitscan_math">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="hitscan 求交——服务器没有物理引擎" style="text;fontSize=38;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="40" width="1150" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="hitscan 求交示意（俯视）· 备用/插镜 · 草案 v1 · 2026-10-24" style="text;fontSize=18;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1280" y="52" width="570" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="plane" value="" style="rounded=0;fillColor=#fafafa;strokeColor=#dddddd;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="140" width="1120" height="740" as="geometry"/></mxCell>
+
+        <mxCell id="ray1" value="" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="240" y="540" as="sourcePoint"/><mxPoint x="560" y="441" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ray1ghost" value="" style="edgeStyle=none;strokeColor=#b85450;strokeWidth=2;endArrow=none;dashed=1;dashPattern=4 6;opacity=45;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="560" y="441" as="sourcePoint"/><mxPoint x="860" y="345" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ray1lab" value="射线 1（瞄向箱子后的人）" style="text;fontSize=17;fontColor=#b85450;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="270" y="380" width="260" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="ray2" value="" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=3;endArrow=block;endFill=1;dashed=1;dashPattern=10 6;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="240" y="540" as="sourcePoint"/><mxPoint x="787" y="687" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ray2lab" value="射线 2（绕开箱子）" style="text;fontSize=17;fontColor=#82b366;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="330" y="640" width="240" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="oDot" value="" style="ellipse;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=3;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="222" y="522" width="36" height="36" as="geometry"/></mxCell>
+        <mxCell id="oLab" value="眼睛 O&#10;（权威位 + 眼高 82）" style="text;fontSize=17;fontColor=#333333;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="120" y="580" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="dirLab" value="dir = (cosP·cosY, cosP·sinY, sinP)&#10;与客户端准星同源（同一 yaw/pitch）" style="text;fontSize=17;fontColor=#666666;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="90" y="660" width="360" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="aabb1" value="遮挡 AABB&#10;（挡弹）" style="rounded=0;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;dashed=1;dashPattern=8 4;fontSize=19;fontColor=#990000;opacity=80;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="560" y="330" width="180" height="130" as="geometry"/></mxCell>
+        <mxCell id="hitWall" value="" style="ellipse;fillColor=#b85450;strokeColor=#990000;" vertex="1" parent="1"><mxGeometry x="549" y="430" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="hitWallLab" value="hitPoint = 墙面&#10;（t_wall 最近）" style="text;fontSize=17;fontStyle=1;fontColor=#990000;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="430" y="470" width="220" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="entB" value="" style="ellipse;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=3;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="815" y="300" width="90" height="90" as="geometry"/></mxCell>
+        <mxCell id="entBLab" value="实体圆柱 B（俯视 = 圆）&#10;t_ent &gt; t_wall → 未命中" style="text;fontSize=17;fontColor=#333333;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="760" y="205" width="330" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="aabb2" value="不在射线上的遮挡&#10;——不参与" style="rounded=0;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;fontColor=#999999;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="930" y="480" width="200" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="entC" value="" style="ellipse;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=3;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="787" y="642" width="90" height="90" as="geometry"/></mxCell>
+        <mxCell id="hitEnt" value="" style="ellipse;fillColor=#82b366;strokeColor=#4d8a3a;" vertex="1" parent="1"><mxGeometry x="776" y="676" width="22" height="22" as="geometry"/></mxCell>
+        <mxCell id="entCLab" value="hitPoint = 圆柱面（t_ent 最近）&#10;→ 命中：result=1 · victimHp −25" style="text;fontSize=17;fontStyle=1;fontColor=#4d8a3a;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="560" y="770" width="480" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="ruler" style="endArrow=none;strokeColor=#666666;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="240" y="850" as="sourcePoint"/><mxPoint x="1120" y="850" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="tick0" value="O · t=0" style="text;fontSize=16;fontColor=#666666;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="180" y="856" width="120" height="26" as="geometry"/></mxCell>
+        <mxCell id="tick1" value="t_wall" style="text;fontSize=16;fontColor=#b85450;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="500" y="856" width="120" height="26" as="geometry"/></mxCell>
+        <mxCell id="tick2" value="t_ent" style="text;fontSize=16;fontColor=#4d8a3a;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="750" y="856" width="120" height="26" as="geometry"/></mxCell>
+        <mxCell id="tick3" value="Lmax = 10000" style="text;fontSize=16;fontColor=#666666;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1040" y="856" width="150" height="26" as="geometry"/></mxCell>
+        <mxCell id="rulerLab" value="沿射线的 t 参数轴——同一发子弹，先撞谁听谁的" style="text;fontSize=16;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="620" y="820" width="480" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="p1" value="先墙后人，取最近 t&#10;t_wall（遮挡）与 t_ent（实体）谁小听谁的" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=21;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="150" width="620" height="96" as="geometry"/></mxCell>
+        <mxCell id="p2" value="线-实体圆柱（解析解）&#10;XY 投影：|O.xy + t·D.xy − C.xy|² = R²&#10;取 [0, Lmax] 内最小实根 t&#10;Z 校验：O.z + t·D.z ∈ [C.z − 90, C.z + 90]" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="270" width="620" height="150" as="geometry"/></mxCell>
+        <mxCell id="p3" value="线-AABB（slab 法）&#10;每个盒子 6 次比较 · O(盒子数)&#10;遮挡表 ≤10 盒 = 双端合同数据" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#b85450;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="440" width="620" height="120" as="geometry"/></mxCell>
+        <mxCell id="p4" value="合同常量（双端一致）&#10;圆柱 R=40 · 半高 90 · Lmax=10000&#10;伤害 25/发 · 初始血 100" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="580" width="620" height="120" as="geometry"/></mxCell>
+        <mxCell id="p5" value="遮挡表坐标 = 合同数据，随地图定稿冻结&#10;（本图为示意坐标；真企业做法=碰撞体离线导出 BVH）" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;fontColor=#666666;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="720" width="620" height="90" as="geometry"/></mxCell>
+
+        <mxCell id="lg1" value="" style="rounded=0;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="898" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg1t" value="遮挡（挡弹）" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="102" y="896" width="130" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg2" value="" style="ellipse;fillColor=#dae8fc;strokeColor=#6c8ebf;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="250" y="898" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg2t" value="实体（可命中）" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="282" y="896" width="140" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg3" value="" style="rounded=1;fillColor=#82b366;strokeColor=#4d8a3a;" vertex="1" parent="1"><mxGeometry x="440" y="898" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg3t" value="命中射线/命中点" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="472" y="896" width="160" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg4" value="" style="rounded=0;fillColor=#b85450;strokeColor=#990000;" vertex="1" parent="1"><mxGeometry x="650" y="898" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg4t" value="被挡（未命中）" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="682" y="896" width="150" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="先墙后人，取最近 t——30 行解析几何，可单测（test_match 断言 11~12）" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=28;fontStyle=1;align=center;spacing=10;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="940" width="1780" height="66" as="geometry"/></mxCell>
+        <mxCell id="foot" value="核对：ep05 设计草案 §4（4.1 方向重建 / 4.3 圆柱常量 / 4.4 求交 / 4.5 遮挡）· 无物理引擎取舍=D5 系列口播素材" style="text;fontSize=15;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1018" width="1400" height="28" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

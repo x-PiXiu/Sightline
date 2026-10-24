@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="开火时序图" id="fire_seq">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="开火时序——只能请求，不能宣判" style="text;fontSize=38;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="40" width="1100" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="开火时序图 · 入镜主图 · 草案 v1 · 2026-10-24" style="text;fontSize=18;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1350" y="52" width="500" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="lg1" value="" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1180" y="98" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg1t" value="客户端" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1212" y="96" width="100" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg2" value="" style="rounded=1;fillColor=#e1f5fe;strokeColor=#0288d1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1330" y="98" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg2t" value="服务器" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1362" y="96" width="100" height="30" as="geometry"/></mxCell>
+        <mxCell id="lg3" value="" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1480" y="98" width="26" height="26" as="geometry"/></mxCell>
+        <mxCell id="lg3t" value="红虚线 = 拒绝路径" style="text;fontSize=16;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1512" y="96" width="220" height="30" as="geometry"/></mxCell>
+
+        <mxCell id="cliHead" value="UE 客户端 · 射手" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="300" y="140" width="540" height="60" as="geometry"/></mxCell>
+        <mxCell id="srvHead" value="服务器 · 裁决方（适配层收帧 → 域层判定）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=24;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1180" y="140" width="560" height="60" as="geometry"/></mxCell>
+        <mxCell id="cliLife" style="endArrow=none;dashed=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="570" y="200" as="sourcePoint"/><mxPoint x="570" y="855" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="srvLife" style="endArrow=none;dashed=1;strokeColor=#0288d1;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1460" y="200" as="sourcePoint"/><mxPoint x="1460" y="855" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="cliBox1" value="左键按下 IA_Fire&#10;本地节流过 → 播开火动画（表现层预测先动）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="330" y="215" width="480" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="msg1" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="570" y="340" as="sourcePoint"/><mxPoint x="1460" y="340" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="msg1lab" value="20 号 MSG_C2S_FIRE · 空 payload —— 触发方=客户端 · 裁决方=服务器" style="text;fontSize=21;align=center;fontColor=#333333;labelBackgroundColor=#ffffff;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="640" y="298" width="760" height="34" as="geometry"/></mxCell>
+        <mxCell id="msg1note" value="连方向都不带——判定全用服务器权威状态（D5-01）" style="text;fontSize=17;fontColor=#999999;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="640" y="346" width="760" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="srvGates" value="① 在对局？   ② 换弹中？&#10;③ 弹匣空？   ④ 射速窗口（100ms）？" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="392" width="460" height="96" as="geometry"/></mxCell>
+        <mxCell id="rejConn" style="endArrow=none;dashed=1;strokeColor=#b85450;strokeWidth=2;dashPattern=8 4;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1460" y="488" as="sourcePoint"/><mxPoint x="1460" y="512" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="rejBox" value="任一门不过 → 静默丢弃（无回执）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=20;fontColor=#990000;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="512" width="460" height="56" as="geometry"/></mxCell>
+        <mxCell id="rejNote" value="第 9 期防作弊起违规可见（回执/踢出）" style="text;fontSize=15;fontColor=#999999;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1230" y="572" width="460" height="26" as="geometry"/></mxCell>
+
+        <mxCell id="srvHit" value="⑤ hitscan 判定&#10;先 AABB 遮挡、再实体圆柱，取最近 t" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="622" width="460" height="80" as="geometry"/></mxCell>
+        <mxCell id="srvSettle" value="⑥ 扣血 victimHp −25 · 钳 0 不死&#10;⑦ 扣弹 magUsed+1 · 记 lastFireMs" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=21;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1230" y="722" width="460" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="msg2" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1460" y="845" as="sourcePoint"/><mxPoint x="570" y="845" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="msg2lab" value="⑧ 21 号 MSG_S2C_FIRE_RESULT · 房内全员广播" style="text;fontSize=21;align=center;fontColor=#333333;labelBackgroundColor=#ffffff;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="620" y="803" width="680" height="34" as="geometry"/></mxCell>
+        <mxCell id="msg2note" value="字段：shooter · result · victim · hitPoint · victimHp（22B）" style="text;fontSize=17;fontColor=#999999;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="620" y="851" width="680" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="fanE1" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="570" y="880" as="sourcePoint"/><mxPoint x="435" y="905" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="fanE2" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1015" y="880" as="sourcePoint"/><mxPoint x="960" y="905" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="fanE3" style="endArrow=none;dashed=1;strokeColor=#999999;strokeWidth=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1460" y="880" as="sourcePoint"/><mxPoint x="1482" y="905" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="fan1" value="射手：Hitmarker 显示 0.15s" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="170" y="905" width="530" height="48" as="geometry"/></mxCell>
+        <mxCell id="fan2" value="受击者：红闪 + HUD 血量行" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="745" y="905" width="430" height="48" as="geometry"/></mxCell>
+        <mxCell id="fan3" value="其他玩家：tracer Muzzle→hitPoint" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1215" y="905" width="535" height="48" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="客户端只能请求，不能宣判——20 号连方向都不带，判定全用服务器权威状态" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=28;fontStyle=1;align=center;spacing=10;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="968" width="1780" height="66" as="geometry"/></mxCell>
+        <mxCell id="foot" value="契约：20/21 号定稿后登记 docs/protocol/MSG_IDS.md · 帧格式 [2B len][2B msgid][payload] 小端 · 流水线=ep05 设计草案 §3（①~⑧ 与代码一致）" style="text;fontSize=15;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1040" width="1500" height="28" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
