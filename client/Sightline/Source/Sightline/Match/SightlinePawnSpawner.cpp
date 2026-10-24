@@ -87,3 +87,8 @@ int32 USightlinePawnSpawner::SpawnedCount() const {
     for (const auto& It : Live) if (It.Value.IsValid()) ++Count;
     return Count;
 }
+APawn* USightlinePawnSpawner::GetPawnByPid(int32 PlayerId) const {
+    const TWeakObjectPtr<APawn>* Found = Live.Find(PlayerId);
+    return Found && Found->IsValid() ? Found->Get() : nullptr;
+}
+

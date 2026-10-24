@@ -26,6 +26,20 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchEntityLeft, int32, PlayerId)
 // M3b 和解动作过界（纯数据，D3-17 同款）：Error=对账误差向量；bFullSnap=true 时 Error 即绝对权威位（断档全量回滚）
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSelfCorrected, FVector, Error, bool, bFullSnap);
 
+/** 21 号开火结果（M5 · D5-02v2）——一条消息三方共用的过界纯数据：
+ *  ShooterPid=自己 → Hitmarker；VictimPid=自己 → 红闪+血量行；其他 → tracer+远端开火动画 */
+USTRUCT(BlueprintType)
+struct FSightlineFireResult {
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) int32 ShooterPid = 0;
+    UPROPERTY(BlueprintReadOnly) bool bHit = false;
+    UPROPERTY(BlueprintReadOnly) int32 VictimPid = 0;
+    UPROPERTY(BlueprintReadOnly) FVector HitPoint = FVector::ZeroVector;   // 命中面/射线终点（tracer 停墙）
+    UPROPERTY(BlueprintReadOnly) int32 VictimHp = 0;                       // 命中后余血（HUD 血量行）
+};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFireResult, const FSightlineFireResult&, Result);
+
 UCLASS()
 class SIGHTLINE_API USightlineMatchSession : public UObject {
     GENERATED_BODY()
@@ -36,6 +50,7 @@ public:
     void SetRegistry(USightlineEntityRegistry* InRegistry);
     void SetSelfPlayerId(int32 InPid) { SelfPlayerId = InPid; }   // 登录回执到位后由 GI 注入
     bool IsInMatch() const { return bInMatch; }                  // 对局激活查询（GI 面板显隐/生命周期判定）
+    bool IsSelfPlayer(int32 Pid) const { return Pid == SelfPlayerId; }   // M5：21 号三分流判己用
     /** 链路断开：Registry 清场（对局视角 = 会话结束） */
     void NotifyLinkLost();
 
@@ -47,12 +62,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void ReportLocalState(const FSightlineLocalState& S);
 
+    // —— M5 开火意图（D5-01：20 号空 payload——方向都不带，判定全用服务器权威状态）——
+    /** 开火请求：本地节流/弹匣在 Character 侧（表现层预测），通过后才调这里；服务器四道门兜底 */
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendFireRequest();
+
     // —— 收帧入口（GameInstance.OnFrameReceived 路由 15/17/18）——
     void HandleFrame(uint16 MsgId, const TArray<uint8>& Payload);
 
     UPROPERTY(BlueprintAssignable) FOnMatchStarted OnMatchStarted;
     UPROPERTY(BlueprintAssignable) FOnMatchEntityLeft OnEntityLeft;
     UPROPERTY(BlueprintAssignable) FOnSelfCorrected OnSelfCorrected;   // M3b：本地 Pawn 订阅（和解落地）
+    UPROPERTY(BlueprintAssignable) FOnFireResult OnFireResult;         // M5：21 号三分流（Hitmarker/红闪/tracer/音效/血量行）
 
     // —— M3c Debug HUD 观测面（GI 每帧取用；AddOnScreenDebugMessage 扩展，D4-08）——
     int32  GetReconcileCount() const { return ReconcileCount; }   // 和解次数（≥ε 触发）
@@ -61,6 +82,11 @@ public:
     double GetErrPeak() const { return ErrPeakCm; }               // 峰值误差（cm）
     uint32 GetLastAckedSeq() const { return LastAckedSeq; }       // 服务器已确认序号（与本地 InputSeq 的差=管线深度）
     uint32 GetAckGap() const { return InputSeq - LastAckedSeq; }  // 管线深度（已发-已认；uint32 差值回绕安全）
+
+    // —— M5 血量观测面（HUD 血量行；21 号事件驱动，TCP 可靠有序=事件流等价状态流，D5-09）——
+    /** 实体当前血量（MatchStart 时全员满血初始化；未知的 pid 返回 DefaultValue） */
+    UFUNCTION(BlueprintPure, Category = "Sightline Match")
+    int32 GetEntityHp(int32 PlayerId, int32 DefaultValue = 100) const;
 
 private:
     /** 一次输入的本地存根（环形缓冲行；(seq,pos,yaw)×1s——设计草案 §2.3） */
@@ -84,4 +110,5 @@ private:
     int32 ReplayFrames = 0;                            // 最近一次回滚重放的输入帧数（断档兑底=0）
     double ErrCurrentCm = 0.0;                         // 当前对账误差（cm；ε 判定的那条）
     double ErrPeakCm = 0.0;                            // 峰值误差（cm）
+    TMap<int32, int32> EntityHp;                       // M5：对局期各实体血量（21 号驱动；D5-09 事件流）
 };

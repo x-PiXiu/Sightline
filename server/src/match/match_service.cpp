@@ -88,4 +88,56 @@ std::vector<MatchEvent> MatchService::TickSnapshot() {
     return out;
 }
 
+// ===== M5：开火裁决（D5 系列；规则在 fire_judge.h 纯决策头，此处只编排）=====
+
+void MatchService::SetGeometry(const MapGeometry& geometry) {
+    geometry_ = geometry;                                    // 构建期烘焙注入（D5-08v2 拒绝运行时上报）
+}
+
+std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {
+    std::vector<MatchEvent> out;
+    if (!bActive_) return out;                               // ① 在对局中？
+    Entity* shooter = nullptr;
+    for (Entity& E : entities_)
+        if (E.playerId == shooterPid) { shooter = &E; break; }
+    if (!shooter || !shooter->bHasReport) return out;        // ① 未上报=位置未知，判不了
+
+    // ②③④ 武器门（换弹含到期补满 / 弹匣空触发换弹 / 射速容差 95ms——fire_judge 纯函数）
+    if (ConsumeWeaponGate(shooter->weapon, nowMs) != FireGate::Ok) return out;   // 静默丢（D5-03）
+
+    // ⑤ hitscan 求交：origin 对齐客户端相机位；候选=其余已上报实体（射手自己排除=无自伤）
+    const Vec3 o = RayOriginFromEntity(shooter->x, shooter->y, shooter->z, shooter->yaw);
+    const Vec3 d = DirectionFromYawPitch(shooter->yaw, shooter->pitch);
+    std::vector<EntityPose> others;
+    others.reserve(entities_.size());
+    for (const Entity& E : entities_)
+        if (E.playerId != shooterPid && E.bHasReport)
+            others.push_back({E.playerId, E.x, E.y, E.z});
+    const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
+
+    // ⑥ 结算扣血（钳 0 不死——死亡判定 ep07 启用）
+    std::uint8_t victimHp = 0;
+    if (v.hit) {
+        for (Entity& E : entities_) {
+            if (E.playerId != v.victimPid) continue;
+            E.weapon.hp = DamageApply(E.weapon.hp);
+            victimHp = static_cast<std::uint8_t>(E.weapon.hp);
+            break;
+        }
+    }
+
+    // ⑦ 扣弹 + 记时（judgeAtMs 预留：ep06 回溯只换判定时刻，本流水线其余步骤不动）
+    shooter->weapon.magUsed++;
+    shooter->weapon.lastFireMs = nowMs;
+    shooter->weapon.bHasFired = true;
+
+    // ⑧ FireResult 全房间广播事件（含射手自己——FrameWriter 翻译成 21 号）
+    MatchEvent ev;
+    ev.type = MatchEvent::Type::FireResult;
+    ev.roomId = roomId_;
+    ev.fire = FireResultData{shooterPid, v.hit, v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp};
+    out.push_back(std::move(ev));
+    return out;
+}
+
 } // namespace sightline::match

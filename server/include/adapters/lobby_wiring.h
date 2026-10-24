@@ -147,6 +147,21 @@ public:
                 }
                 break;
             }
+            case MT::FireResult: {
+                // v4.2：21 号房内全员广播（**含射手自己**——射手要出 Hitmarker；其余画 tracer；
+                // 受击者红闪）——一条消息三方共用（D5-02v2；翻译唯一落点纪律同 15/17/18）
+                const sightline::wire::FireResultMsg m{
+                    e.fire.shooterPid, e.fire.bHit ? std::uint8_t{1} : std::uint8_t{0},
+                    e.fire.victimPid, e.fire.hitX, e.fire.hitY, e.fire.hitZ, e.fire.victimHp};
+                const std::string p = m.Encode();
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    send(fd, protocol::MSG_S2C_FIRE_RESULT, p);
+                LOG_DEBUG("[出站] FIRE_RESULT shooter=" + std::to_string(e.fire.shooterPid) +
+                          " hit=" + std::to_string(e.fire.bHit) +
+                          " victim=" + std::to_string(e.fire.victimPid) +
+                          " hp=" + std::to_string(e.fire.victimHp));
+                break;
+            }
             }
         }
     }

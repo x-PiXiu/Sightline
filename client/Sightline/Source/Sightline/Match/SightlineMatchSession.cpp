@@ -40,6 +40,13 @@ void USightlineMatchSession::StartMatch() {
     Conn->Send(SightlineProtocol::MSG_C2S_START_MATCH, Empty);   // v3 契约 14：空 payload
 }
 
+void USightlineMatchSession::SendFireRequest() {
+    // M5 · D5-01：20 号空 payload——方向都不带（判定全用服务器权威状态）；节流在 Character 侧
+    if (!Conn || !bInMatch) return;
+    TArray<uint8> Empty;
+    Conn->Send(SightlineProtocol::MSG_C2S_FIRE, Empty);
+}
+
 void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
     // v4·R10：对局期上行 = 19 PLAYER_INPUT（25B·带本地预测序号）；未进对局不上报
     if (!Conn || !bInMatch || SelfPlayerId == 0) return;
@@ -90,6 +97,8 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         InputHistory.Reset();                          // M3b：新对局=新底账（环形缓冲与 HUD 统计归零）
         ReconcileCount = 0; ReplayFrames = 0;
         ErrCurrentCm = 0.0; ErrPeakCm = 0.0; LastAckedSeq = 0;
+        EntityHp.Reset();                              // M5：新对局血量清账（D5-09 事件流等价状态流）
+        for (const FSightlineEntityState& R : Roster) EntityHp.Add(R.PlayerId, 100);   // 全员满血
         if (CSightlineStatLog.GetValueOnGameThread() != 0)   // 误差曲线对齐锚（plot_stat_curve：各端以最后锚为 t0）
             UE_LOG(LogTemp, Log, TEXT("[STAT] MATCH_START t=%.3f"), FPlatformTime::Seconds());
         Registry->ApplyMatchStart(SelfPlayerId, Roster);
@@ -129,9 +138,31 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         const int32 Pid = static_cast<int32>(ReadU32(Payload, 0));
         if (Pid == SelfPlayerId) bInMatch = false;     // 自己离场：上报窗口关闭
         Registry->ApplyLeave(Pid);
+        EntityHp.Remove(Pid);                          // M5：离场实体血量随账清（重连恢复走 MatchStart）
         OnEntityLeft.Broadcast(Pid);
         return;
     }
+
+    if (MsgId == SightlineProtocol::MSG_S2C_FIRE_RESULT) {
+        // M5：21 号三分流——射手 Hitmarker / 其余 tracer+远端动画 / 受击者红闪（D5-02v2）
+        // 血量行数据也在此更新（TCP 可靠有序：事件流等价状态流，无丢包漂移）
+        SightlineProtocol::FFireResult R;
+        if (!SightlineProtocol::FFireResult::Parse(Payload, R)) return;   // 坏帧防御：整包放弃
+        if (R.bHit != 0) EntityHp.Add(static_cast<int32>(R.VictimPid), static_cast<int32>(R.VictimHp));
+        FSightlineFireResult Out;
+        Out.ShooterPid = static_cast<int32>(R.ShooterPid);
+        Out.bHit = (R.Result != 0);
+        Out.VictimPid = static_cast<int32>(R.VictimPid);
+        Out.HitPoint = FVector(R.HitX, R.HitY, R.HitZ);
+        Out.VictimHp = static_cast<int32>(R.VictimHp);
+        OnFireResult.Broadcast(Out);
+        return;
+    }
+}
+
+int32 USightlineMatchSession::GetEntityHp(const int32 PlayerId, const int32 DefaultValue) const {
+    const int32* Found = EntityHp.Find(PlayerId);
+    return Found ? *Found : DefaultValue;
 }
 
 // —— M3b 三方对账（设计草案 §2.3 + reconcile_state 定稿状态机）——

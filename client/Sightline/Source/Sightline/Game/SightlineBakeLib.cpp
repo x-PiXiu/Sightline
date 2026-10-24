@@ -1,0 +1,99 @@
+#include "Game/SightlineBakeLib.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Game/SightlineOccluderComponent.h"
+#include "Character/SightlineCharacter.h"
+#include "GameFramework/Character.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+
+bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPath, FString& OutSummary) {
+    if (!World) {
+        OutSummary = TEXT("World 为空");
+        return false;
+    }
+
+    // 1) 扫描标记件 → 世界系盒（中心/半尺寸/yaw）。自定义覆盖：组件变换进合同（支持 yaw）；
+    //    默认：Owner 的组件联合包围盒（世界 AABB——轴对齐，yaw=0）
+    TArray<FVector> Centers;
+    TArray<FVector> Halves;
+    TArray<float>   Yaws;
+    for (TActorIterator<AActor> It(World); It; ++It) {
+        AActor* Actor = *It;
+        USightlineOccluderComponent* Marker = Actor->FindComponentByClass<USightlineOccluderComponent>();
+        if (!Marker) continue;
+        FVector Center;
+        FVector Half;
+        float YawDeg = 0.f;
+        if (Marker->bOverrideBounds) {
+            const FTransform Xf = Marker->GetComponentTransform();
+            Center = Xf.TransformPosition(Marker->CustomCenter);
+            // 半尺寸随 yaw 旋转展开（合同原语="yaw 旋转的轴对齐盒"——pitch/roll 不支持，D5-08v2 边界）
+            const FRotator Rot = Xf.Rotator();
+            const float Rad = FMath::DegreesToRadians(Rot.Yaw);
+            const FVector E = Marker->CustomHalfExtents;
+            Half = FVector(
+                FMath::Abs(E.X * FMath::Cos(Rad)) + FMath::Abs(E.Y * FMath::Sin(Rad)),
+                FMath::Abs(E.X * FMath::Sin(Rad)) + FMath::Abs(E.Y * FMath::Cos(Rad)),
+                E.Z);
+            YawDeg = Rot.Yaw;
+        } else {
+            const FBox Bounds = Actor->GetComponentsBoundingBox(/*bNonColliding=*/true);
+            if (!Bounds.IsValid) continue;
+            Center = Bounds.GetCenter();
+            Half = Bounds.GetExtent();
+        }
+        if (Half.X <= 0.f || Half.Y <= 0.f || Half.Z <= 0.f) continue;
+        Centers.Add(Center);
+        Halves.Add(Half);
+        Yaws.Add(YawDeg);
+    }
+    if (Centers.Num() == 0) {
+        OutSummary = TEXT("关卡内没有挂 SightlineOccluder 的遮挡物");
+        return false;
+    }
+
+    // 2) entityHitbox = 角色胶囊真身（CDO 读取——烘焙期拿默认值，服务器不猜）
+    float HitRadius = 40.f, HitHalfH = 90.f;
+    if (const ASightlineCharacter* CharCDO = GetDefault<ASightlineCharacter>()) {
+        if (const UCapsuleComponent* Capsule = CharCDO->GetCapsuleComponent()) {
+            HitRadius = Capsule->GetUnscaledCapsuleRadius();
+            HitHalfH = Capsule->GetUnscaledCapsuleHalfHeight();
+        }
+    }
+
+    // 3) 产出几何合同 v1（手拼 JSON——客户端只写不读，解析在服务器 MapGeometryLoader）
+    const FString LevelName = World->GetName();
+    FString Json = TEXT("{\n");
+    Json += TEXT("  \"map\": \"") + LevelName + TEXT("\",\n  \"unit\": \"cm\",\n");
+    Json += FString::Printf(TEXT("  \"occluders\": [\n"));
+    for (int32 i = 0; i < Centers.Num(); ++i) {
+        Json += FString::Printf(TEXT("    { \"primitives\": [ { \"type\": \"box\", \"pos\": [%.2f, %.2f, %.2f], \"size\": [%.2f, %.2f, %.2f], \"yawDeg\": %.2f } ] }%s\n"),
+                                Centers[i].X, Centers[i].Y, Centers[i].Z,
+                                Halves[i].X, Halves[i].Y, Halves[i].Z, Yaws[i],
+                                i + 1 < Centers.Num() ? TEXT(",") : TEXT(""));
+    }
+    Json += TEXT("  ],\n");
+    Json += FString::Printf(TEXT("  \"entityHitbox\": { \"radius\": %.2f, \"halfHeight\": %.2f }\n"), HitRadius, HitHalfH);
+    Json += TEXT("}\n");
+
+    // 4) 落盘（工程目录相对两仓同盘；目录不存在则创建）
+    FString Path = OutPath;
+    if (Path.IsEmpty()) {
+        const FString LevelFile = LevelName + TEXT(".json");
+        Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("../../server/assets/maps/"), LevelFile);
+        Path = FPaths::NormalizeFilename(Path);
+    }
+    const FString Dir = FPaths::GetPath(Path);
+    if (!IFileManager::Get().MakeDirectory(*Dir, /*Tree=*/true)) {
+        OutSummary = TEXT("目录创建失败：") + Dir;
+        return false;
+    }
+    if (!FFileHelper::SaveStringToFile(Json, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)) {
+        OutSummary = TEXT("写盘失败：") + Path;
+        return false;
+    }
+    OutSummary = FString::Printf(TEXT("盒=%d → %s（entityHitbox r=%.1f h=%.1f）"), Centers.Num(), *Path, HitRadius, HitHalfH);
+    return true;
+}

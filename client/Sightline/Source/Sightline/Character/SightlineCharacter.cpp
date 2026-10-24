@@ -11,6 +11,12 @@
 #include "InputMappingContext.h"
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Animation/AnimMontage.h"
+#include "Game/SightlineBakeLib.h"
+#include "Game/SightlineOccluderComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Match/SightlinePawnSpawner.h"
+#include "Sound/SoundBase.h"
 
 namespace {
     constexpr const TCHAR* kMappingContextPath = TEXT("/Game/Code/Input/IMC_Default.IMC_Default");
@@ -24,6 +30,10 @@ namespace {
     constexpr float kInterpDelaySec = 0.025f;  // 渲染延迟 25ms < 快照间隔 33ms——渲染点落在 AB 窗口内真插值
                                                // （100ms 是 300ms 时代遗留：间隔回 33ms 后 Alpha 恒 0=30Hz 跳格）
     constexpr float kRotInterpSpeed = 10.f;    // 朝向/俯仰平滑速度
+    // —— M5 开火（表现层预测常量=服务器合同镜像；D5-14 客户端步进 100ms>服务器容差 95ms）——
+    constexpr uint64 kClientFireIntervalMs = 100;
+    constexpr int32  kClientMag            = 30;
+    constexpr uint64 kClientReloadMs       = 2500;
 }
 
 ASightlineCharacter::ASightlineCharacter() {
@@ -66,6 +76,7 @@ void ASightlineCharacter::BeginPlay() {
             MatchSession = GI->GetMatchSession();
         if (MatchSession.IsValid()) {
             MatchSession->OnSelfCorrected.AddDynamic(this, &ASightlineCharacter::OnSelfCorrected);
+            MatchSession->OnFireResult.AddDynamic(this, &ASightlineCharacter::OnFireResult);   // M5：三分流（本地角色处理全房间开火结果）
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
@@ -91,6 +102,10 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASightlineCharacter::Look);
     Input->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
     Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+    if (FireAction) {
+        Input->BindAction(FireAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnFirePressed);
+        Input->BindAction(FireAction, ETriggerEvent::Completed, this, &ASightlineCharacter::OnFireReleased);
+    }
 }
 
 void ASightlineCharacter::Move(const FInputActionValue& Value) {
@@ -109,6 +124,7 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
+    if (IsPlayerControlled() && bFireHeld) TryFire();   // M5 按住=全自动（D5-14）：节流循环在 Tick，输入系统 Repeat 不可靠
     if (IsPlayerControlled()) {
         const FVector Vel = GetVelocity();
         const float Speed = Vel.Size2D();
@@ -246,4 +262,54 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
                FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
                AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
     }
+// ===== M5 开火链路（D5 系列；蓝图方案 §0 P1/P3/P5 + M5-C/4.5）=====
+void ASightlineCharacter::OnFirePressed() {
+    bFireHeld = true;
+    TryFire();                                       // 点按=同一通路的第一发
+}
+
+void ASightlineCharacter::OnFireReleased() {
+    bFireHeld = false;
+}
+
+void ASightlineCharacter::TryFire() {
+    const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+    if (NowMs < NextFireAllowedMs) return;           // 本地节流（表现层预测先行一拍）
+    if (LocalMag <= 0) {
+        if (NowMs < LocalReloadUntilMs) return;      // 换弹中（镜像服务器状态机，D5-13 热区拆账：无 UI 不纠偏）
+        LocalMag = kClientMag;                       // 到期补满
+    }
+    NextFireAllowedMs = NowMs + kClientFireIntervalMs;
+    --LocalMag;
+    if (FireMontage) PlayAnimMontage(FireMontage);   // AM_Code 包装蒙太奇（UpperBody 槽，蓝图 3.3）
+    if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
+    if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
+}
+
+void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
+    // 三分流（图=代码 fire_client_flow）：命中音/他人枪声/受击音 + 远端开火动画（D5-10v2）
+    const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
+    const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
+    if (bSelfShot) {
+        if (Result.bHit && HitSound.IsValid()) UGameplayStatics::PlaySound2D(this, HitSound.Get());
+    } else {
+        if (RemoteFireSound.IsValid()) UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 2D 缩小版（ep14 空间化）
+        if (FireMontage) {
+            if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
+                if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner()) {
+                    if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Result.ShooterPid)))
+                        Remote->PlayAnimMontage(FireMontage);   // 远端开火动画（否则枪线凭空出现）
+                }
+            }
+        }
+    }
+    if (bSelfVictim && Result.bHit && HurtSound.IsValid()) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
+}
+
+void ASightlineCharacter::SrvBakeOccluders() {
+    // M5-F 步骤 6.2：控制台入口（PIE 控制台输入 SrvBakeOccluders；编辑器工具按钮走 BakeLib 同函数）
+    FString Summary;
+    const bool bOk = USightlineBakeLib::BakeServerOccluders(GetWorld(), FString(), Summary);
+    UE_LOG(LogTemp, Log, TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary);
+}
 }

@@ -50,13 +50,24 @@ struct PlayerInputMsg {
     }
 };
 
-using C2SMsg = std::variant<StartMatchMsg, PlayerInputMsg>;   // M1 迁移集；旧消息走 raw 回落（渐进并存）
+/** 20 FIRE（v4.2 · 空 payload）—— 空结构体占位。空 payload 是设计核心（D5-01）：
+ *  方向/位置/命中结果一概不收，判定全用服务器权威状态——客户端连"往哪打"都不让插嘴。
+ *  预埋：第 7 期第二把武器加 weaponType 字段（D5-11，契约演进） */
+struct FireMsg {
+    static std::optional<FireMsg> Parse(std::span<const std::uint8_t> b) {
+        if (!b.empty()) return std::nullopt;               // 契约：空 payload，非空即拒（带方向=宣判苗头）
+        return FireMsg{};
+    }
+};
+
+using C2SMsg = std::variant<StartMatchMsg, PlayerInputMsg, FireMsg>;   // M1 迁移集；旧消息走 raw 回落（渐进并存）
 
 /** 唯一 C2S switch：msgid → 选 Parse；未迁移/未知一律 nullopt（调用方回落旧路径） */
 inline std::optional<C2SMsg> DecodeC2S(std::uint16_t msgid, std::span<const std::uint8_t> payload) {
     switch (msgid) {
     case 14: if (auto m = StartMatchMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
     case 19: if (auto m = PlayerInputMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
+    case 20: if (auto m = FireMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
     default: return std::nullopt;
     }
 }
@@ -119,6 +130,37 @@ struct EntityLeaveMsg {
     std::string Encode() const {
         std::string s(4, '\0');
         for (int i = 0; i < 4; ++i) s[i] = static_cast<char>((pid >> (8 * i)) & 0xFF);
+        return s;
+    }
+};
+
+/** 21 FIRE_RESULT（v4.2 · 22B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]
+ *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
+ *  result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中。
+ *  victimHp=命中后余血：第 5 期供 HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动） */
+struct FireResultMsg {
+    std::uint32_t shooterPid = 0;
+    std::uint8_t result = 0;
+    std::uint32_t victimPid = 0;
+    float hitX = 0.f, hitY = 0.f, hitZ = 0.f;
+    std::uint8_t victimHp = 0;
+
+    static constexpr std::size_t kSize = 22;
+
+    std::string Encode() const {
+        std::string s(kSize, '\0');
+        const auto wrU32 = [&s](int o, std::uint32_t v) {
+            for (int i = 0; i < 4; ++i) s[o + i] = static_cast<char>((v >> (8 * i)) & 0xFF);
+        };
+        const auto wrF = [&s, &wrU32](int o, float f) {
+            std::uint32_t bits; std::memcpy(&bits, &f, sizeof(float));
+            wrU32(o, bits);
+        };
+        wrU32(0, shooterPid);
+        s[4] = static_cast<char>(result);
+        wrU32(5, victimPid);
+        wrF(9, hitX); wrF(13, hitY); wrF(17, hitZ);
+        s[21] = static_cast<char>(victimHp);
         return s;
     }
 };

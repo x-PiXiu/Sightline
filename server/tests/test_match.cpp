@@ -2,6 +2,8 @@
 // 不起网络：喂查询/请求，断言事件与名册（整洁架构体检第 3 条）
 // 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp -o /tmp/test_match && /tmp/test_match
 #include "match/match_service.h"
+#include "match/fire_judge.h"
+#include "adapters/map_geometry.h"
 #include "lobby/lobby.h"
 
 #include <cmath>
@@ -160,6 +162,108 @@ int main() {
 
     stage("非房主请求由适配层拦截（此处仅验用例收到的名册不受影响）");
     // （IsHost 拒绝发生在 wireMatch——用例层只接收合法输入；拦截行为在服务器联调期验证）
+
+    // ===== 第 5 期：开火命中（D5 系列；fire_judge 纯决策头 + MatchService 编排 + 几何合同装载）=====
+    stage("M5 方向重建：yaw/pitch → 单位向量（§4.1 合同公式）");
+    const auto d0 = DirectionFromYawPitch(0.f, 0.f);
+    CHECK(std::fabs(d0.x - 1.f) < 1e-5 && std::fabs(d0.y) < 1e-5 && std::fabs(d0.z) < 1e-5);
+    const auto d90 = DirectionFromYawPitch(90.f, 0.f);
+    CHECK(std::fabs(d90.x) < 1e-5 && std::fabs(d90.y - 1.f) < 1e-5);
+    const auto d45 = DirectionFromYawPitch(0.f, 45.f);
+    CHECK(std::fabs(d45.z - 0.70710678f) < 1e-5);
+
+    stage("M5 武器门：首发免射速 / 50ms 拒 97ms 收（容差 D5-14）/ 换弹状态机闭环（审计修复①）");
+    WeaponState w;
+    CHECK(ConsumeWeaponGate(w, 1000) == FireGate::Ok);           // 首发免射速门（bHasFired=false）
+    w.lastFireMs = 1000; w.bHasFired = true;                     // 记账在用例⑦——纯函数测试自账
+    CHECK(ConsumeWeaponGate(w, 1050) == FireGate::RateLimited);  // 50ms < 95ms 容差 → 拒
+    CHECK(ConsumeWeaponGate(w, 1097) == FireGate::Ok);           // 97ms ≥ 95ms → 收
+    w.magUsed = kMagCapacity;
+    CHECK(ConsumeWeaponGate(w, 2000) == FireGate::MagEmpty);     // ③ 触发换弹（reloadUntil=4500）
+    CHECK(ConsumeWeaponGate(w, 4000) == FireGate::Reloading);    // ② 换弹中
+    CHECK(ConsumeWeaponGate(w, 4600) == FireGate::Ok);           // ② 到期就地补满
+    CHECK(w.magUsed == 0);
+
+    stage("M5 求交：圆柱命中 / 未命中终点 / 遮挡挡弹 hitPoint=墙面");
+    const Vec3 o{0, 0, 90};
+    const Vec3 rayX{1, 0, 0};
+    const EntityHitbox hb;
+    {
+        const std::vector<EntityPose> hit{{7, 500, 0, 90}};
+        const auto v = CastRay(o, rayX, OccluderTable{}, hit, hb);
+        CHECK(v.hit && v.victimPid == 7);
+        CHECK(std::fabs(v.hitX - 460.f) < 1.0f);                 // 命中面 = 圆柱近面（500-40）
+    }
+    {
+        const std::vector<EntityPose> miss{{8, 500, 200, 90}};   // 侧偏 200 > R=40
+        const auto v = CastRay(o, rayX, OccluderTable{}, miss, hb);
+        CHECK(!v.hit && std::fabs(v.hitX - kMaxRangeUu) < 1.0f); // 未命中终点 = Lmax 端点
+    }
+    {
+        OccluderTable occ;
+        occ.boxes.push_back({250, -80, 90, 30, 120, 90, 0.f});   // AABB 罩住射线 y=0
+        const std::vector<EntityPose> behind{{9, 500, 0, 90}};
+        const auto v = CastRay(o, rayX, occ, behind, hb);
+        CHECK(!v.hit);                                            // 隔墙 → 未命中（穿墙防线）
+        CHECK(std::fabs(v.hitX - 220.f) < 1.0f);                  // hitPoint = 墙面（近面 250-30）
+    }
+
+    stage("M5 求交：旋转 OBB 不变胖（AABB 误挡真身不挡）/ 球遮挡");
+    {
+        OccluderTable occ;
+        occ.boxes.push_back({300, 300, 90, 200, 20, 90, 45.f});  // 旋转 45°：真身 x∈[144,456]
+        const Vec3 rayY{0, 1, 0};
+        const Vec3 oX{130, 0, 90};
+        const auto vMiss = CastRay(oX, rayY, occ, {}, hb);
+        CHECK(std::fabs(vMiss.hitY - kMaxRangeUu) < 1.0f);       // OBB：x=130 不碰真身（AABB 会误挡）
+        occ.boxes[0].yawDeg = 0.f;                               // 同中心同尺寸 AABB：x∈[100,500] 罩住射线
+        const auto vHit = CastRay(oX, rayY, occ, {}, hb);
+        CHECK(std::fabs(vHit.hitY - 280.f) < 1.0f);              // AABB：挡在 y=280（胖盒对比）
+    }
+    {
+        OccluderTable occ;
+        occ.spheres.push_back({300, 0, 90, 50.f});
+        const auto v = CastRay(o, rayX, occ, {}, hb);
+        CHECK(std::fabs(v.hitX - 250.f) < 1.0f);                 // 球面 300-50
+    }
+
+    stage("M5 开火编排：命中扣血 / 幻影枪容差 / 未命中事件 / 打空换弹恢复（审计修复①端到端）");
+    MatchService fm;
+    std::vector<RosterEntry> roster5{{10, "a", 0}, {11, "b", 0}, {12, "c", 0}};
+    fm.StartMatch(1, roster5);
+    fm.SetGeometry(MapGeometry{});                               // 空遮挡（显式注入）
+    fm.UpdateEntity(10, 0, 0, 90, 0, 0, 0, 1);                   // 射手 @ 原点（首报即真值）
+    fm.UpdateEntity(11, 500, 0, 90, 0, 0, 0, 1);                 // 受击者正前 5m
+    CHECK(fm.Fire(12, 1000).empty());                            // ① 未上报者：静默丢
+    auto fEv = fm.Fire(10, 1000);
+    CHECK(fEv.size() == 1 && fEv[0].type == MatchEvent::Type::FireResult);
+    CHECK(fEv[0].fire.shooterPid == 10 && fEv[0].fire.bHit && fEv[0].fire.victimPid == 11);
+    CHECK(fEv[0].fire.victimHp == 75);                            // 100 - 25
+    CHECK(fm.Fire(10, 1097).size() == 1);                        // 97ms 间隔：容差内接受（mag=2）
+    CHECK(fm.Fire(10, 1147).empty());                            // 50ms：RateLimited（幻影枪口径 D5-04）
+    fm.UpdateEntity(10, 0, 0, 90, 90, 0, 0, 2);                  // 射手转向 +Y
+    const auto fEv2 = fm.Fire(10, 1300);
+    CHECK(fEv2.size() == 1 && !fEv2[0].fire.bHit && fEv2[0].fire.victimPid == 0);
+    CHECK(std::fabs(fEv2[0].fire.hitX) < 1.0f && fEv2[0].fire.hitY > 9000.f);  // 未命中 = 射线终点
+    for (int i = 0; i <= 26; ++i) (void)fm.Fire(10, 1400 + i * 100);   // 打满剩余（mag 3+27=30）
+    CHECK(fm.Fire(10, 4100).empty());                            // ③ 弹匣空 → 触发换弹（静默）
+    CHECK(fm.Fire(10, 5000).empty());                            // ② 换弹中
+    fm.UpdateEntity(10, 0, 0, 90, 0, 0, 0, 3);                   // 射手转回 +X
+    const auto fEv3 = fm.Fire(10, 6600);                          // ② 到期补满（4100+2500）→ 正常出膛
+    CHECK(fEv3.size() == 1 && fEv3[0].fire.bHit && fEv3[0].fire.victimPid == 11);
+    CHECK(fEv3[0].fire.victimHp == 25);                           // 前已两中（75→50）→ 50-25=25
+
+    stage("M5 几何合同装载：ParseMapGeometry（适配层核心，纯文本可测——整洁架构体检第 3 条）");
+    const std::string geo = R"({
+        "map": "NewMap", "unit": "cm",
+        "occluders": [ { "primitives": [ { "type": "box", "pos": [250, -80, 90], "size": [30, 120, 90] } ] } ],
+        "entityHitbox": { "radius": 42, "halfHeight": 96 } })";
+    const auto geoParsed = adapters::ParseMapGeometry(geo);
+    CHECK(geoParsed.has_value());
+    CHECK(geoParsed->occluders.boxes.size() == 1 && std::fabs(geoParsed->occluders.boxes[0].hx - 30.f) < 1e-5);
+    CHECK(std::fabs(geoParsed->hitbox.radius - 42.f) < 1e-5 && std::fabs(geoParsed->hitbox.halfHeight - 96.f) < 1e-5);
+    CHECK(!adapters::ParseMapGeometry("{ not json").has_value());          // 非法 JSON → nullopt（fail-fast 源头）
+    CHECK(!adapters::ParseMapGeometry("{\"unit\":\"m\"}").has_value()); // 单位合同只认 cm
 
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";
     return 0;

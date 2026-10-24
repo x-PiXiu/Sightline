@@ -30,6 +30,9 @@ namespace SightlineProtocol
         MSG_S2C_ENTITY_LEAVE  = 18, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
         // —— 第 4 期：预测与和解（与 docs/protocol/MSG_IDS.md v4 保持同步）——
         MSG_C2S_PLAYER_INPUT  = 19, // C→S  [4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B（对局期替代 16·R10）
+        // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
+        MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
+        MSG_S2C_FIRE_RESULT   = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B（房内全员广播·含射手）
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid
@@ -159,6 +162,32 @@ namespace SightlineProtocol
             Out.Pitch      = ReadF32(Payload, Offset + 20);
             Out.Flags      = Payload[Offset + 24];
             Out.AckedSeq   = ReadU32(Payload, Offset + 25);
+            return true;
+        }
+    };
+
+    /** 21 FIRE_RESULT（22B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]
+     *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪 */
+    struct FFireResult
+    {
+        uint32 ShooterPid = 0;
+        uint8 Result = 0;         // 0=未命中 / 1=命中
+        uint32 VictimPid = 0;
+        float HitX = 0.f, HitY = 0.f, HitZ = 0.f;   // 命中面/射线终点（tracer 停墙）
+        uint8 VictimHp = 0;       // 命中后余血（HUD 血量行；ep07 接血条）
+
+        static constexpr int32 Size = 22;
+
+        static bool Parse(const TArray<uint8>& Payload, FFireResult& Out)
+        {
+            if (Payload.Num() < Size) return false;
+            Out.ShooterPid = ReadU32(Payload, 0);
+            Out.Result     = Payload[4];
+            Out.VictimPid  = ReadU32(Payload, 5);
+            Out.HitX       = ReadF32(Payload, 9);
+            Out.HitY       = ReadF32(Payload, 13);
+            Out.HitZ       = ReadF32(Payload, 17);
+            Out.VictimHp   = Payload[21];
             return true;
         }
     };

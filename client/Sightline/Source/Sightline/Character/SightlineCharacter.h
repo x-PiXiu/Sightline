@@ -83,11 +83,40 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
     TObjectPtr<UInputAction> JumpAction;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
+    TObjectPtr<UInputAction> FireAction;                 // M5：IA_Fire（Digital·Down——按住全自动走 C++ 节流循环，D5-14）
+
+    // —— M5 开火资产（资产引用分层：软引用=可能缺席静默降级；蓝图 4.5 填入，C++ 零资产路径红线）——
+    /** 开火蒙太奇（AM_Code_Rifle_Fire 挂 UpperBody 槽——蓝图 3.3 填入；远端开火动画同款复用） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<UAnimMontage> FireMontage;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TSoftObjectPtr<USoundBase> FireSound;        // 射手自己：本地即时（表现层预测零延迟）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TSoftObjectPtr<USoundBase> HitSound;         // 命中音：21 号 shooter=自己
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TSoftObjectPtr<USoundBase> HurtSound;        // 受击音：21 号 victim=自己
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TSoftObjectPtr<USoundBase> RemoteFireSound;  // 他人枪声：21 号 shooter≠自己（2D 缩小版）
+
+    UFUNCTION(Exec) void SrvBakeOccluders();     // 控制台烘焙入口（M5-F 步骤 6.2）
+
 private:
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     void SampleLocalState();
     UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
+
+    // —— M5 开火（D5-14：按住=全自动节流连发；本地扣弹=表现层预测，服务器四道门兜底，D5-04 不纠偏）——
+    void OnFirePressed();
+    void OnFireReleased();
+    void TryFire();                              // 本地节流（100ms/30 发/2.5s 镜像服务器常量）+ 蒙太奇 + 枪声 + 20 号
+    UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
+    bool bFireHeld = false;
+    std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
+    int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
+    std::uint64_t LocalReloadUntilMs = 0;
 
     // —— 远端插值：快照缓冲 + 恒速线性插值 ——
     // 两个带时间戳的快照，在 (Now - 延迟) 处线性插值。速度=位移/Δack 拍（发端时钟口径）。

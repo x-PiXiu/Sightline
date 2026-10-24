@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <deque>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -23,6 +24,7 @@
 #include "net/client_connection.h"
 #include "adapters/frame_codec.h"
 #include "adapters/lobby_wiring.h"
+#include "adapters/map_geometry.h"
 #include "adapters/match_wiring.h"
 #include "lobby/lobby.h"
 #include "match/match_service.h"
@@ -128,6 +130,27 @@ int main() {
     adapters::ConnTable connections;
     adapters::FrameWriter writer{connections, lobby};
     std::map<int, int> fdWorker;                         // fd → worker 下标（选择计数的 main 侧账本）
+
+    // 5.5 几何合同装载（D5-08v2：编辑器烘焙产物，构建期数据——拒绝运行时上报）。
+    //     语义分层：文件存在但非法 → fail-fast（装配错误不留活口）；文件不存在 → 空遮挡表 +
+    //     LOG_INFO 继续（无图环境兼容 smoke/loadbot——hitscan 无遮挡，烘焙后重启生效）
+    {
+        const char* envPath = std::getenv("SIGHTLINE_MAP_GEOMETRY");
+        const std::string path = envPath ? envPath : "assets/maps/NewMap.json";
+        if (auto geometry = adapters::LoadMapGeometry(path)) {
+            match.SetGeometry(*geometry);
+            LOG_INFO("[几何合同] 装载 path=" + path +
+                     " 盒=" + std::to_string(geometry->occluders.boxes.size()) +
+                     " 球=" + std::to_string(geometry->occluders.spheres.size()) +
+                     " 命中体 r=" + std::to_string(geometry->hitbox.radius) +
+                     " h=" + std::to_string(geometry->hitbox.halfHeight));
+        } else if (std::ifstream f(path); f.good()) {
+            LOG_ERROR("[几何合同] " + path + " 存在但非法（schema 校验失败）——装配错误，拒绝启动");
+            return 1;                                    // fail-fast：装配错误不留活口（D5-08v2）
+        } else {
+            LOG_INFO("[几何合同] 未找到 " + path + " → 空遮挡表（hitscan 无遮挡；烘焙后重启生效）");
+        }
+    }
 
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）

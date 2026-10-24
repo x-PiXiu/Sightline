@@ -3,6 +3,7 @@
 // 注册顺序契约：Register() 须先于 wireLobby() 调用——msgid 10 的对局离场钩子要先于
 //               大厅离开执行（fd→PlayerId 翻译必须发生在 lobby 移除映射之前）
 #pragma once
+#include <chrono>
 #include <cstring>
 
 #include "adapters/lobby_wiring.h"   // MessageDispatcher / FrameWriter / ConnTable
@@ -47,6 +48,25 @@ public:
                 LOG_WARNING("[位置上报] v4 R10：对局期 16 已停用 fd=" + std::to_string(fd));
                 return;
             }
+        });
+
+        // 20：开火请求（v4.2 · 空 payload）——判定全用服务器权威状态（D5-01）；
+        // 时间由适配层注入（steady 时钟，域不持钟）；FireResult 经 FrameWriter 翻译成 21 号全员广播
+        disp_.on(protocol::MSG_C2S_FIRE, "开火",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            if (!sightline::wire::FireMsg::Parse(bytes)) {   // 非空 payload 拒收（带方向=宣判苗头，D5-01）
+                LOG_WARNING("[开火] 非法 payload 长度=" + std::to_string(payload.size()) +
+                            " fd=" + std::to_string(fd));
+                return;
+            }
+            const int pid = lobby_.PlayerIdByFd(fd);
+            if (pid < 0) return;                             // 未登录：无效
+            const auto nowMs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count());
+            writer_.deliverMatch(match_.Fire(static_cast<std::uint32_t>(pid), nowMs));
         });
 
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译

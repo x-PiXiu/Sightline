@@ -26,7 +26,10 @@ namespace protocol {
         MSG_C2S_MOVE_REPORT    = 16, // C→S  [12B pos xyz f32][4B yaw f32][4B pitch f32][1B flags]（bit0=腾空）
         MSG_S2C_ENTITY_STATE   = 17, // S→C  [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags]}×n（不含接收者自己）
         MSG_S2C_ENTITY_LEAVE   = 18,
-    MSG_C2S_PLAYER_INPUT    = 19   // [v4] 位置上报 v2：[4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B——对局期替代 16（R10）, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
+    MSG_C2S_PLAYER_INPUT    = 19, // [v4] 位置上报 v2：[4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B——对局期替代 16（R10）
+        // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
+        MSG_C2S_FIRE            = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
+        MSG_S2C_FIRE_RESULT     = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B——房内全员广播（含射手）
     };
 
 } // namespace protocol
