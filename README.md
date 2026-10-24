@@ -11,7 +11,7 @@
 | 序章 · 一条心跳的两种命运 | [BV113WF6MEBZ](https://www.bilibili.com/video/BV113WF6MEBZ/) | — | 接手前任网络库，五个隐患逐个拆 | — |
 | 第 1 期 · UE 连上服务器 | [BV113WF6ME8f](https://www.bilibili.com/video/BV113WF6ME8f/) | `ep01` | 心跳 / ping / LAG 重连，UE 首连 | 登录 213ms，心跳往返 62–228ms |
 | 第 2 期 · 登录 + 房间系统 | [BV1SNWF6GEuk](https://www.bilibili.com/video/BV1SNWF6GEuk/) | `ep02` | 登录 / 房间 / 顶号 / 协议契约 | 回环响应 <1ms；8 类非法请求全拦 |
-| 第 3 期 · 移动同步 + 网络滑块 | 定时发布中（2026-10-24） | `ep03` | 朴素移动同步，损伤滑块 0~300ms | 30Hz 上报每包 21B |
+| 第 3 期 · 移动同步 + 网络滑块 | [BV1NYn56zEyk](https://www.bilibili.com/video/BV1NYn56zEyk/) | `ep03` | 朴素移动同步，损伤滑块 0~300ms | 30Hz 上报每包 21B |
 | 第 4 期 · 预测 · 和解 · 插值 | 待定时 | `ep04` | 三部曲 + 主从 Reactor + 压测 | 3 万同时在线全绿；单测 125 断言 |
 
 每期代码快照 = 对应 tag，可 `git checkout epNN` 复现当期状态。
