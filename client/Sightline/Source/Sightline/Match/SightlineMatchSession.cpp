@@ -148,7 +148,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         // 血量行数据也在此更新（TCP 可靠有序：事件流等价状态流，无丢包漂移）
         SightlineProtocol::FFireResult R;
         if (!SightlineProtocol::FFireResult::Parse(Payload, R)) return;   // 坏帧防御：整包放弃
-        if (R.bHit != 0) EntityHp.Add(static_cast<int32>(R.VictimPid), static_cast<int32>(R.VictimHp));
+        if (R.Result != 0) EntityHp.Add(static_cast<int32>(R.VictimPid), static_cast<int32>(R.VictimHp));
         FSightlineFireResult Out;
         Out.ShooterPid = static_cast<int32>(R.ShooterPid);
         Out.bHit = (R.Result != 0);
@@ -163,6 +163,12 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
 int32 USightlineMatchSession::GetEntityHp(const int32 PlayerId, const int32 DefaultValue) const {
     const int32* Found = EntityHp.Find(PlayerId);
     return Found ? *Found : DefaultValue;
+}
+
+TArray<int32> USightlineMatchSession::GetEntityIds() const {
+    TArray<int32> Ids;
+    EntityHp.GetKeys(Ids);
+    return Ids;
 }
 
 // —— M3b 三方对账（设计草案 §2.3 + reconcile_state 定稿状态机）——

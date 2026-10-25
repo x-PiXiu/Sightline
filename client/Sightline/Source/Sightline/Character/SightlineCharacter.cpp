@@ -23,6 +23,7 @@ namespace {
     constexpr const TCHAR* kMoveActionPath     = TEXT("/Game/Code/Input/IA_Move.IA_Move");
     constexpr const TCHAR* kLookActionPath     = TEXT("/Game/Code/Input/IA_Look.IA_Look");
     constexpr const TCHAR* kJumpActionPath     = TEXT("/Game/Code/Input/IA_Jump.IA_Jump");
+    constexpr const TCHAR* kFireActionPath     = TEXT("/Game/Code/Input/IA_Fire.IA_Fire");   // M5：仓库资产→构造期加载（BP 零手填）
 
     constexpr float kSpeedDeadZone = 5.f;
 
@@ -59,6 +60,8 @@ ASightlineCharacter::ASightlineCharacter() {
         if (Lact.Succeeded()) LookAction = Lact.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> Jact(kJumpActionPath);
         if (Jact.Succeeded()) JumpAction = Jact.Object;
+        ConstructorHelpers::FObjectFinder<UInputAction> Fact(kFireActionPath);
+        if (Fact.Succeeded()) FireAction = Fact.Object;   // 资产未建时静默跳过（M5-A 步骤 1.1 建完即自动接线）
     }
 }
 
@@ -262,6 +265,8 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
                FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
                AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
     }
+}
+
 // ===== M5 开火链路（D5 系列；蓝图方案 §0 P1/P3/P5 + M5-C/4.5）=====
 void ASightlineCharacter::OnFirePressed() {
     bFireHeld = true;
@@ -311,5 +316,4 @@ void ASightlineCharacter::SrvBakeOccluders() {
     FString Summary;
     const bool bOk = USightlineBakeLib::BakeServerOccluders(GetWorld(), FString(), Summary);
     UE_LOG(LogTemp, Log, TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary);
-}
 }

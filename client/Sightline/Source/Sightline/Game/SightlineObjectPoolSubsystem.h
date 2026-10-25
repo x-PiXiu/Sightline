@@ -14,13 +14,16 @@ class SIGHTLINE_API USightlineObjectPoolSubsystem : public UGameInstanceSubsyste
 public:
     /** 取一个闲置实例（空池则新建 NewObject；池对象"出生即隐藏、归还即重置"）
      *  widget：调用方自行 AddToViewport；actor：调用方自行放置/显示 */
+    UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     UObject* Acquire(TSubclassOf<UObject> Class);
 
     /** 归还（隐藏回池，不销毁）：widget → RemoveFromParent；actor → 隐藏+关碰撞+关 tick。
      *  超过上限强回收最老（丢弃引用交给 GC）——Acquire 必配 Release（RAII guard 由调用方保证） */
+    UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     void Release(UObject* Obj);
 
     /** 预热（防首帧 NewObject 卡顿）：Hitmarker 池预热 4 / 上限 8（蓝图方案 4.3） */
+    UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     void Prewarm(TSubclassOf<UObject> Class, int32 Count);
 
 private:

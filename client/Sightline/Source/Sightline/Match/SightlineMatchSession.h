@@ -87,6 +87,8 @@ public:
     /** 实体当前血量（MatchStart 时全员满血初始化；未知的 pid 返回 DefaultValue） */
     UFUNCTION(BlueprintPure, Category = "Sightline Match")
     int32 GetEntityHp(int32 PlayerId, int32 DefaultValue = 100) const;
+    UFUNCTION(BlueprintPure, Category = "Sightline Match")
+    TArray<int32> GetEntityIds() const;   // 血量行枚举（血量缓存键序）
 
 private:
     /** 一次输入的本地存根（环形缓冲行；(seq,pos,yaw)×1s——设计草案 §2.3） */

@@ -1,4 +1,5 @@
 #include "Game/SightlineBakeLib.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/SightlineOccluderComponent.h"
@@ -83,7 +84,7 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
     if (Path.IsEmpty()) {
         const FString LevelFile = LevelName + TEXT(".json");
         Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("../../server/assets/maps/"), LevelFile);
-        Path = FPaths::NormalizeFilename(Path);
+        FPaths::NormalizeFilename(Path);
     }
     const FString Dir = FPaths::GetPath(Path);
     if (!IFileManager::Get().MakeDirectory(*Dir, /*Tree=*/true)) {

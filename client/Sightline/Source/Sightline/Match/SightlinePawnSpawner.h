@@ -30,8 +30,6 @@ public:
     /** M5：pid → 已生成远端 Pawn（21 号驱动远端开火动画的查找口；不在场返回 nullptr） */
     APawn* GetPawnByPid(int32 PlayerId) const;
 
-    /** M5：pid → 已生成远端 Pawn（21 号驱动远端开火动画的查找口；不在场返回 nullptr） */
-    APawn* GetPawnByPid(int32 PlayerId) const;
 
     /** 出生点查找（唯一实现，本地/远端共用——三重匹配：内部名/Tag/Label）；找不到返回 nullptr */
     static APlayerStart* FindSpawnStart(UWorld* World, int32 SpawnIndex);

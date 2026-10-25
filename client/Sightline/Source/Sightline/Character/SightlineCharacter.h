@@ -12,6 +12,8 @@
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class UAnimMontage;
+class USoundBase;
 struct FInputActionValue;
 
 /** 动画输入聚合体：ABP 的唯一数据入口（跨界 DTO——本地/远端两源在此归一） */
