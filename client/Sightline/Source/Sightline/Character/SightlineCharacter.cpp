@@ -16,6 +16,8 @@
 #include "Game/SightlineOccluderComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Match/SightlinePawnSpawner.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "Sound/SoundBase.h"
 
 namespace {
@@ -298,6 +300,7 @@ void ASightlineCharacter::TryFire() {
     --LocalMag;
     if (FireMontage) PlayAnimMontage(FireMontage);   // AM_Code 包装蒙太奇（UpperBody 槽，蓝图 3.3）
     if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
+    if (MuzzleFlash) MuzzleFlash->Activate(true);    // D5-16：重置重播（连发时每次开火重启火光），开火链单源在 C++
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
 
