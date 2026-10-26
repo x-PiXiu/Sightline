@@ -24,6 +24,7 @@ namespace {
     constexpr const TCHAR* kLookActionPath     = TEXT("/Game/Code/Input/IA_Look.IA_Look");
     constexpr const TCHAR* kJumpActionPath     = TEXT("/Game/Code/Input/IA_Jump.IA_Jump");
     constexpr const TCHAR* kFireActionPath     = TEXT("/Game/Code/Input/IA_Fire.IA_Fire");   // M5：仓库资产→构造期加载（BP 零手填）
+    constexpr const TCHAR* kCameraTogglePath   = TEXT("/Game/Code/Input/IA_Camera.IA_Camera"); // M5：视角切换（D5-15，资产未建静默跳过）
 
     constexpr float kSpeedDeadZone = 5.f;
 
@@ -44,10 +45,10 @@ ASightlineCharacter::ASightlineCharacter() {
     GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->MaxWalkSpeed = 400.f;
 
-    Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+    Camera = CreateDefaultSubobject<USightlineCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(GetCapsuleComponent());
-    Camera->SetRelativeLocation(FVector(18.f, 0.f, 82.f));
     Camera->bUsePawnControlRotation = true;
+    // 偏移由组件驱动（D5-15：TPP(-45,35,70)/FPP(18,0,82) 双模式插值）——不再写死 ep03 头部位
 
     GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 
@@ -62,6 +63,8 @@ ASightlineCharacter::ASightlineCharacter() {
         if (Jact.Succeeded()) JumpAction = Jact.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> Fact(kFireActionPath);
         if (Fact.Succeeded()) FireAction = Fact.Object;   // 资产未建时静默跳过（M5-A 步骤 1.1 建完即自动接线）
+        ConstructorHelpers::FObjectFinder<UInputAction> CamTact(kCameraTogglePath);
+        if (CamTact.Succeeded()) CameraToggleAction = CamTact.Object;
     }
 }
 
@@ -82,6 +85,10 @@ void ASightlineCharacter::BeginPlay() {
             MatchSession->OnFireResult.AddDynamic(this, &ASightlineCharacter::OnFireResult);   // M5：三分流（本地角色处理全房间开火结果）
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
+        }
+        if (Camera) {
+            Camera->OnCameraModeChanged.AddDynamic(this, &ASightlineCharacter::OnCameraModeChanged);   // D5-15：模式切换 → 分层显隐
+            ApplyCameraModeVisibility();                                // 初始显隐（默认 TPP=全显）
         }
     } else {
         GetCharacterMovement()->DisableMovement();
@@ -108,6 +115,9 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     if (FireAction) {
         Input->BindAction(FireAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnFirePressed);
         Input->BindAction(FireAction, ETriggerEvent::Completed, this, &ASightlineCharacter::OnFireReleased);
+    }
+    if (CameraToggleAction) {
+        Input->BindAction(CameraToggleAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnCameraToggle);
     }
 }
 
@@ -316,4 +326,26 @@ void ASightlineCharacter::SrvBakeOccluders() {
     FString Summary;
     const bool bOk = USightlineBakeLib::BakeServerOccluders(GetWorld(), FString(), Summary);
     UE_LOG(LogTemp, Log, TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary);
+}
+
+// ===== M5 视角系统（D5-15：Lyra 相机模式栈缩小版——切换 + 分层显隐）=====
+
+void ASightlineCharacter::OnCameraToggle() {
+    if (Camera) Camera->ToggleCameraMode();          // TPP ↔ FPP（偏移由组件 Tick 插值混合）
+}
+
+void ASightlineCharacter::OnCameraModeChanged(ESightlineCameraMode NewMode) {
+    ApplyCameraModeVisibility();                     // 模式一切换就重排显隐（装备双模型的"分层"半边）
+}
+
+void ASightlineCharacter::ApplyCameraModeVisibility() {
+    // 装备双模型的"分层显隐"半边（D5-15）：远端机器永远看到"身体+3P 枪"（OwnerNoSee 只对主人生效）；
+    // 1P 枪用 OnlyOwnerSee(true) 常驻 + OwnerNoSee 取反——TPP 时全隐（别人也不该看见悬浮枪）
+    const bool bFirst = Camera && Camera->GetCameraMode() == ESightlineCameraMode::FirstPerson;
+    GetMesh()->SetOwnerNoSee(bFirst);                            // FPP 藏自己身体（影子保留，ep03 定位法）
+    if (GunThirdPerson) GunThirdPerson->SetOwnerNoSee(bFirst);   // 3P 枪同身体节奏
+    if (GunFirstPerson) {
+        GunFirstPerson->SetOnlyOwnerSee(true);                   // 1P 枪永远只有主人可能看见
+        GunFirstPerson->SetOwnerNoSee(!bFirst);                  // FPP=主人可见；TPP=全隐（含主人）
+    }
 }

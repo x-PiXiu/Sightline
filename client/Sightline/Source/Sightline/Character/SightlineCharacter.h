@@ -6,10 +6,10 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Camera/SightlineCameraComponent.h"
 #include "Match/SightlineMatchSession.h"
 #include "SightlineCharacter.generated.h"
 
-class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 class UAnimMontage;
@@ -68,7 +68,7 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
-    TObjectPtr<UCameraComponent> Camera;
+    TObjectPtr<USightlineCameraComponent> Camera;
 
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<USkeletalMeshComponent> ShadowMesh;
@@ -88,10 +88,21 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
     TObjectPtr<UInputAction> FireAction;                 // M5：IA_Fire（Digital·Down——按住全自动走 C++ 节流循环，D5-14）
 
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
+    TObjectPtr<UInputAction> CameraToggleAction;         // M5：IA_Camera（V 键·TPP/FPP 切换，D5-15）
+
     // —— M5 开火资产（资产引用分层：软引用=可能缺席静默降级；蓝图 4.5 填入，C++ 零资产路径红线）——
-    /** 开火蒙太奇（AM_Code_Rifle_Fire 挂 UpperBody 槽——蓝图 3.3 填入；远端开火动画同款复用） */
+    /** 开火蒙太奇（AM_MM_Rifle_Fire 原包直填——蓝图 3.2 路线 A 定稿；远端开火动画同款复用） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> FireMontage;
+
+    // —— M5 视角双枪（D5-15：Lyra 式装备双模型缩小版——1P/3P 双枪组件，显隐由 C++ 按相机模式驱动）——
+    /** 1P 枪（挂 Camera 子级·FPP 视角枪；蓝图 M5-B 填组件引用） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<USkeletalMeshComponent> GunFirstPerson;
+    /** 3P 枪（挂 weapon_r·远端视角枪；蓝图 M5-B 填组件引用） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<USkeletalMeshComponent> GunThirdPerson;
 
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TSoftObjectPtr<USoundBase> FireSound;        // 射手自己：本地即时（表现层预测零延迟）
@@ -115,6 +126,9 @@ private:
     void OnFireReleased();
     void TryFire();                              // 本地节流（100ms/30 发/2.5s 镜像服务器常量）+ 蒙太奇 + 枪声 + 20 号
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
+    void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
+    UFUNCTION() void OnCameraModeChanged(ESightlineCameraMode NewMode);
+    void ApplyCameraModeVisibility();            // 分层显隐：FPP=藏自己身体+3P 枪、亮 1P 枪；TPP=全显、1P 枪全隐
     bool bFireHeld = false;
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
