@@ -40,9 +40,9 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
     FVector ThirdPersonOffset = FVector(-45.f, 35.f, 70.f);
 
-    /** FPP 头部位（ep03 相机基准 (18,0,82)） */
+    /** FPP 眼高位（Lyra 同款：GetPivotLocation 用 BaseEyeHeight≈62——枪/手臂经持枪姿势自然入镜，无悬浮枪） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
-    FVector FirstPersonOffset = FVector(18.f, 0.f, 82.f);
+    FVector FirstPersonOffset = FVector(8.f, 0.f, 62.f);
 
     /** 模式切换混合速度（uu/s，VInterpTo 常量速度——约 0.3s 走完 80uu 全程） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
@@ -54,5 +54,5 @@ public:
 private:
     FVector TargetOffset() const;
 
-    ESightlineCameraMode CurrentMode = ESightlineCameraMode::ThirdPerson;
+    ESightlineCameraMode CurrentMode = ESightlineCameraMode::FirstPerson;   // 默认 FPP（用户裁决 2026-10-27）
 };

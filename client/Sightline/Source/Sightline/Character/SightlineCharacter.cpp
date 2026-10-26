@@ -87,8 +87,8 @@ void ASightlineCharacter::BeginPlay() {
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
         if (Camera) {
-            Camera->OnCameraModeChanged.AddDynamic(this, &ASightlineCharacter::OnCameraModeChanged);   // D5-15：模式切换 → 分层显隐
-            ApplyCameraModeVisibility();                                // 初始显隐（默认 TPP=全显）
+            // D5-15v3：显隐不再翻转（Lyra 同款——FPP 身体/枪在相机后方自然入镜，不藏任何东西）；
+            // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
     } else {
         GetCharacterMovement()->DisableMovement();
@@ -328,24 +328,8 @@ void ASightlineCharacter::SrvBakeOccluders() {
     UE_LOG(LogTemp, Log, TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary);
 }
 
-// ===== M5 视角系统（D5-15：Lyra 相机模式栈缩小版——切换 + 分层显隐）=====
+// ===== M5 视角系统（D5-15v3：Lyra 同款——只切相机位置，不藏任何东西）=====
 
 void ASightlineCharacter::OnCameraToggle() {
-    if (Camera) Camera->ToggleCameraMode();          // TPP ↔ FPP（偏移由组件 Tick 插值混合）
-}
-
-void ASightlineCharacter::OnCameraModeChanged(ESightlineCameraMode NewMode) {
-    ApplyCameraModeVisibility();                     // 模式一切换就重排显隐（装备双模型的"分层"半边）
-}
-
-void ASightlineCharacter::ApplyCameraModeVisibility() {
-    // 装备双模型的"分层显隐"半边（D5-15）：远端机器永远看到"身体+3P 枪"（OwnerNoSee 只对主人生效）；
-    // 1P 枪用 OnlyOwnerSee(true) 常驻 + OwnerNoSee 取反——TPP 时全隐（别人也不该看见悬浮枪）
-    const bool bFirst = Camera && Camera->GetCameraMode() == ESightlineCameraMode::FirstPerson;
-    GetMesh()->SetOwnerNoSee(bFirst);                            // FPP 藏自己身体（影子保留，ep03 定位法）
-    if (GunThirdPerson) GunThirdPerson->SetOwnerNoSee(bFirst);   // 3P 枪同身体节奏
-    if (GunFirstPerson) {
-        GunFirstPerson->SetOnlyOwnerSee(true);                   // 1P 枪永远只有主人可能看见
-        GunFirstPerson->SetOwnerNoSee(!bFirst);                  // FPP=主人可见；TPP=全隐（含主人）
-    }
+    if (Camera) Camera->ToggleCameraMode();          // FPP(眼高) ↔ TPP(越肩)，偏移由组件 Tick 插值混合
 }

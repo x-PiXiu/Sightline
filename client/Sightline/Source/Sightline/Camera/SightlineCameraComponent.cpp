@@ -2,8 +2,8 @@
 
 USightlineCameraComponent::USightlineCameraComponent() {
     PrimaryComponentTick.bCanEverTick = true;
-    // 初始即落在 TPP 偏移上（避免首帧从原点漂移）；挂接由 Character 构造函数 SetupAttachment 完成
-    SetRelativeLocation(ThirdPersonOffset);
+    // 初始即落在默认模式偏移上（避免首帧从原点漂移）；挂接由 Character 构造函数 SetupAttachment 完成
+    SetRelativeLocation(TargetOffset());
 }
 
 void USightlineCameraComponent::ToggleCameraMode() {

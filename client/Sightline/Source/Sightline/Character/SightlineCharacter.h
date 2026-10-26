@@ -96,13 +96,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> FireMontage;
 
-    // —— M5 视角双枪（D5-15：Lyra 式装备双模型缩小版——1P/3P 双枪组件，显隐由 C++ 按相机模式驱动）——
-    /** 1P 枪（挂 Camera 子级·FPP 视角枪；蓝图 M5-B 填组件引用） */
-    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TObjectPtr<USkeletalMeshComponent> GunFirstPerson;
-    /** 3P 枪（挂 weapon_r·远端视角枪；蓝图 M5-B 填组件引用） */
-    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TObjectPtr<USkeletalMeshComponent> GunThirdPerson;
+    // —— M5 视角（D5-15v3 终稿：Lyra 同款——FPP=眼高相机+3P 姿势借入，不藏身体不建 1P 枪）——
+    // 沿革：双枪模（悬浮枪，用户否）→ FPP 藏身体（背离 Lyra 实现作废）→ 终稿=纯相机位置差异。
+    // Lyra 实勘（完整工程）：CM_ThirdPerson 是唯一相机资产，无 FPP 相机模式类、无 1P 手臂网格。
 
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TSoftObjectPtr<USoundBase> FireSound;        // 射手自己：本地即时（表现层预测零延迟）
@@ -127,8 +123,6 @@ private:
     void TryFire();                              // 本地节流（100ms/30 发/2.5s 镜像服务器常量）+ 蒙太奇 + 枪声 + 20 号
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
-    UFUNCTION() void OnCameraModeChanged(ESightlineCameraMode NewMode);
-    void ApplyCameraModeVisibility();            // 分层显隐：FPP=藏自己身体+3P 枪、亮 1P 枪；TPP=全显、1P 枪全隐
     bool bFireHeld = false;
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
