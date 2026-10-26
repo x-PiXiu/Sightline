@@ -110,10 +110,12 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TSoftObjectPtr<USoundBase> RemoteFireSound;  // 他人枪声：21 号 shooter≠自己（2D 缩小版）
 
-    // —— M5 枪口火光（D5-16：组件挂在 WeaponRifle 的 Muzzle 插槽上——BP 里建组件，引用填到这里；
-    //     TryFire 统一触发（开火链单源，不落 BP 事件图）；Niagara 系统缺失时引用为空=静默降级）——
-    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TObjectPtr<UNiagaraComponent> MuzzleFlash;
+    // —— M5 枪口火光（D5-16：组件由 BP 挂在 WeaponRifle 的 Muzzle 插槽上——
+    //     C++ BeginPlay 按 FindComponentByClass 自动发现（BP Class Defaults 的组件引用选择器
+    //     对 SCS 实例支持有坑，2026-10-27 用户实勘——运行时按类查找=UE 标准做法零引用操作）；
+    //     组件缺失时=nullptr 静默降级）——
+    UPROPERTY(VisibleAnywhere, Category = "Sightline|Fire")
+    TObjectPtr<UNiagaraComponent> MuzzleFXComp = nullptr;
 
     UFUNCTION(Exec) void SrvBakeOccluders();     // 控制台烘焙入口（M5-F 步骤 6.2）
 

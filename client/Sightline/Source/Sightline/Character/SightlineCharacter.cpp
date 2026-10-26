@@ -92,6 +92,10 @@ void ASightlineCharacter::BeginPlay() {
             // D5-15v3：显隐不再翻转（Lyra 同款——FPP 身体/枪在相机后方自然入镜，不藏任何东西）；
             // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
+        // D5-16：枪口火光组件自动发现（BP 挂在 WeaponRifle 下的 Niagara——全角色应只有一个）
+        MuzzleFXComp = FindComponentByClass<UNiagaraComponent>();
+        if (!MuzzleFXComp)
+            UE_LOG(LogTemp, Log, TEXT("[开火] 枪口火光组件未找到（特效静默降级；BP 挂 Niagara 组件后重启生效）"));
     } else {
         GetCharacterMovement()->DisableMovement();
         GetCharacterMovement()->GravityScale = 0.f;
@@ -300,7 +304,7 @@ void ASightlineCharacter::TryFire() {
     --LocalMag;
     if (FireMontage) PlayAnimMontage(FireMontage);   // AM_Code 包装蒙太奇（UpperBody 槽，蓝图 3.3）
     if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
-    if (MuzzleFlash) MuzzleFlash->Activate(true);    // D5-16：重置重播（连发时每次开火重启火光），开火链单源在 C++
+    if (MuzzleFXComp) MuzzleFXComp->Activate(true);  // D5-16：重置重播（连发时每次开火重启火光），开火链单源在 C++
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
 
