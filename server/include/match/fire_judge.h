@@ -20,7 +20,7 @@ inline constexpr float        kMaxHp              = 100.f;
 inline constexpr int          kMagCapacity        = 30;      // 弹匣（D5-07）
 inline constexpr std::uint64_t kReloadMs          = 2500;    // 打空自动换弹（服务器权威计时）
 inline constexpr std::uint64_t kFireMinIntervalMs = 95;      // 服务器阈值 < 客户端步进 100ms（D5-14 容差吸抖动）
-inline constexpr float        kMaxRangeUu         = 10000.f; // 100m（1uu=1cm）
+inline constexpr float        kMaxRangeUu         = 1000000.f; // 10km=数值护栏（float 精度安全上限）——实际无距离限制（用户裁决 2026-10-27：去除射程限制），任何对局地图不可能触及
 inline constexpr float        kEyeForwardOffset   = 18.f;    // 客户端相机 (18,0,82)——origin 对齐 §4.2
 inline constexpr float        kEyeHeight          = 82.f;
 inline constexpr float        kDefaultHitboxRadius = 40.f;   // entityHitbox 烘焙缺失时的兜底

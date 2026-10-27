@@ -318,3 +318,24 @@ void UDebugPanelBase::OnDelayChanged(float Value) {
         FString::Printf(TEXT("入站延迟 %d ms"), Ms)));
     if (GI.IsValid()) GI->SetInboundDelayMs(Ms);              // 队列本体在连接适配器（D3-11）
 }
+
+// M5 血量行（蓝图 4.6）：5Hz 节流拉取 + 变更才重写文本（避免每帧字符串重建）
+void UDebugPanelBase::NativeTick(const FGeometry& MyGeometry, float InDeltaTime) {
+    Super::NativeTick(MyGeometry, InDeltaTime);
+    if (!HpText || !GI.IsValid()) return;
+    HpTextCooldown -= InDeltaTime;
+    if (HpTextCooldown > 0.f) return;
+    HpTextCooldown = 0.2f;
+
+    const USightlineMatchSession* Session = GI.IsValid() ? GI->GetMatchSession() : nullptr;
+    if (!Session || !Session->IsInMatch()) return;
+
+    const TArray<int32> Ids = Session->GetEntityIds();
+    FString Out;
+    for (const int32 Id : Ids)
+        Out += FString::Printf(TEXT("P%d  %d\n"), Id, Session->GetEntityHp(Id));
+    if (!Out.IsEmpty() && Out != LastHpText) {
+        LastHpText = Out;
+        HpText->SetText(FText::FromString(Out));
+    }
+}

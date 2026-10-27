@@ -110,9 +110,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TSoftObjectPtr<USoundBase> RemoteFireSound;  // 他人枪声：21 号 shooter≠自己（2D 缩小版）
 
-    // —— M5 枪口火光（D5-16：组件由 BP 挂在 WeaponRifle 的 Muzzle 插槽上——
-    //     C++ BeginPlay 按 FindComponentByClass 自动发现（BP Class Defaults 的组件引用选择器
-    //     对 SCS 实例支持有坑，2026-10-27 用户实勘——运行时按类查找=UE 标准做法零引用操作）；
+    // —— M5 枪口火光（D5-16v2：NS 为参数驱动——每发写 User.Trigger 上升沿 + User.Direction；
+    //     组件由 BP 挂在 WeaponRifle 的 Muzzle 插槽下，C++ BeginPlay 按类自动发现；
     //     组件缺失时=nullptr 静默降级）——
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Fire")
     TObjectPtr<UNiagaraComponent> MuzzleFXComp = nullptr;

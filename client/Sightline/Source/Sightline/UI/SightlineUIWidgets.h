@@ -217,6 +217,14 @@ protected:
     UPROPERTY(meta = (BindWidgetOptional))
     UTextBlock* DelayText = nullptr;
 
+    // M5 血量行（蓝图 4.6）：多行文本，每行"PID 血量"——数据源 21 号（MatchSession.EntityHp），Tick 节流刷新
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* HpText = nullptr;
+
 private:
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
     TWeakObjectPtr<USightlineGameInstance> GI;
+    FString LastHpText;
+    float HpTextCooldown = 0.f;
 };

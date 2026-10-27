@@ -5,9 +5,9 @@
 
 DEFINE_LOG_CATEGORY(LogSightline);
 
-// KPI② STAT 日志总开关（M5 消音件；默认开——采集期结束后 Sightline.StatLog 0 消音）
+// KPI② STAT/ANIM 诊断日志总开关（默认关=平时消音；KPI 采集/联调诊断时控制台 Sightline.StatLog 1 开启）
 TAutoConsoleVariable<int32> CSightlineStatLog(
-    TEXT("Sightline.StatLog"), 1,
+    TEXT("Sightline.StatLog"), 0,
     TEXT("STAT 采样/同步日志总开关（0=消音 1=采集）"),
     ECVF_Default);
 

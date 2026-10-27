@@ -92,10 +92,10 @@ void ASightlineCharacter::BeginPlay() {
             // D5-15v3：显隐不再翻转（Lyra 同款——FPP 身体/枪在相机后方自然入镜，不藏任何东西）；
             // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
-        // D5-16：枪口火光组件自动发现（BP 挂在 WeaponRifle 下的 Niagara——全角色应只有一个）
+        // D5-16：枪口火光组件自动发现 + 系统常驻激活（触发由每发 User.Trigger 参数驱动）
         MuzzleFXComp = FindComponentByClass<UNiagaraComponent>();
-        if (!MuzzleFXComp)
-            UE_LOG(LogTemp, Log, TEXT("[开火] 枪口火光组件未找到（特效静默降级；BP 挂 Niagara 组件后重启生效）"));
+        if (MuzzleFXComp) MuzzleFXComp->Activate();
+        else UE_LOG(LogTemp, Log, TEXT("[开火] 枪口火光组件未找到（特效静默降级；BP 挂 Niagara 组件后重启生效）"));
     } else {
         GetCharacterMovement()->DisableMovement();
         GetCharacterMovement()->GravityScale = 0.f;
@@ -143,7 +143,17 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
-    if (IsPlayerControlled() && bFireHeld) TryFire();   // M5 按住=全自动（D5-14）：节流循环在 Tick，输入系统 Repeat 不可靠
+    if (IsPlayerControlled()) {
+        // D5-16v2：Trigger=电平驱动（按住且有弹=真；松开/空匣/换弹=假）——
+        // 生成节奏由 NS 的 NM_WeaponTrigger（TriggerSpacing）负责；这里只表达"想开火"的电平
+        const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+        const bool bTrigger = bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
+        if (MuzzleFXComp) {
+            MuzzleFXComp->SetVariableBool(FName("User.Trigger"), bTrigger);
+            MuzzleFXComp->SetVariableVec3(FName("User.Direction"), GetBaseAimRotation().Vector());
+        }
+        if (bTrigger) TryFire();   // 节流/蒙太奇/枪声/20 号全在 TryFire（单源）
+    }
     if (IsPlayerControlled()) {
         const FVector Vel = GetVelocity();
         const float Speed = Vel.Size2D();
@@ -302,9 +312,8 @@ void ASightlineCharacter::TryFire() {
     }
     NextFireAllowedMs = NowMs + kClientFireIntervalMs;
     --LocalMag;
-    if (FireMontage) PlayAnimMontage(FireMontage);   // AM_Code 包装蒙太奇（UpperBody 槽，蓝图 3.3）
+    if (FireMontage) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
-    if (MuzzleFXComp) MuzzleFXComp->Activate(true);  // D5-16：重置重播（连发时每次开火重启火光），开火链单源在 C++
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
 
