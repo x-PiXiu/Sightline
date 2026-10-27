@@ -92,6 +92,10 @@ void ASightlineCharacter::BeginPlay() {
             // D5-15v3：显隐不再翻转（Lyra 同款——FPP 身体/枪在相机后方自然入镜，不藏任何东西）；
             // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
+        if (MatchSession->IsInMatch())
+            BP_OnMatchStarted();                         // 晚于开局入局（切图后生成）也补发开局 UI 事件
+        else
+            MatchSession->OnMatchStarted.AddDynamic(this, &ASightlineCharacter::OnMatchStartedHandler);
         // D5-16：枪口火光组件自动发现 + 系统常驻激活（触发由每发 User.Trigger 参数驱动）
         MuzzleFXComp = FindComponentByClass<UNiagaraComponent>();
         if (MuzzleFXComp) MuzzleFXComp->Activate();
@@ -335,6 +339,8 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
         }
     }
     if (bSelfVictim && Result.bHit && HurtSound.IsValid()) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
+    // D5-16：UI 反馈派发（Hitmarker 池/红闪/血量行——BP 只做表现，判己已在 C++ 完成）
+    BP_OnFireFeedback(bSelfShot, Result.bHit, bSelfVictim, Result.VictimPid, Result.VictimHp);
 }
 
 void ASightlineCharacter::SrvBakeOccluders() {
@@ -348,4 +354,9 @@ void ASightlineCharacter::SrvBakeOccluders() {
 
 void ASightlineCharacter::OnCameraToggle() {
     if (Camera) Camera->ToggleCameraMode();          // FPP(眼高) ↔ TPP(越肩)，偏移由组件 Tick 插值混合
+}
+
+// 15 号 → BP 开局 UI 事件（准星/红闪挂载）
+void ASightlineCharacter::OnMatchStartedHandler() {
+    BP_OnMatchStarted();
 }

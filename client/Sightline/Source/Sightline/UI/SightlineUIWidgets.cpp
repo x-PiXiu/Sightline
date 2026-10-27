@@ -332,8 +332,13 @@ void UDebugPanelBase::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
     const TArray<int32> Ids = Session->GetEntityIds();
     FString Out;
-    for (const int32 Id : Ids)
-        Out += FString::Printf(TEXT("P%d  %d\n"), Id, Session->GetEntityHp(Id));
+    for (const int32 Id : Ids) {
+        FString Name = FString::Printf(TEXT("P%d"), Id);        // 名册无名兜底
+        if (auto* Registry = GI->GetEntityRegistry())
+            if (FSightlineEntityState Ent; Registry->GetEntity(Id, Ent) && !Ent.Name.IsEmpty())
+                Name = Ent.Name;
+        Out += FString::Printf(TEXT("%s  %d\n"), *Name, Session->GetEntityHp(Id));
+    }
     if (!Out.IsEmpty() && Out != LastHpText) {
         LastHpText = Out;
         HpText->SetText(FText::FromString(Out));

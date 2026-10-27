@@ -68,6 +68,15 @@ protected:
     virtual void Tick(float DeltaSeconds) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+    // —— M5 视角 UI（D5-16：对局 UI 挂载/开火反馈由 C++ 派发，BP 只做表现——零 MatchSession 访问）——
+    UFUNCTION()
+    void OnMatchStartedHandler();                    // 15 号 → BP_OnMatchStarted
+    UFUNCTION(BlueprintImplementableEvent, Category = "Sightline|Fire")
+    void BP_OnMatchStarted();                        // BP 实现：创建准星/红闪挂进视口
+    UFUNCTION(BlueprintImplementableEvent, Category = "Sightline|Fire")
+    void BP_OnFireFeedback(bool bSelfShot, bool bHit, bool bSelfVictim, int32 VictimPid, int32 VictimHp);
+                                                     // BP 实现：Hitmarker（bSelfShot&&bHit）/红闪（bSelfVictim）
+
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<USightlineCameraComponent> Camera;
 
