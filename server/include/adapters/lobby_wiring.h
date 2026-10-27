@@ -156,7 +156,7 @@ public:
                 const std::string p = m.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     send(fd, protocol::MSG_S2C_FIRE_RESULT, p);
-                LOG_DEBUG("[出站] FIRE_RESULT shooter=" + std::to_string(e.fire.shooterPid) +
+                LOG_INFO("[出站] FIRE_RESULT shooter=" + std::to_string(e.fire.shooterPid) +
                           " hit=" + std::to_string(e.fire.bHit) +
                           " victim=" + std::to_string(e.fire.victimPid) +
                           " hp=" + std::to_string(e.fire.victimHp));
