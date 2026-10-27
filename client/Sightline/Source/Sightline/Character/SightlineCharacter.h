@@ -15,6 +15,8 @@ class UInputAction;
 class UAnimMontage;
 class UNiagaraComponent;
 class USoundBase;
+class UUserWidget;
+class USightlineObjectPoolSubsystem;
 struct FInputActionValue;
 
 /** 动画输入聚合体：ABP 的唯一数据入口（跨界 DTO——本地/远端两源在此归一） */
@@ -119,6 +121,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TSoftObjectPtr<USoundBase> RemoteFireSound;  // 他人枪声：21 号 shooter≠自己（2D 缩小版）
 
+    // —— M5 对局 UI（D5-16：全 C++ 驱动——BP 侧只在 Class Defaults 填 3 个类引用，零事件图）——
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> CrosshairClass;     // 准星（WBP_Crosshair）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> HurtFlashClass;     // 红闪（WBP_HurtFlash）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> HitmarkerClass;     // Hitmarker（WBP_Hitmarker·对象池管理）
+
     // —— M5 枪口火光（D5-16v2：NS 为参数驱动——每发写 User.Trigger 上升沿 + User.Direction；
     //     组件由 BP 挂在 WeaponRifle 的 Muzzle 插槽下，C++ BeginPlay 按类自动发现；
     //     组件缺失时=nullptr 静默降级）——
@@ -139,7 +149,16 @@ private:
     void TryFire();                              // 本地节流（100ms/30 发/2.5s 镜像服务器常量）+ 蒙太奇 + 枪声 + 20 号
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
+    void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
+    void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.15s 归池
+    void ReleaseHitmarker(UUserWidget* Marker);
     bool bFireHeld = false;
+
+    // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
+    UPROPERTY() TObjectPtr<UUserWidget> CrosshairWidget = nullptr;
+    UPROPERTY() TObjectPtr<UUserWidget> HurtFlashWidget = nullptr;
+    FTimerHandle HitmarkerTimer;
+    FTimerHandle HurtFlashTimer;
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;

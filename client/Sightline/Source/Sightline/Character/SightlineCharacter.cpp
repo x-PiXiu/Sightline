@@ -19,6 +19,9 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Sound/SoundBase.h"
+#include "Blueprint/UserWidget.h"
+#include "Game/SightlineObjectPoolSubsystem.h"
+#include "UI/SightlineUIWidgets.h"
 
 namespace {
     constexpr const TCHAR* kMappingContextPath = TEXT("/Game/Code/Input/IMC_Default.IMC_Default");
@@ -93,7 +96,7 @@ void ASightlineCharacter::BeginPlay() {
             // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
         if (MatchSession->IsInMatch())
-            BP_OnMatchStarted();                         // 晚于开局入局（切图后生成）也补发开局 UI 事件
+            CreateMatchUI();                             // 晚于开局入局（切图后生成）也补建对局 UI
         else
             MatchSession->OnMatchStarted.AddDynamic(this, &ASightlineCharacter::OnMatchStartedHandler);
         // D5-16：枪口火光组件自动发现 + 系统常驻激活（触发由每发 User.Trigger 参数驱动）
@@ -339,8 +342,13 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
         }
     }
     if (bSelfVictim && Result.bHit && HurtSound.IsValid()) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
-    // D5-16：UI 反馈派发（Hitmarker 池/红闪/血量行——BP 只做表现，判己已在 C++ 完成）
-    BP_OnFireFeedback(bSelfShot, Result.bHit, bSelfVictim, Result.VictimPid, Result.VictimHp);
+    if (bSelfShot && Result.bHit) ShowHitmarker();       // D5-16：Hitmarker 池化显示（全 C++）
+    if (bSelfVictim && Result.bHit && HurtFlashWidget.Get()) {
+        HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);   // 红闪（常驻实例重播）
+        GetWorldTimerManager().SetTimer(HurtFlashTimer, [Weak = TWeakObjectPtr<UUserWidget>(HurtFlashWidget.Get())]() {
+            if (Weak.IsValid()) Weak->SetVisibility(ESlateVisibility::Collapsed);
+        }, 0.3f, false);
+    }
 }
 
 void ASightlineCharacter::SrvBakeOccluders() {
@@ -356,7 +364,48 @@ void ASightlineCharacter::OnCameraToggle() {
     if (Camera) Camera->ToggleCameraMode();          // FPP(眼高) ↔ TPP(越肩)，偏移由组件 Tick 插值混合
 }
 
-// 15 号 → BP 开局 UI 事件（准星/红闪挂载）
+// 15 号 → 对局 UI（C++ 全自动建准星/红闪；BP_OnMatchStarted 钩子保留给未来 BP 侧自定义）
 void ASightlineCharacter::OnMatchStartedHandler() {
-    BP_OnMatchStarted();
+    BP_OnMatchStarted();                                 // BP 钩子（未实现=no-op）
+    CreateMatchUI();
+}
+
+void ASightlineCharacter::CreateMatchUI() {
+    auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
+    if (CrosshairClass) {
+        CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairClass);
+        if (CrosshairWidget) CrosshairWidget->AddToViewport(40);
+    }
+    if (HurtFlashClass) {
+        HurtFlashWidget = CreateWidget<UUserWidget>(GetWorld(), HurtFlashClass);
+        if (HurtFlashWidget) {
+            HurtFlashWidget->AddToViewport(41);
+            HurtFlashWidget->SetVisibility(ESlateVisibility::Collapsed);   // 红闪平时隐藏
+        }
+    }
+    UE_LOG(LogTemp, Log, TEXT("[对局UI] 准星=%s 红闪=%s"),
+           CrosshairWidget ? TEXT("OK") : TEXT("未配置"),
+           HurtFlashWidget ? TEXT("OK") : TEXT("未配置"));
+}
+
+// Hitmarker：池 Acquire → 显示 → 0.15s 归池（D5-13 池纪律：Acquire 必配 Release）
+void ASightlineCharacter::ShowHitmarker() {
+    auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
+    if (!Subsystem || !HitmarkerClass) return;
+    if (UUserWidget* M = Cast<UUserWidget>(Subsystem->Acquire(HitmarkerClass))) {
+        M->AddToViewport(42);
+        M->SetVisibility(ESlateVisibility::Visible);
+        TWeakObjectPtr<UUserWidget> Weak(M);
+        TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
+        GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak, WeakSelf]() {
+            if (Weak.IsValid() && WeakSelf.IsValid()) WeakSelf->ReleaseHitmarker(Weak.Get());
+        }, 0.15f, false);
+    }
+}
+
+void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
+    if (!Marker) return;
+    Marker->SetVisibility(ESlateVisibility::Collapsed);
+    if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
+        Subsystem->Release(Marker);                      // 归池（池内 Collapsed+出视口）
 }
