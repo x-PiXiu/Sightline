@@ -103,7 +103,16 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     if (!shooter || !shooter->bHasReport) return out;        // ① 未上报=位置未知，判不了
 
     // ②③④ 武器门（换弹含到期补满 / 弹匣空触发换弹 / 射速容差 95ms——fire_judge 纯函数）
-    if (ConsumeWeaponGate(shooter->weapon, nowMs) != FireGate::Ok) return out;   // 静默丢（D5-03）
+    const FireGate gate = ConsumeWeaponGate(shooter->weapon, nowMs);
+    if (gate != FireGate::Ok) {                              // 静默丢（D5-03）——诊断数据仍回传适配层落日志
+        MatchEvent ev;
+        ev.type = MatchEvent::Type::FireResult;
+        ev.roomId = roomId_;
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate),
+                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        out.push_back(std::move(ev));
+        return out;
+    }
 
     // ⑤ hitscan 求交：origin 对齐客户端相机位；候选=其余已上报实体（射手自己排除=无自伤）
     const Vec3 o = RayOriginFromEntity(shooter->x, shooter->y, shooter->z, shooter->yaw);
@@ -135,7 +144,10 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     MatchEvent ev;
     ev.type = MatchEvent::Type::FireResult;
     ev.roomId = roomId_;
-    ev.fire = FireResultData{shooterPid, v.hit, v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp};
+    ev.fire = FireResultData{shooterPid, v.hit, true, static_cast<std::uint8_t>(gate),
+                             v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp,
+                             o.x, o.y, o.z, d.x, d.y, d.z,
+                             v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f};
     out.push_back(std::move(ev));
     return out;
 }

@@ -148,18 +148,29 @@ public:
                 break;
             }
             case MT::FireResult: {
+                // 诊断行（每次开火一条全参数判定链：门/眼位/方向/命中距离/余血）
+                static const char* GateName[] = {"Ok", "换弹中", "弹匣空", "射速限制"};
+                const auto& F = e.fire;
+                if (!F.bAccepted) {
+                    LOG_INFO("[射击拒绝] shooter=" + std::to_string(F.shooterPid) +
+                              " 原因=" + GateName[F.gate % 4]);
+                    break;                                   // 被武器门拦下：不广播 21 号（静默丢 D5-03）
+                }
+                LOG_INFO("[射击判定] shooter=" + std::to_string(F.shooterPid) +
+                          " 眼位=(" + std::to_string(F.oX) + "," + std::to_string(F.oY) + "," + std::to_string(F.oZ) + ")" +
+                          " 方向=(" + std::to_string(F.dX) + "," + std::to_string(F.dY) + "," + std::to_string(F.dZ) + ")" +
+                          " hit=" + std::to_string(F.bHit) +
+                          " victim=" + std::to_string(F.victimPid) +
+                          " dist=" + std::to_string(F.dist) +
+                          " hp=" + std::to_string(F.victimHp));
                 // v4.2：21 号房内全员广播（**含射手自己**——射手要出 Hitmarker；其余画 tracer；
                 // 受击者红闪）——一条消息三方共用（D5-02v2；翻译唯一落点纪律同 15/17/18）
                 const sightline::wire::FireResultMsg m{
-                    e.fire.shooterPid, e.fire.bHit ? std::uint8_t{1} : std::uint8_t{0},
-                    e.fire.victimPid, e.fire.hitX, e.fire.hitY, e.fire.hitZ, e.fire.victimHp};
+                    F.shooterPid, F.bHit ? std::uint8_t{1} : std::uint8_t{0},
+                    F.victimPid, F.hitX, F.hitY, F.hitZ, F.victimHp};
                 const std::string p = m.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     send(fd, protocol::MSG_S2C_FIRE_RESULT, p);
-                LOG_INFO("[出站] FIRE_RESULT shooter=" + std::to_string(e.fire.shooterPid) +
-                          " hit=" + std::to_string(e.fire.bHit) +
-                          " victim=" + std::to_string(e.fire.victimPid) +
-                          " hp=" + std::to_string(e.fire.victimHp));
                 break;
             }
             }

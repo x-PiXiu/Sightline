@@ -240,14 +240,16 @@ int main() {
     CHECK(fEv[0].fire.shooterPid == 10 && fEv[0].fire.bHit && fEv[0].fire.victimPid == 11);
     CHECK(fEv[0].fire.victimHp == 75);                            // 100 - 25
     CHECK(fm.Fire(10, 1097).size() == 1);                        // 97ms 间隔：容差内接受（mag=2）
-    CHECK(fm.Fire(10, 1147).empty());                            // 50ms：RateLimited（幻影枪口径 D5-04）
+    const auto Rej = fm.Fire(10, 1147);
+    CHECK(Rej.size() == 1 && !Rej[0].fire.bAccepted && !Rej[0].fire.bHit);   // 50ms：RateLimited（诊断事件回传）
     fm.UpdateEntity(10, 0, 0, 90, 90, 0, 0, 2);                  // 射手转向 +Y
     const auto fEv2 = fm.Fire(10, 1300);
     CHECK(fEv2.size() == 1 && !fEv2[0].fire.bHit && fEv2[0].fire.victimPid == 0);
     CHECK(std::fabs(fEv2[0].fire.hitX) < 1.0f && fEv2[0].fire.hitY > 9000.f);  // 未命中 = 射线终点
     for (int i = 0; i <= 26; ++i) (void)fm.Fire(10, 1400 + i * 100);   // 打满剩余（mag 3+27=30）
-    CHECK(fm.Fire(10, 4100).empty());                            // ③ 弹匣空 → 触发换弹（静默）
-    CHECK(fm.Fire(10, 5000).empty());                            // ② 换弹中
+    const auto RejMag = fm.Fire(10, 4100);
+    CHECK(RejMag.size() == 1 && !RejMag[0].fire.bAccepted);      // ③ 弹匣空 → 触发换弹（诊断事件回传）
+    CHECK(fm.Fire(10, 5000).size() == 1 && !fm.Fire(10, 5000).empty());   // ② 换弹中（第二次调用落在 4100+900ms 仍换弹中）
     fm.UpdateEntity(10, 0, 0, 90, 0, 0, 0, 3);                   // 射手转回 +X
     const auto fEv3 = fm.Fire(10, 6600);                          // ② 到期补满（4100+2500）→ 正常出膛
     CHECK(fEv3.size() == 1 && fEv3[0].fire.bHit && fEv3[0].fire.victimPid == 11);

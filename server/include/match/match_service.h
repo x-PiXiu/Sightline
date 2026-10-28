@@ -46,13 +46,19 @@ struct EntitySnapshot {
 };
 
 /** 对局领域事件（纯数据；FrameWriter 翻译成 15/17/18/21 帧）
- *  M5：FireResult = 21 号载荷源（全房间广播含射手自己——一条消息三方共用：Hitmarker/tracer/红闪） */
+ *  M5：FireResult = 21 号载荷源（全房间广播含射手自己——一条消息三方共用：Hitmarker/tracer/红闪）
+ *  诊断字段（bAccepted/gate/o/d/dist）不入 21 号——仅供适配层日志（每次开火一条判定链全参数行） */
 struct FireResultData {
     std::uint32_t shooterPid = 0;
     bool bHit = false;
+    bool bAccepted = true;                     // false=被武器门拦下（②③④ 静默丢——诊断日志用）
+    std::uint8_t gate = 0;                     // FireGate 枚举值（0=Ok 1=换弹 2=弹匣 3=射速）
     std::uint32_t victimPid = 0;
     float hitX = 0.f, hitY = 0.f, hitZ = 0.f;  // 未命中=射线终点（墙面或 Lmax 端点，tracer 停墙）
     std::uint8_t victimHp = 0;                 // 命中后余血（ep07 接血条/死亡判定，契约一次定稿）
+    float oX = 0.f, oY = 0.f, oZ = 0.f;        // 射线起点（眼位）
+    float dX = 0.f, dY = 0.f, dZ = 0.f;        // 射线方向（单位向量）
+    float dist = 0.f;                          // 命中距离（未命中=Lmax）
 };
 
 struct MatchEvent {

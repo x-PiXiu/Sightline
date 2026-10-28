@@ -319,6 +319,8 @@ void ASightlineCharacter::TryFire() {
     }
     NextFireAllowedMs = NowMs + kClientFireIntervalMs;
     --LocalMag;
+    UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f"),
+           LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch);
     if (FireMontage) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
