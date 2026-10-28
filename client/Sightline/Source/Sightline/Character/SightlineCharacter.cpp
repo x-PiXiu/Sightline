@@ -191,11 +191,6 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         }
         AnimInputs.Pitch = GetBaseAimRotation().Pitch;
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
-        if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
-            UE_LOG(LogTemp, Log, TEXT("[ANIM] LOCAL  t=%.3f vel=%.1f spd=%.1f dir=%.1f pitch=%.1f"),
-                   FPlatformTime::Seconds(), Vel.Size2D(),
-                   AnimInputs.Speed, AnimInputs.DirectionAngle, AnimInputs.Pitch);
-        }
     }
     TickRemoteInterpolation(DeltaSeconds);
 }
@@ -237,10 +232,6 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
         // 后续快照：A←B，B←新（滑动窗口）
         SnapA = SnapB;
         SnapB = {Now, Pos, Yaw, AckedSeq};
-    }
-
-    if (CSightlineStatLog.GetValueOnGameThread() != 0) {
-        UE_LOG(LogTemp, Log, TEXT("[ANIM] SNAP   t=%.3f yaw=%.1f"), Now, Yaw);
     }
 }
 
@@ -304,14 +295,6 @@ void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
 
     AnimInputs.Pitch = FMath::FInterpTo(AnimInputs.Pitch, RemotePitchTarget,
                                         DeltaTime, kRotInterpSpeed);
-
-    // 诊断日志
-    if (CSightlineStatLog.GetValueOnGameThread() != 0 && GFrameCounter % 6 == 0) {
-        const float Dist = FVector::Dist2D(NewLoc, SnapB.Pos);
-        UE_LOG(LogTemp, Log, TEXT("[ANIM] REMOTE t=%.3f vel=%.1f spd=%.1f dir=%.1f dist=%.1f pitch=%.1f"),
-               FPlatformTime::Seconds(), RemoteVelocity.Size2D(),
-               AnimInputs.Speed, AnimInputs.DirectionAngle, Dist, AnimInputs.Pitch);
-    }
 }
 
 // ===== M5 开火链路（D5 系列；蓝图方案 §0 P1/P3/P5 + M5-C/4.5）=====

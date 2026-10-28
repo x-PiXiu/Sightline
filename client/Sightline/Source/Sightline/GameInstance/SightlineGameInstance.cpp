@@ -261,8 +261,6 @@ void USightlineGameInstance::SetInboundDelayMs(int32 Ms)
 {
     if (Connection) Connection->SetInboundDelayMs(Ms);    // 延迟队列本体在连接适配器（D3-11）
     LastInboundDelayMs = Ms;                              // M3c：和解 HUD 的滑块值显示源
-    if (CSightlineStatLog.GetValueOnGameThread() != 0)
-        UE_LOG(LogSightline, Log, TEXT("[STAT] DELAY t=%.3f ms=%d"), FPlatformTime::Seconds(), Ms);
 }
 
 void USightlineGameInstance::ShowLoginScreen()

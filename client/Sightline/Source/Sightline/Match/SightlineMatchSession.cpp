@@ -65,11 +65,6 @@ void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
             static_cast<int32>(In.Seq - InputHistory[EvictCount].Seq) > kInputHistoryTarget))
         ++EvictCount;
     if (EvictCount > 0) InputHistory.RemoveAt(0, EvictCount);
-    // KPI② 误差日志（发送端真实轨迹；对齐锚 = MATCH_START 行，离线按 t0 对齐）
-    if (CSightlineStatLog.GetValueOnGameThread() != 0)
-        UE_LOG(LogTemp, Log, TEXT("[STAT] SELF t=%.3f pid=%d seq=%u x=%.2f y=%.2f z=%.2f yaw=%.1f pitch=%.1f f=%d"),
-               FPlatformTime::Seconds(), SelfPlayerId, In.Seq, S.Pos.X, S.Pos.Y, S.Pos.Z,
-               S.Yaw, S.Pitch, S.bFalling ? 1 : 0);
 }
 
 void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>& Payload) {
@@ -99,8 +94,6 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         ErrCurrentCm = 0.0; ErrPeakCm = 0.0; LastAckedSeq = 0;
         EntityHp.Reset();                              // M5：新对局血量清账（D5-09 事件流等价状态流）
         for (const FSightlineEntityState& R : Roster) EntityHp.Add(R.PlayerId, 100);   // 全员满血
-        if (CSightlineStatLog.GetValueOnGameThread() != 0)   // 误差曲线对齐锚（plot_stat_curve：各端以最后锚为 t0）
-            UE_LOG(LogTemp, Log, TEXT("[STAT] MATCH_START t=%.3f"), FPlatformTime::Seconds());
         Registry->ApplyMatchStart(SelfPlayerId, Roster);
         OnMatchStarted.Broadcast();                    // GI 切对局关卡（生成由 PawnSpawner 延迟执行）
         return;
@@ -125,10 +118,6 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             Registry->ApplyState(Pid,
                                  FVector(Ent.X, Ent.Y, Ent.Z), Ent.Yaw, Ent.Pitch,
                                  (Ent.Flags & 0x01) != 0, static_cast<int32>(Ent.AckedSeq));
-            if (CSightlineStatLog.GetValueOnGameThread() != 0)
-                UE_LOG(LogTemp, Log, TEXT("[STAT] PEER t=%.3f pid=%d ack=%u x=%.2f y=%.2f z=%.2f f=%d"),
-                       FPlatformTime::Seconds(), Pid, Ent.AckedSeq,
-                       Ent.X, Ent.Y, Ent.Z, (Ent.Flags & 0x01) != 0);
         }
         return;
     }
@@ -205,9 +194,6 @@ void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthP
     case sightline::reconcile::Decision::Action::FullSnap:
         ++ReconcileCount;
         OnSelfCorrected.Broadcast(AuthPos, /*bFullSnap=*/true);
-        if (CSightlineStatLog.GetValueOnGameThread() != 0)
-            UE_LOG(LogTemp, Log, TEXT("[STAT] RECON t=%.3f ack=%u err=%.2f replays=0 full=1"),
-                   FPlatformTime::Seconds(), AckedSeq, ErrCurrentCm);
         break;
 
     case sightline::reconcile::Decision::Action::ErrorTranslate:
@@ -215,9 +201,6 @@ void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthP
         // 回滚 + 重放（位移空间）：渲染位 += 误差向量——纯平移运动下与"摆回权威位再逐输入重放"
         // 数学等价且不与 CMC 相搏；穿墙/碰撞级的逐帧输入重放不在本期范围（按需后置）
         OnSelfCorrected.Broadcast(FVector(D.errorX, D.errorY, D.errorZ), /*bFullSnap=*/false);
-        if (CSightlineStatLog.GetValueOnGameThread() != 0)
-            UE_LOG(LogTemp, Log, TEXT("[STAT] RECON t=%.3f ack=%u err=%.2f replays=%d full=0"),
-                   FPlatformTime::Seconds(), AckedSeq, ErrCurrentCm, ReplayFrames);
         break;
     }
 }
