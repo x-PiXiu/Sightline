@@ -16,6 +16,7 @@ class UAnimMontage;
 class UNiagaraComponent;
 class USoundBase;
 class UUserWidget;
+class UDecalComponent;
 class USightlineObjectPoolSubsystem;
 struct FInputActionValue;
 
@@ -143,6 +144,11 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Fire")
     TObjectPtr<UNiagaraComponent> MuzzleFXComp = nullptr;
 
+    // —— M5 弹孔贴花（2026-10-28 用户令：21 号 hitPoint 已带落点，C++ 补朝向与渲染）——
+    /** 弹孔贴花材质（Lyra 迁移 M_Decal_Base 系；未配置=静默降级零开销） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<UMaterialInterface> ImpactDecalMaterial = nullptr;
+
     UFUNCTION(Exec) void SrvBakeOccluders();     // 控制台烘焙入口（M5-F 步骤 6.2）
 
 private:
@@ -160,6 +166,7 @@ private:
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.15s 归池（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
+    void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线）
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
@@ -168,6 +175,8 @@ private:
     FTimerHandle HitmarkerTimer;
     TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;
+    UPROPERTY()
+    TArray<TObjectPtr<UDecalComponent>> LiveDecals;   // 活跃弹孔 FIFO（上限见 kMaxLiveDecals；角色销毁=对局贴花全清）
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;

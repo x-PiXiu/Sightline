@@ -12,6 +12,7 @@
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "Components/DecalComponent.h"
 #include "Game/SightlineBakeLib.h"
 #include "Game/SightlineOccluderComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -41,6 +42,10 @@ namespace {
     constexpr uint64 kClientFireIntervalMs = 100;
     constexpr int32  kClientMag            = 30;
     constexpr uint64 kClientReloadMs       = 2500;
+    // —— M5 弹孔贴花（落点短程探针参数 + FIFO 上限）——
+    constexpr int32  kMaxLiveDecals   = 64;    // 600 RPM 连发上限防贴花洪峰（超限回收最老）
+    constexpr float  kDecalProbeBackCm = 15.f; // 探针起点=落点向射手侧回退（墙面外侧）
+    constexpr float  kDecalProbeFwdCm  = 5.f;  // 探针终点=落点向墙内推进（短程：天端点探不到=自动跳过）
 }
 
 ASightlineCharacter::ASightlineCharacter() {
@@ -340,6 +345,7 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 落点=(%.0f,%.0f,%.0f)"),
            Result.ShooterPid, Result.bHit ? 1 : 0, Result.VictimPid, Result.VictimHp,
            Result.HitPoint.X, Result.HitPoint.Y, Result.HitPoint.Z);   // 21 号响应腿：与 TryFire 的 [开火] 弹余行成链
+    if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
     if (bSelfShot) {
@@ -429,4 +435,41 @@ void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
     Marker->SetVisibility(ESlateVisibility::Collapsed);
     if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
         Subsystem->Release(Marker);                      // 归池（池内 Collapsed+出视口）
+}
+
+// ===== M5 弹孔贴花（21 号 hitPoint 已带落点；朝向=落点短程回溯探针取墙面法线）=====
+// 未命中时 hitPoint=墙面交点或 10km 天端点（fire_judge 合同）。法线不进 21 号契约（22B 定稿
+// 零改动）——在落点沿射入方向做 15/5cm 短程探针：墙面点必命中该面（拿 Normal）；天端点探空
+// 自动跳过。眼位估计与服务器 RayOriginFromEntity 同式（位置+前向18+高82）——探针方向失真极小。
+// 不进对象池：UDecalComponent 生命周期（Register/Destroy）与 widget/actor 池机件不同构，
+// 直接 Create/Destroy+FIFO 上限（64）最稳；贴花挂在本地角色名下=对局结束随 Pawn 全清。
+void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 ShooterPid) {
+    if (!ImpactDecalMaterial || !GetWorld()) return;
+    FVector Eye(ForceInitToZero);
+    if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(ShooterPid)) {
+        Eye = Camera ? Camera->GetComponentLocation() : GetActorLocation() + FVector(0, 0, 82);
+    } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
+        if (const ASightlineCharacter* Remote = Cast<ASightlineCharacter>(GI->GetPawnSpawner()->GetPawnByPid(ShooterPid)))
+            Eye = Remote->GetActorLocation() + Remote->GetActorRotation().Vector() * 18.f + FVector(0, 0, 82);
+    }
+    if (Eye.IsZero()) return;                         // 射手已离场（远端 Pawn 销毁）：无方向源，放弃
+    const FVector Incoming = (HitPoint - Eye).GetSafeNormal();
+    if (Incoming.IsZero()) return;
+    FHitResult HR;
+    GetWorld()->LineTraceSingleByChannel(HR, HitPoint - Incoming * kDecalProbeBackCm,
+                                         HitPoint + Incoming * kDecalProbeFwdCm, ECC_Visibility);
+    if (!HR.bBlockingHit) return;                     // 天端点/无面：不贴
+    UDecalComponent* D = NewObject<UDecalComponent>(this);
+    D->SetDecalMaterial(ImpactDecalMaterial);
+    D->DecalSize = FVector(20.f, 14.f, 14.f);         // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径
+    D->SetWorldLocationAndRotation(HitPoint, FRotationMatrix::MakeFromX(HR.Normal).Rotator());
+    D->FadeStartDelay = 8.f;                          // 8s 后 2s 淡出（销毁仍走 FIFO 回收）
+    D->FadeDuration = 2.f;
+    D->FadeScreenSize = 0.f;                          // 远小不剔除（弹孔的意义就是远看也有）
+    D->RegisterComponent();                           // 不 Attach：世界静态；outer=本角色=对局期存活
+    LiveDecals.Add(D);
+    if (LiveDecals.Num() > kMaxLiveDecals) {
+        if (UDecalComponent* Oldest = LiveDecals[0]) Oldest->DestroyComponent();
+        LiveDecals.RemoveAt(0);
+    }
 }
