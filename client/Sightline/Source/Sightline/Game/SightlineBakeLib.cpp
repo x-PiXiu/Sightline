@@ -1,13 +1,49 @@
 #include "Game/SightlineBakeLib.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/SightlineOccluderComponent.h"
 #include "Character/SightlineCharacter.h"
 #include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+
+namespace {
+    // 烘焙全局控制台命令（2026-10-29 用户实勘：Output Log 命令行走引擎级路由，到不了 Pawn 的
+    // UFUNCTION(Exec)——命令被静默吞掉零输出）。注册为 IConsoleManager 命令后：PIE 视口控制台/
+    // Output Log 命令行/编辑器 Cmd 全可达；PIE 在跑取 PIE 世界，否则取编辑器世界。
+    // 结果同时打日志与屏幕（AddOnScreenDebugMessage——防日志洪峰刷过看不见）。
+    UWorld* FindBakeTargetWorld() {
+        if (!GEngine) return nullptr;
+        UWorld* EditorWorld = nullptr;
+        for (const FWorldContext& Ctx : GEngine->GetWorldContexts()) {
+            UWorld* W = Ctx.World();
+            if (!W) continue;
+            if (W->WorldType == EWorldType::PIE) return W;      // PIE 优先（验的是玩法场景）
+            if (W->WorldType == EWorldType::Editor && !EditorWorld) EditorWorld = W;
+        }
+        return EditorWorld;
+    }
+}
+
+FAutoConsoleCommand GBakeOccludersCmd(
+    TEXT("SrvBakeOccluders"),
+    TEXT("烘焙服务器几何合同（SightlineOccluder 标记 → server/assets/maps/<关卡>.json）"),
+    FConsoleCommandDelegate::CreateLambda([]() {
+        UWorld* Target = FindBakeTargetWorld();
+        if (!Target) {
+            UE_LOG(LogTemp, Warning, TEXT("[烘焙] FAIL 未找到可烘焙的世界（先打开关卡 NewMap）"));
+            return;
+        }
+        FString Summary;
+        const bool bOk = USightlineBakeLib::BakeServerOccluders(Target, FString(), Summary);
+        UE_LOG(LogTemp, Log, TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary);
+        if (GEngine) GEngine->AddOnScreenDebugMessage(77001, 8.f, bOk ? FColor::Green : FColor::Red,
+            FString::Printf(TEXT("[烘焙] %s %s"), bOk ? TEXT("OK") : TEXT("FAIL"), *Summary));
+    }));
 
 bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPath, FString& OutSummary) {
     if (!World) {
