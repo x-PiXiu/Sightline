@@ -147,7 +147,10 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         // M5：21 号三分流——射手 Hitmarker / 其余 tracer+远端动画 / 受击者红闪（D5-02v2）
         // 血量行数据也在此更新（TCP 可靠有序：事件流等价状态流，无丢包漂移）
         SightlineProtocol::FFireResult R;
-        if (!SightlineProtocol::FFireResult::Parse(Payload, R)) return;   // 坏帧防御：整包放弃
+        if (!SightlineProtocol::FFireResult::Parse(Payload, R)) {
+            UE_LOG(LogSightline, Warning, TEXT("[21] 判定帧解析失败 长度=%d（契约漂移？）"), Payload.Num());
+            return;                                      // 坏帧防御：整包放弃（2026-10-29 加警告：此前静默=链路断点不可见）
+        }
         if (R.Result != 0) EntityHp.Add(static_cast<int32>(R.VictimPid), static_cast<int32>(R.VictimHp));
         FSightlineFireResult Out;
         Out.ShooterPid = static_cast<int32>(R.ShooterPid);

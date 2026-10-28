@@ -344,12 +344,12 @@ void ASightlineCharacter::TryFire() {
 
 void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     // 三分流（图=代码 fire_client_flow）：命中音/他人枪声/受击音 + 远端开火动画（D5-10v2）
-    UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 落点=(%.0f,%.0f,%.0f)"),
-           Result.ShooterPid, Result.bHit ? 1 : 0, Result.VictimPid, Result.VictimHp,
-           Result.HitPoint.X, Result.HitPoint.Y, Result.HitPoint.Z);   // 21 号响应腿：与 TryFire 的 [开火] 弹余行成链
     if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
+    UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 自机射手=%d 自机受击=%d"),
+           Result.ShooterPid, Result.bHit ? 1 : 0, Result.VictimPid, Result.VictimHp,
+           bSelfShot ? 1 : 0, bSelfVictim ? 1 : 0);   // 自机双旗外显：全 0=SelfPlayerId 未注入（登录链问题）；三分流的判定依据一屏可见
     if (bSelfShot) {
         if (Result.bHit && HitSound != nullptr) UGameplayStatics::PlaySound2D(this, HitSound.Get());
     } else {
@@ -365,6 +365,10 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     }
     if (bSelfVictim && Result.bHit && HurtSound != nullptr) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
     if (bSelfShot && Result.bHit) ShowHitmarker();       // D5-16：Hitmarker 池化显示（全 C++）
+    if (bSelfVictim && Result.bHit && !HurtFlashWidget.Get()) {
+        static bool bWarned = false;
+        if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[受击] 红闪未显示：HurtFlashWidget 为空（WBP_HurtFlash 未建或 HurtFlashClass 未填 BP）")); }
+    }
     if (bSelfVictim && Result.bHit && HurtFlashWidget.Get()) {
         HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);   // 红闪（常驻实例重播）
         GetWorldTimerManager().SetTimer(HurtFlashTimer, [Weak = TWeakObjectPtr<UUserWidget>(HurtFlashWidget.Get())]() {
@@ -415,13 +419,21 @@ void ASightlineCharacter::CreateMatchUI() {
 // 被同名 Handle 覆盖（控件泄漏在视口且永不回池）。活跃中只续时，不重复取件。
 void ASightlineCharacter::ShowHitmarker() {
     auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
-    if (!Subsystem || !HitmarkerClass) return;
+    if (!Subsystem || !HitmarkerClass) {
+        static bool bWarned = false;
+        if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[命中] Hitmarker 未显示：HitmarkerClass 未配置（BP Character Class Defaults → Sightline|UI）")); }
+        return;
+    }
     UUserWidget* M = ActiveHitmarker.Get();
     if (!M) {
         M = Cast<UUserWidget>(Subsystem->Acquire(HitmarkerClass));
         ActiveHitmarker = M;
     }
-    if (!M) return;
+    if (!M) {
+        static bool bWarned2 = false;
+        if (!bWarned2) { bWarned2 = true; UE_LOG(LogSightline, Warning, TEXT("[命中] Hitmarker 池取件失败（检查对象池/类引用）")); }
+        return;
+    }
     M->AddToViewport(42);
     M->SetVisibility(ESlateVisibility::Visible);
     TWeakObjectPtr<UUserWidget> Weak(M);
@@ -447,7 +459,12 @@ void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
 // idle 池条目 GC 可见（UPROPERTY 红线），对局结束 EndPlay 全量归还。
 void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 ShooterPid) {
     auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
-    if (!Subsystem || !ImpactDecalMaterial || !GetWorld()) return;
+    if (!ImpactDecalMaterial) {
+        static bool bWarned = false;
+        if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[弹孔] 不生成：ImpactDecalMaterial 未配置（迁移 MI_Decal_Concrete 后填 BP）")); }
+        return;
+    }
+    if (!Subsystem || !GetWorld()) return;
     FVector Eye(ForceInitToZero);
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(ShooterPid)) {
         Eye = Camera ? Camera->GetComponentLocation() : GetActorLocation() + FVector(0, 0, 82);
@@ -471,6 +488,8 @@ void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 
     D->FadeDuration = 2.f;
     D->FadeScreenSize = 0.f;                          // 远小不剔除（弹孔的意义就是远看也有）
     D->RegisterComponent();                           // 不 Attach：世界静态
+    UE_LOG(LogSightline, Log, TEXT("[弹孔] 落点=(%.0f,%.0f,%.0f) 法线=(%.2f,%.2f,%.2f) 活跃=%d"),
+           HitPoint.X, HitPoint.Y, HitPoint.Z, HR.Normal.X, HR.Normal.Y, HR.Normal.Z, LiveDecals.Num() + 1);
     LiveDecals.Add(D);
     if (LiveDecals.Num() > kMaxLiveDecals) {
         if (UDecalComponent* Oldest = LiveDecals[0]) Subsystem->Release(Oldest);   // 归池注销（非销毁）
