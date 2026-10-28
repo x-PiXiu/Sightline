@@ -156,14 +156,15 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
     if (IsPlayerControlled()) {
-        // D5-16v2：Trigger=电平驱动（按住且有弹=真；松开/空匣/换弹=假）——
+        // D5-16v2：Trigger=电平驱动（对局中+按住且有弹=真；登录/大厅/松开/空匣/换弹=假）——
         // 生成节奏由 NS 的 NM_WeaponTrigger（TriggerSpacing）负责；这里只表达"想开火"的电平
         const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+        const bool bMatchLive = MatchSession.IsValid() && MatchSession->IsInMatch();   // 对局门：与 TryFire 同源
         if (LocalMag == 0 && NowMs >= LocalReloadUntilMs)
             LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣时上弦——
                                                      // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
                                                      // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
-        const bool bTrigger = bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
+        const bool bTrigger = bMatchLive && bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
         if (MuzzleFXComp) {
             if (bTrigger && !MuzzleFXComp->IsActive())
                 MuzzleFXComp->Activate(true);        // 系统自完成后复活（寿命型 Niagara 资产兜底）
@@ -305,6 +306,9 @@ void ASightlineCharacter::OnFireReleased() {
 }
 
 void ASightlineCharacter::TryFire() {
+    // 对局门（2026-10-29 用户报：登录页点击出枪声）：未进对局武器系统休眠——客户端镜像服务器
+    // 四道门的第一道（在局）；登录页/大厅/断链时点击不再出枪声/蒙太奇/扣弹
+    if (!MatchSession.IsValid() || !MatchSession->IsInMatch()) return;
     const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
     if (NowMs < NextFireAllowedMs) return;           // 本地节流（表现层预测先行一拍）
     if (LocalMag <= 0) {
