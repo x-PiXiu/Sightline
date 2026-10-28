@@ -6,6 +6,7 @@
 //       kIoThreads=0（环境变量 SIGHTLINE_IO_THREADS）→ 回落单线程拓扑（同一套代码两种形态，smoke 双过）
 // 业务层零改动抵押：lobby/match 一行不碰（git diff 为证——验收四条之二）
 #include <csignal>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -14,8 +15,11 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
+
+#include <unistd.h>                                  // readlink（exe 相对路径解析）
 
 #include "logger/logger.h"
 #include "net/event_loop.h"
@@ -80,6 +84,29 @@ namespace {
     void appendU64(std::string& s, uint64_t v) {           // 小端
         for (int i = 0; i < 8; ++i) s.push_back(static_cast<char>((v >> (8 * i)) & 0xFF));
     }
+
+    // 几何合同路径候选链（2026-10-29 用户实勘：CLion 启动 CWD=构建目录，CWD 相对路径落空）——
+    // env 显式 > CWD 相对 > exe 同级（仓库根布局：server/sightline_server）> exe 上级（构建子目录布局：
+    // cmake-build-ubuntu/sightline_server）。首个存在者胜；全不存在返回 CWD 相对——保持"未找到→空遮挡表
+    // +LOG_INFO 继续"既有语义（无图环境兼容 smoke/loadbot）
+    std::string ResolveGeometryPath() {
+        if (const char* env = std::getenv("SIGHTLINE_MAP_GEOMETRY")) return env;
+        std::vector<std::string> candidates{"assets/maps/NewMap.json"};
+        std::array<char, 4096> buf{};
+        const ssize_t n = ::readlink("/proc/self/exe", buf.data(), buf.size() - 1);
+        if (n > 0) {
+            buf[static_cast<std::size_t>(n)] = '\0';
+            const std::string exe(buf.data());
+            const std::size_t slash = exe.find_last_of('/');
+            const std::string exeDir = (slash == std::string::npos) ? std::string(".") : exe.substr(0, slash);
+            candidates.push_back(exeDir + "/assets/maps/NewMap.json");
+            candidates.push_back(exeDir + "/../assets/maps/NewMap.json");
+        }
+        for (const std::string& c : candidates) {
+            if (std::ifstream f(c); f.good()) return c;
+        }
+        return candidates.front();
+    }
 } // namespace
 
 int main() {
@@ -136,8 +163,7 @@ int main() {
     //     语义分层：文件存在但非法 → fail-fast（装配错误不留活口）；文件不存在 → 空遮挡表 +
     //     LOG_INFO 继续（无图环境兼容 smoke/loadbot——hitscan 无遮挡，烘焙后重启生效）
     {
-        const char* envPath = std::getenv("SIGHTLINE_MAP_GEOMETRY");
-        const std::string path = envPath ? envPath : "assets/maps/NewMap.json";
+        const std::string path = ResolveGeometryPath();
         if (auto geometry = adapters::LoadMapGeometry(path)) {
             match.SetGeometry(*geometry);
             LOG_INFO("[几何合同] 装载 path=" + path +
