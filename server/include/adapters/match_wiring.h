@@ -23,6 +23,7 @@ public:
 
     void Register() {
         // 19：位置上报 v2（v4 R10——对局期内替代 16）——Parse 集中校验（messages.h 唯一长度守门）
+        // trace=true：30Hz×客户端 高频帧，收帧行降 TRACE（默认 DEBUG 档不再刷屏；判定不受影响）
         disp_.on(protocol::MSG_C2S_PLAYER_INPUT, "位置上报v2",
                  [this](int fd, const std::string& payload) {
             const std::span<const std::uint8_t> bytes(
@@ -38,7 +39,7 @@ public:
             match_.UpdateEntity(static_cast<uint32_t>(pid),
                                 msg->x, msg->y, msg->z, msg->yaw, msg->pitch,
                                 msg->flags, msg->seq);
-        });
+        }, true);
 
         // 16：v4 R10 对局期停用——在局者收到 16 视为无效帧丢弃（19 替代）；对局外 16 本就无效（未知 pid 静默）
         disp_.on(protocol::MSG_C2S_MOVE_REPORT, "位置上报(v4停用)",
@@ -51,7 +52,9 @@ public:
         });
 
         // 20：开火请求（v4.2 · 空 payload）——判定全用服务器权威状态（D5-01）；
-        // 时间由适配层注入（steady 时钟，域不持钟）；FireResult 经 FrameWriter 翻译成 21 号全员广播
+        // 时间由适配层注入（steady 时钟，域不持钟）；FireResult 经 FrameWriter 翻译成 21 号全员广播。
+        // trace=true：通用收帧行降 TRACE——本消息的链路日志由下方 [开火·请求]（INFO）+ FrameWriter
+        // [射击判定]/[射击拒绝]（INFO）承担，INFO 档即整链可见
         disp_.on(protocol::MSG_C2S_FIRE, "开火",
                  [this](int fd, const std::string& payload) {
             const std::span<const std::uint8_t> bytes(
@@ -63,11 +66,12 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                             // 未登录：无效
+            LOG_INFO("[开火·请求] shooter=" + std::to_string(pid) + " fd=" + std::to_string(fd));
             const auto nowMs = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now().time_since_epoch()).count());
             writer_.deliverMatch(match_.Fire(static_cast<std::uint32_t>(pid), nowMs));
-        });
+        }, true);
 
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
         disp_.on(protocol::MSG_C2S_START_MATCH, "开始对局",

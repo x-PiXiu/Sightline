@@ -88,7 +88,8 @@ int main() {
     common::logger::Logger::getInstance().addSink(
         std::make_unique<common::logger::ConsoleSink>());
     // 日志级别环境可调（SIGHTLINE_LOG_LEVEL=INFO/DEBUG/TRACE，默认 DEBUG）——
-    // 联调/压测开 INFO：[收帧·位置上报v2] 等 DEBUG 行自动隐藏，异步日志队列压力立减（30Hz×客户端 每秒数十行）
+    // 30Hz 高频帧（位置上报v2/心跳）收帧行已降 TRACE，默认 DEBUG 即消音；
+    // 开火链路（[开火·请求]→[射击判定]/[射击拒绝]）走 INFO：任意档位整链可见
     common::logger::LogLevel lvl = common::logger::LogLevel::DEBUG;
     if (const char* env = std::getenv("SIGHTLINE_LOG_LEVEL")) {
         const std::string lv(env);

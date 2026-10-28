@@ -328,6 +328,9 @@ void ASightlineCharacter::TryFire() {
 
 void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     // 三分流（图=代码 fire_client_flow）：命中音/他人枪声/受击音 + 远端开火动画（D5-10v2）
+    UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 落点=(%.0f,%.0f,%.0f)"),
+           Result.ShooterPid, Result.bHit ? 1 : 0, Result.VictimPid, Result.VictimHp,
+           Result.HitPoint.X, Result.HitPoint.Y, Result.HitPoint.Z);   // 21 号响应腿：与 TryFire 的 [开火] 弹余行成链
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
     if (bSelfShot) {
