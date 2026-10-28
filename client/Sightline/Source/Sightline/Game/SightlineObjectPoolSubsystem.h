@@ -44,5 +44,8 @@ private:
      *  的共同根因即此缺失 */
     UPROPERTY()
     TMap<TSubclassOf<UObject>, FPoolItemList> Idle;
+    UPROPERTY()
+    TSet<UObject*> Active;                               // 已借出未归还：双还守卫（二次 Release 直接忽略——
+                                                         // 否则同对象入池两份，两个使用者互踢显隐）
     static constexpr int32 kMaxIdlePerClass = 16;        // 上限：超还即弃（防泄漏上限，非硬并发顶）
 };
