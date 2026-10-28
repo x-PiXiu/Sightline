@@ -245,7 +245,12 @@ int main() {
     fm.UpdateEntity(10, 0, 0, 90, 90, 0, 0, 2);                  // 射手转向 +Y
     const auto fEv2 = fm.Fire(10, 1300);
     CHECK(fEv2.size() == 1 && !fEv2[0].fire.bHit && fEv2[0].fire.victimPid == 0);
-    CHECK(std::fabs(fEv2[0].fire.hitX) < 1.0f && fEv2[0].fire.hitY > 9000.f);  // 未命中 = 射线终点
+    {   // 未命中 = 射线终点（眼位/方向符号化引用生产函数——眼位合同变更自动适配，2026-10-29 眼位镜像合同改造）
+        const Vec3 expO = RayOriginFromEntity(0, 0, 90, 90);
+        const Vec3 expD = DirectionFromYawPitch(90, 0);
+        CHECK(std::fabs(fEv2[0].fire.hitX - (expO.x + expD.x * kMaxRangeUu)) < 1.0f
+           && std::fabs(fEv2[0].fire.hitY - (expO.y + expD.y * kMaxRangeUu)) < 1.0f);
+    }
     for (int i = 0; i <= 26; ++i) (void)fm.Fire(10, 1400 + i * 100);   // 打满剩余（mag 3+27=30）
     const auto RejMag = fm.Fire(10, 4100);
     CHECK(RejMag.size() == 1 && !RejMag[0].fire.bAccepted);      // ③ 弹匣空 → 触发换弹（诊断事件回传）
