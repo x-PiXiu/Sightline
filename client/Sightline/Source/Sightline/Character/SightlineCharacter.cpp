@@ -154,8 +154,14 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         // D5-16v2：Trigger=电平驱动（按住且有弹=真；松开/空匣/换弹=假）——
         // 生成节奏由 NS 的 NM_WeaponTrigger（TriggerSpacing）负责；这里只表达"想开火"的电平
         const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+        if (LocalMag == 0 && NowMs >= LocalReloadUntilMs)
+            LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣时上弦——
+                                                     // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
+                                                     // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
         const bool bTrigger = bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
         if (MuzzleFXComp) {
+            if (bTrigger && !MuzzleFXComp->IsActive())
+                MuzzleFXComp->Activate(true);        // 系统自完成后复活（寿命型 Niagara 资产兜底）
             MuzzleFXComp->SetVariableBool(FName("User.Trigger"), bTrigger);
             MuzzleFXComp->SetVariableVec3(FName("User.Direction"), GetBaseAimRotation().Vector());
         }
@@ -319,10 +325,12 @@ void ASightlineCharacter::TryFire() {
     }
     NextFireAllowedMs = NowMs + kClientFireIntervalMs;
     --LocalMag;
+    if (LocalMag == 0)
+        LocalReloadUntilMs = NowMs + kClientReloadMs;   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
     UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f"),
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch);
     if (FireMontage) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
-    if (FireSound.IsValid()) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
+    if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
 
@@ -334,9 +342,9 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
     if (bSelfShot) {
-        if (Result.bHit && HitSound.IsValid()) UGameplayStatics::PlaySound2D(this, HitSound.Get());
+        if (Result.bHit && HitSound != nullptr) UGameplayStatics::PlaySound2D(this, HitSound.Get());
     } else {
-        if (RemoteFireSound.IsValid()) UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 2D 缩小版（ep14 空间化）
+        if (RemoteFireSound != nullptr) UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 2D 缩小版（ep14 空间化）
         if (FireMontage) {
             if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
                 if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner()) {
@@ -346,7 +354,7 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
             }
         }
     }
-    if (bSelfVictim && Result.bHit && HurtSound.IsValid()) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
+    if (bSelfVictim && Result.bHit && HurtSound != nullptr) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
     if (bSelfShot && Result.bHit) ShowHitmarker();       // D5-16：Hitmarker 池化显示（全 C++）
     if (bSelfVictim && Result.bHit && HurtFlashWidget.Get()) {
         HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);   // 红闪（常驻实例重播）

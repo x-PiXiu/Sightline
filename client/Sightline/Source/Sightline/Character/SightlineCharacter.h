@@ -112,14 +112,16 @@ protected:
     // 沿革：双枪模（悬浮枪，用户否）→ FPP 藏身体（背离 Lyra 实现作废）→ 终稿=纯相机位置差异。
     // Lyra 实勘（完整工程）：CM_ThirdPerson 是唯一相机资产，无 FPP 相机模式类、无 1P 手臂网格。
 
+    // 四音=硬引用（TObjectPtr）：核心反馈资产必须常驻——曾用 TSoftObjectPtr 软引用不持资产，
+    // 首次 GC 即卸载 → IsValid() 转假 → 开火中途永久静默（2026-10-28 实锤）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TSoftObjectPtr<USoundBase> FireSound;        // 射手自己：本地即时（表现层预测零延迟）
+    TObjectPtr<USoundBase> FireSound;            // 射手自己：本地即时（表现层预测零延迟）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TSoftObjectPtr<USoundBase> HitSound;         // 命中音：21 号 shooter=自己
+    TObjectPtr<USoundBase> HitSound;             // 命中音：21 号 shooter=自己
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TSoftObjectPtr<USoundBase> HurtSound;        // 受击音：21 号 victim=自己
+    TObjectPtr<USoundBase> HurtSound;            // 受击音：21 号 victim=自己
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
-    TSoftObjectPtr<USoundBase> RemoteFireSound;  // 他人枪声：21 号 shooter≠自己（2D 缩小版）
+    TObjectPtr<USoundBase> RemoteFireSound;      // 他人枪声：21 号 shooter≠自己（2D 缩小版）
 
     // —— M5 对局 UI（D5-16：全 C++ 驱动——BP 侧只在 Class Defaults 填 3 个类引用，零事件图）——
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
