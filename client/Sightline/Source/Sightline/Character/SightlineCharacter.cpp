@@ -55,7 +55,9 @@ ASightlineCharacter::ASightlineCharacter() {
     Camera->bUsePawnControlRotation = true;
     // 偏移由组件驱动（D5-15：TPP(-45,35,70)/FPP(18,0,82) 双模式插值）——不再写死 ep03 头部位
 
-    GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+    // 模型原生朝 +Y：-90 对齐胶囊 +X；-80=实验性 10° 内旋（用户 2026-10-28 令——枪口向中线收的近似，
+    // ⚠ BP 级旋转=本机与远端同转，远端眼里的你也是斜的；终稿若采纳需转 1P viewmodel 方案）
+    GetMesh()->SetRelativeRotation(FRotator(0.f, -80.f, 0.f));
 
     if (GetWorld() && !IsRunningDedicatedServer()) {
         ConstructorHelpers::FObjectFinder<UInputMappingContext> Mctx(kMappingContextPath);
