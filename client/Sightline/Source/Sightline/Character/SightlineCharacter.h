@@ -16,7 +16,6 @@ class UAnimMontage;
 class UNiagaraComponent;
 class USoundBase;
 class UUserWidget;
-class UDecalComponent;
 class USightlineObjectPoolSubsystem;
 struct FInputActionValue;
 
@@ -164,10 +163,9 @@ private:
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
-    void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.15s 归池（池根因修复后回归）
+    void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
-    void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线·池用户#2）
-    virtual void EndPlay(const EEndPlayReason::Type Reason) override;   // 对局清场：活跃弹孔全量归池
+    void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线·引擎原生 Spawn）
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
@@ -176,8 +174,6 @@ private:
     FTimerHandle HitmarkerTimer;
     TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;
-    UPROPERTY()
-    TArray<TObjectPtr<UDecalComponent>> LiveDecals;   // 活跃弹孔 FIFO（上限见 kMaxLiveDecals；角色销毁=对局贴花全清）
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;

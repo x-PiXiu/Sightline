@@ -4,9 +4,12 @@
 // （600 RPM 并发峰值 2~3）；tracer 走零分配 DrawLine；ep15 手雷投射物=第二用户（规格按它设计）。
 // 对照取舍：引擎有 CommonUI 的 UCommonWidgetPool——不引插件自研百行的取舍=避免 CommonUI 全家依赖。
 // ⚠ widget 池化两炸存档（2026-10-28）：widget 生命周期（CreateWidget 初始化/归池复用/跨切图弱化）
-//   手搓易碎——根因=Idle 缺 UPROPERTY（GC 不可见→池发悬垂指针），已修；三形态齐备：
-//   widget（CreateWidget）/actor（隐藏+关碰撞+关tick）/组件（注销=退出渲染，取用重注册+换位）。
-// 用户：#1 Hitmarker widget · #2 弹孔贴花 UDecalComponent（2026-10-28）· #3 ep15 手雷投射物。
+//   手搓易碎——根因=Idle 缺 UPROPERTY（GC 不可见→池发悬垂指针），已修；两形态齐备：
+//   widget（CreateWidget）/actor（隐藏+关碰撞+关tick）。
+// ⚠ 组件形态已撤（2026-10-29 PIE 实勘）：UDecalComponent 注册硬性要求 Owner Actor
+//   （ActorComponent.cpp RegisterComponent ensure(MyOwnerWorld)）——池对象（子系统 outer）无宿主，
+//   注册永远失败=组件进了池就永远不可见。弹孔贴花改走引擎原生 SpawnDecalAtLocation(LifeSpan)。
+// 用户：#1 Hitmarker widget（在用）· ep15 手雷投射物=actor 形态用户。
 #pragma once
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SightlineObjectPoolSubsystem.generated.h"

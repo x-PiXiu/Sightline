@@ -1,6 +1,5 @@
 #include "Game/SightlineObjectPoolSubsystem.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/ActorComponent.h"
 #include "Engine/World.h"
 
 UObject* USightlineObjectPoolSubsystem::Acquire(TSubclassOf<UObject> Class) {
@@ -41,9 +40,9 @@ void USightlineObjectPoolSubsystem::Release(UObject* Obj) {
         Actor->SetActorHiddenInGame(true);
         Actor->SetActorEnableCollision(false);
         Actor->SetActorTickEnabled(false);
-    } else if (UActorComponent* Comp = Cast<UActorComponent>(Obj)) {
-        Comp->UnregisterComponent();                     // 组件形态：注销=退出渲染（对象存活，取用时重注册+换位）
     }
+    // 组件形态已撤（2026-10-29 PIE 实勘：RegisterComponent 需要 Owner Actor，池对象（子系统 outer）
+    // 无法满足——弹孔贴花改走引擎原生 SpawnDecalAtLocation(LifeSpan)，见 SightlineCharacter.cpp）
     FPoolItemList* List = Idle.Find(Obj->GetClass());
     if (!List) List = &Idle.Add(Obj->GetClass());
     if (List->Items.Num() >= kMaxIdlePerClass) return;   // 上限：丢弃引用交 GC（强回收最老=同效，省一次换位）

@@ -42,8 +42,7 @@ namespace {
     constexpr uint64 kClientFireIntervalMs = 100;
     constexpr int32  kClientMag            = 30;
     constexpr uint64 kClientReloadMs       = 2500;
-    // —— M5 弹孔贴花（落点短程探针参数 + FIFO 上限）——
-    constexpr int32  kMaxLiveDecals   = 64;    // 600 RPM 连发上限防贴花洪峰（超限回收最老）
+    // —— M5 弹孔贴花（落点短程探针参数；回收走引擎 LifeSpan 无需 FIFO）——
     constexpr float  kDecalProbeBackCm = 15.f; // 探针起点=落点向射手侧回退（墙面外侧）
     constexpr float  kDecalProbeFwdCm  = 5.f;  // 探针终点=落点向墙内推进（短程：天端点探不到=自动跳过）
 }
@@ -109,8 +108,6 @@ void ASightlineCharacter::BeginPlay() {
         MuzzleFXComp = FindComponentByClass<UNiagaraComponent>();
         if (MuzzleFXComp) MuzzleFXComp->Activate();
         else UE_LOG(LogTemp, Log, TEXT("[开火] 枪口火光组件未找到（特效静默降级；BP 挂 Niagara 组件后重启生效）"));
-        if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
-            Subsystem->Prewarm(UDecalComponent::StaticClass(), 8);   // 弹孔预热（防首枪建件卡顿；归还即注销=零渲染开销）
     } else {
         GetCharacterMovement()->DisableMovement();
         GetCharacterMovement()->GravityScale = 0.f;
@@ -423,7 +420,7 @@ void ASightlineCharacter::ShowHitmarker() {
     TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
     GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak, WeakSelf]() {
         if (Weak.IsValid() && WeakSelf.IsValid()) WeakSelf->ReleaseHitmarker(Weak.Get());
-    }, 0.15f, false);
+    }, 0.25f, false);                                // 0.15s 单发闪现太短（用户反馈"没正常显示"因素之一），0.25s 可感知
 }
 
 void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
@@ -438,16 +435,21 @@ void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
 // 未命中时 hitPoint=墙面交点或 10km 天端点（fire_judge 合同）。法线不进 21 号契约（22B 定稿
 // 零改动）——在落点沿射入方向做 15/5cm 短程探针：墙面点必命中该面（拿 Normal）；天端点探空
 // 自动跳过。眼位估计与服务器 RayOriginFromEntity 同式（位置+前向18+高82）——探针方向失真极小。
-// 走对象池（用户 #2 · D5-13）：取用=重注册+换位，超限归池=注销不销毁（600 RPM 下零建件 churn）；
-// idle 池条目 GC 可见（UPROPERTY 红线），对局结束 EndPlay 全量归还。
+// ===== M5 弹孔贴花（21 号 hitPoint 已带落点；朝向=落点短程回溯探针取墙面法线）=====
+// 未命中时 hitPoint=墙面交点或 10km 天端点（fire_judge 合同）。法线不进 21 号契约（22B 定稿
+// 零改动）——在落点沿射入方向做 15/5cm 短程探针：墙面点必命中该面（拿 Normal）；天端点探空
+// 自动跳过。眼位估计与服务器 RayOriginFromEntity 同式（位置+前向18+高82）——探针方向失真极小。
+// 生成走引擎原生 SpawnDecalAtLocation（2026-10-29 PIE 实勘：池化组件 NewObject(outer=池子系统)
+// 注册时 ActorComponent.cpp:2039 MyOwnerWorld ensure 失败——**组件注册必须挂 Owner Actor**，
+// 池对象没有宿主无从满足；引擎 helper 内部 Spawn 临时 ADecalActor=完整 Actor 生命周期，
+// LifeSpan 自动回收（6s×600RPM=稳态约 40 个，无需 FIFO/池），对局结束随世界拆除。
 void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 ShooterPid) {
-    auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
     if (!ImpactDecalMaterial) {
         static bool bWarned = false;
         if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[弹孔] 不生成：ImpactDecalMaterial 未配置（迁移 MI_Decal_Concrete 后填 BP）")); }
         return;
     }
-    if (!Subsystem || !GetWorld()) return;
+    if (!GetWorld()) return;
     FVector Eye(ForceInitToZero);
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(ShooterPid)) {
         Eye = Camera ? Camera->GetComponentLocation() : GetActorLocation() + FVector(0, 0, 82);
@@ -462,29 +464,13 @@ void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 
     GetWorld()->LineTraceSingleByChannel(HR, HitPoint - Incoming * kDecalProbeBackCm,
                                          HitPoint + Incoming * kDecalProbeFwdCm, ECC_Visibility);
     if (!HR.bBlockingHit) return;                     // 天端点/无面：不贴
-    UDecalComponent* D = Cast<UDecalComponent>(Subsystem->Acquire(UDecalComponent::StaticClass()));
+    UDecalComponent* D = UGameplayStatics::SpawnDecalAtLocation(this, ImpactDecalMaterial,
+        FVector(20.f, 24.f, 24.f),                    // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径
+        HitPoint, FRotationMatrix::MakeFromX(HR.Normal).Rotator(), /*LifeSpan=*/6.f);
     if (!D) return;
-    D->SetDecalMaterial(ImpactDecalMaterial);
-    D->DecalSize = FVector(20.f, 24.f, 24.f);         // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径（14 太小远看不可见，用户实测后调 24）
-    D->SetWorldLocationAndRotation(HitPoint, FRotationMatrix::MakeFromX(HR.Normal).Rotator());
-    D->FadeStartDelay = 8.f;                          // 取用时重设：归还复用件可能带着未完成的淡出状态
+    D->FadeStartDelay = 4.f;                          // 4s 后 2s 淡出（LifeSpan 6s 到点由引擎销毁）
     D->FadeDuration = 2.f;
     D->FadeScreenSize = 0.f;                          // 远小不剔除（弹孔的意义就是远看也有）
-    D->RegisterComponent();                           // 不 Attach：世界静态
-    UE_LOG(LogSightline, Log, TEXT("[弹孔] 落点=(%.0f,%.0f,%.0f) 法线=(%.2f,%.2f,%.2f) 活跃=%d"),
-           HitPoint.X, HitPoint.Y, HitPoint.Z, HR.Normal.X, HR.Normal.Y, HR.Normal.Z, LiveDecals.Num() + 1);
-    LiveDecals.Add(D);
-    if (LiveDecals.Num() > kMaxLiveDecals) {
-        if (UDecalComponent* Oldest = LiveDecals[0]) Subsystem->Release(Oldest);   // 归池注销（非销毁）
-        LiveDecals.RemoveAt(0);
-    }
-}
-
-void ASightlineCharacter::EndPlay(const EEndPlayReason::Type Reason) {
-    // 对局清场：活跃弹孔全量归池（注销）——防角色销毁把池件带进悬置注册态（池件 outer=池，跨对局复用）
-    if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
-        for (const TObjectPtr<UDecalComponent>& D : LiveDecals)
-            if (D) Subsystem->Release(D);
-    LiveDecals.Empty();
-    Super::EndPlay(Reason);
+    UE_LOG(LogSightline, Log, TEXT("[弹孔] 落点=(%.0f,%.0f,%.0f) 法线=(%.2f,%.2f,%.2f)"),
+           HitPoint.X, HitPoint.Y, HitPoint.Z, HR.Normal.X, HR.Normal.Y, HR.Normal.Z);
 }
