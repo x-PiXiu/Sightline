@@ -11,7 +11,13 @@ ADecalActor* USightlineDecalManagerSubsystem::SpawnSlot(UWorld* World) {
     FActorSpawnParameters Params;
     Params.ObjectFlags |= RF_Transient;              // 运行时表现物：不入存档
     ADecalActor* D = World->SpawnActor<ADecalActor>(ADecalActor::StaticClass(), FTransform::Identity, Params);
-    if (D) D->SetActorHiddenInGame(true);            // 待命形态（显形由 SpawnImpactDecal 驱动）
+    if (D) {
+        D->SetActorHiddenInGame(true);               // 待命形态（显形由 SpawnImpactDecal 驱动）
+        // ⚠ ADecalActor 出厂自带 bDestroyOwnerAfterFade=true（DecalActor.cpp 构造显式置位）——
+        // 淡出完成即销毁宿主 Actor=槽位 6s 后逐个自灭、环池退化成动态建删。槽位寿命归管理器：必须关掉。
+        if (UDecalComponent* Comp = D->GetDecal())
+            Comp->bDestroyOwnerAfterFade = false;
+    }
     return D;
 }
 
@@ -25,9 +31,10 @@ ADecalActor* USightlineDecalManagerSubsystem::AcquireSlot(UWorld* World, bool& b
         }
         return D;
     }
-    // 稳态：环指针即最老槽；槽若被切图销毁（GC 置空）就地重 Spawn=跨局自愈
+    // 稳态：环指针即最老槽；槽被销毁/待销毁/切图 GC 置空 → 就地重 Spawn=跨局自愈
+    // （IsValid 必查：pending-kill 指针非空但不可用—— Destroy 与 GC 之间的窗口期）
     ADecalActor* D = Slots[NextSlot].Get();
-    if (D) {
+    if (D && IsValid(D)) {
         bOutReused = true;
     } else {
         D = SpawnSlot(World);
