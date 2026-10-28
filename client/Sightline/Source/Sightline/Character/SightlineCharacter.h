@@ -85,6 +85,12 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Camera")
     TObjectPtr<USkeletalMeshComponent> ShadowMesh;
 
+    /** mesh 相对胶囊的偏航（模型原生朝 +Y；-90=对齐 +X）。
+     *  向心收枪口用负向加大（-100=向左 10°，-80=向右 10°）。
+     *  ⚠ BP 级旋转=本机与远端同转，远端眼里的你同样斜；终稿向心斜置应走 1P viewmodel */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera", meta = (ClampMin = "-180", ClampMax = "180"))
+    float MeshYawOffset = -80.f;
+
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
     TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
