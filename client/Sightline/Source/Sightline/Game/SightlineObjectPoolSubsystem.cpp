@@ -1,5 +1,6 @@
 #include "Game/SightlineObjectPoolSubsystem.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/ActorComponent.h"
 #include "Engine/World.h"
 
 UObject* USightlineObjectPoolSubsystem::Acquire(TSubclassOf<UObject> Class) {
@@ -40,6 +41,8 @@ void USightlineObjectPoolSubsystem::Release(UObject* Obj) {
         Actor->SetActorHiddenInGame(true);
         Actor->SetActorEnableCollision(false);
         Actor->SetActorTickEnabled(false);
+    } else if (UActorComponent* Comp = Cast<UActorComponent>(Obj)) {
+        Comp->UnregisterComponent();                     // 组件形态：注销=退出渲染（对象存活，取用时重注册+换位）
     }
     FPoolItemList* List = Idle.Find(Obj->GetClass());
     if (!List) List = &Idle.Add(Obj->GetClass());

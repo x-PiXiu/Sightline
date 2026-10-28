@@ -4,7 +4,9 @@
 // （600 RPM 并发峰值 2~3）；tracer 走零分配 DrawLine；ep15 手雷投射物=第二用户（规格按它设计）。
 // 对照取舍：引擎有 CommonUI 的 UCommonWidgetPool——不引插件自研百行的取舍=避免 CommonUI 全家依赖。
 // ⚠ widget 池化两炸存档（2026-10-28）：widget 生命周期（CreateWidget 初始化/归池复用/跨切图弱化）
-//   手搓易碎，Hitmarker 已改常驻单实例；本池 ep15 起供 Actor 形态（手雷投射物）使用。
+//   手搓易碎——根因=Idle 缺 UPROPERTY（GC 不可见→池发悬垂指针），已修；三形态齐备：
+//   widget（CreateWidget）/actor（隐藏+关碰撞+关tick）/组件（注销=退出渲染，取用重注册+换位）。
+// 用户：#1 Hitmarker widget · #2 弹孔贴花 UDecalComponent（2026-10-28）· #3 ep15 手雷投射物。
 #pragma once
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SightlineObjectPoolSubsystem.generated.h"
@@ -29,7 +31,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     UObject* Acquire(TSubclassOf<UObject> Class);
 
-    /** 归还（隐藏回池，不销毁）：widget → RemoveFromParent；actor → 隐藏+关碰撞+关 tick。
+    /** 归还（隐藏回池，不销毁）：widget → RemoveFromParent；actor → 隐藏+关碰撞+关 tick；
+     *  组件 → 注销（退出渲染，取用时重注册+换位）。
      *  超过上限强回收最老（丢弃引用交给 GC）——Acquire 必配 Release（RAII guard 由调用方保证） */
     UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     void Release(UObject* Obj);

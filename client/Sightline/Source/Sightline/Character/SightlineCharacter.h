@@ -166,7 +166,8 @@ private:
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.15s 归池（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
-    void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线）
+    void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线·池用户#2）
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;   // 对局清场：活跃弹孔全量归池
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
