@@ -3,6 +3,8 @@
 // 消费方是表现层（UMG 反馈件/后续 Actor 类）。热区拆账（D5-13）：ep05 首批用户=Hitmarker widget 池
 // （600 RPM 并发峰值 2~3）；tracer 走零分配 DrawLine；ep15 手雷投射物=第二用户（规格按它设计）。
 // 对照取舍：引擎有 CommonUI 的 UCommonWidgetPool——不引插件自研百行的取舍=避免 CommonUI 全家依赖。
+// ⚠ widget 池化两炸存档（2026-10-28）：widget 生命周期（CreateWidget 初始化/归池复用/跨切图弱化）
+//   手搓易碎，Hitmarker 已改常驻单实例；本池 ep15 起供 Actor 形态（手雷投射物）使用。
 #pragma once
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SightlineObjectPoolSubsystem.generated.h"

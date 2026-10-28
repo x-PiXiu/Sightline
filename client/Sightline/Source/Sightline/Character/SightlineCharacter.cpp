@@ -384,7 +384,6 @@ void ASightlineCharacter::OnMatchStartedHandler() {
 }
 
 void ASightlineCharacter::CreateMatchUI() {
-    auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
     if (CrosshairClass) {
         CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairClass);
         if (CrosshairWidget) CrosshairWidget->AddToViewport(40);
@@ -396,36 +395,33 @@ void ASightlineCharacter::CreateMatchUI() {
             HurtFlashWidget->SetVisibility(ESlateVisibility::Collapsed);   // 红闪平时隐藏
         }
     }
-    UE_LOG(LogTemp, Log, TEXT("[对局UI] 准星=%s 红闪=%s"),
-           CrosshairWidget ? TEXT("OK") : TEXT("未配置"),
-           HurtFlashWidget ? TEXT("OK") : TEXT("未配置"));
-}
-
-// Hitmarker：池 Acquire → 显示 → 0.15s 归池（D5-13 池纪律：Acquire 必配 Release）
-// 单活跃纪律：连发间隔 100ms < 归池时长 150ms——活跃中再次 Acquire 会让上一枚的归池定时器
-// 被同名 Handle 覆盖（控件泄漏在视口且永不回池）。活跃中只续时，不重复取件。
-void ASightlineCharacter::ShowHitmarker() {
-    auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
-    if (!Subsystem || !HitmarkerClass) return;
-    UUserWidget* M = ActiveHitmarker.Get();
-    if (!M) {
-        M = Cast<UUserWidget>(Subsystem->Acquire(HitmarkerClass));
-        ActiveHitmarker = M;
+    if (HitmarkerClass) {
+        HitmarkerWidget = CreateWidget<UUserWidget>(GetWorld(), HitmarkerClass);
+        if (HitmarkerWidget) {
+            HitmarkerWidget->AddToViewport(42);
+            HitmarkerWidget->SetVisibility(ESlateVisibility::Collapsed);   // Hitmarker 平时隐藏（常驻单实例）
+        }
     }
-    if (!M) return;
-    M->AddToViewport(42);
-    M->SetVisibility(ESlateVisibility::Visible);
-    TWeakObjectPtr<UUserWidget> Weak(M);
-    TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
-    GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak, WeakSelf]() {
-        if (Weak.IsValid() && WeakSelf.IsValid()) WeakSelf->ReleaseHitmarker(Weak.Get());
-    }, 0.15f, false);
+    UE_LOG(LogTemp, Log, TEXT("[对局UI] 准星=%s 红闪=%s Hitmarker=%s"),
+           CrosshairWidget ? TEXT("OK") : TEXT("未配置"),
+           HurtFlashWidget ? TEXT("OK") : TEXT("未配置"),
+           HitmarkerWidget ? TEXT("OK") : TEXT("未配置"));
 }
 
-void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
-    if (!Marker) return;
-    if (ActiveHitmarker.Get() == Marker) ActiveHitmarker = nullptr;   // 池保活下 Weak 恒 Valid——活跃判定用显式解除
-    Marker->SetVisibility(ESlateVisibility::Collapsed);
-    if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
-        Subsystem->Release(Marker);                      // 归池（池内 Collapsed+出视口）
+// Hitmarker：常驻单实例 Visible→0.15s 隐藏（与红闪同款）。
+// 池化两炸存档（2026-10-28）：raw NewObject 绕过 CreateWidget 初始化→UMG 读空 AV；
+// 改 CreateWidget 后仍于弱指针/对象表解析处 Index>=0 断言——widget 池化需要 CommonUI 级
+// 生命周期管理，不手搓；对象池本体保留给 ep15 手雷投射物（Actor 形态）。
+void ASightlineCharacter::ShowHitmarker() {
+    if (!HitmarkerClass) return;
+    if (!HitmarkerWidget) {                          // 兜底懒建（CreateMatchUI 早于类配置时）
+        HitmarkerWidget = CreateWidget<UUserWidget>(GetWorld(), HitmarkerClass);
+        if (HitmarkerWidget) HitmarkerWidget->AddToViewport(42);
+    }
+    if (!HitmarkerWidget) return;
+    HitmarkerWidget->SetVisibility(ESlateVisibility::Visible);
+    TWeakObjectPtr<UUserWidget> Weak(HitmarkerWidget);
+    GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak]() {
+        if (Weak.IsValid()) Weak->SetVisibility(ESlateVisibility::Collapsed);
+    }, 0.15f, false);
 }
