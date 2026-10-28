@@ -465,7 +465,7 @@ void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 
     UDecalComponent* D = Cast<UDecalComponent>(Subsystem->Acquire(UDecalComponent::StaticClass()));
     if (!D) return;
     D->SetDecalMaterial(ImpactDecalMaterial);
-    D->DecalSize = FVector(20.f, 14.f, 14.f);         // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径
+    D->DecalSize = FVector(20.f, 24.f, 24.f);         // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径（14 太小远看不可见，用户实测后调 24）
     D->SetWorldLocationAndRotation(HitPoint, FRotationMatrix::MakeFromX(HR.Normal).Rotator());
     D->FadeStartDelay = 8.f;                          // 取用时重设：归还复用件可能带着未完成的淡出状态
     D->FadeDuration = 2.f;
