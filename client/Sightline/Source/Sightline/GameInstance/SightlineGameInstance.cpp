@@ -462,9 +462,11 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
         return;
     }
 
-    // 第 3 期：15/17/18（对局）转发给对局会话（17 的快照解析 M4 实装，先统一入口喂 Registry）
+    // 对局帧转发给对局会话：15/17/18（M3 开局/快照/离场）+ 21（M5 开火判定——命中链/Hitmarker/
+    // 血量行的唯一数据源；漏路由则 MatchSession 的 21 分支成死代码，PIE 命中链验收实锤）
     if (MatchSession &&
-        (MsgId == MSG_S2C_MATCH_START || MsgId == MSG_S2C_ENTITY_STATE || MsgId == MSG_S2C_ENTITY_LEAVE))
+        (MsgId == MSG_S2C_MATCH_START || MsgId == MSG_S2C_ENTITY_STATE || MsgId == MSG_S2C_ENTITY_LEAVE ||
+         MsgId == MSG_S2C_FIRE_RESULT))
     {
         MatchSession->HandleFrame(MsgId, Payload);
         return;
