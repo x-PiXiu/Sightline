@@ -41,9 +41,9 @@ public:
     FVector ThirdPersonOffset = FVector(-45.f, 35.f, 70.f);
 
     /** FPP 眼高位（Lyra 同款：GetPivotLocation 用 BaseEyeHeight≈62——枪/手臂经持枪姿势自然入镜，无悬浮枪）。
-     *  Y 右移让枪身向屏幕中线收（枪口指向准星感）；细调在 BP Character Class Defaults 里的同名属性 */
+     *  用户定稿 (8,8,62)（2026-10-28：Y=14 右移过头回调）；细调在 BP Character Class Defaults 同名属性 */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
-    FVector FirstPersonOffset = FVector(8.f, 14.f, 62.f);
+    FVector FirstPersonOffset = FVector(8.f, 8.f, 62.f);
 
     /** FPP 近裁剪面（cm）：相机前此距离内不渲染——低头/抬头手臂躯干怼脸穿模的解法
      *  （用户 2026-10-28 报穿模；引擎默认 10cm 不够）。贴脸枪身距相机约 25~40cm，>20 会切枪尾；
