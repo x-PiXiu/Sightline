@@ -12,8 +12,8 @@
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimMontage.h"
-#include "Components/DecalComponent.h"
 #include "Game/SightlineBakeLib.h"
+#include "Game/SightlineDecalManagerSubsystem.h"
 #include "Game/SightlineOccluderComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Match/SightlinePawnSpawner.h"
@@ -439,10 +439,8 @@ void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
 // 未命中时 hitPoint=墙面交点或 10km 天端点（fire_judge 合同）。法线不进 21 号契约（22B 定稿
 // 零改动）——在落点沿射入方向做 15/5cm 短程探针：墙面点必命中该面（拿 Normal）；天端点探空
 // 自动跳过。眼位估计与服务器 RayOriginFromEntity 同式（位置+前向18+高82）——探针方向失真极小。
-// 生成走引擎原生 SpawnDecalAtLocation（2026-10-29 PIE 实勘：池化组件 NewObject(outer=池子系统)
-// 注册时 ActorComponent.cpp:2039 MyOwnerWorld ensure 失败——**组件注册必须挂 Owner Actor**，
-// 池对象没有宿主无从满足；引擎 helper 内部 Spawn 临时 ADecalActor=完整 Actor 生命周期，
-// LifeSpan 自动回收（6s×600RPM=稳态约 40 个，无需 FIFO/池），对局结束随世界拆除。
+// 职责边界（整洁架构）：本函数只做"上下文翻译"——眼位/探针是 Character 独有的相机/Pawn 上下文，
+// 解析出 FSightlineDecalRequest 纯数据后交管理器；预算/复用/剔除策略全部在 DecalManagerSubsystem。
 void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 ShooterPid) {
     if (!ImpactDecalMaterial) {
         static bool bWarned = false;
@@ -464,13 +462,14 @@ void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 
     GetWorld()->LineTraceSingleByChannel(HR, HitPoint - Incoming * kDecalProbeBackCm,
                                          HitPoint + Incoming * kDecalProbeFwdCm, ECC_Visibility);
     if (!HR.bBlockingHit) return;                     // 天端点/无面：不贴
-    UDecalComponent* D = UGameplayStatics::SpawnDecalAtLocation(this, ImpactDecalMaterial,
-        FVector(20.f, 24.f, 24.f),                    // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径
-        HitPoint, FRotationMatrix::MakeFromX(HR.Normal).Rotator(), /*LifeSpan=*/6.f);
-    if (!D) return;
-    D->FadeStartDelay = 4.f;                          // 4s 后 2s 淡出（LifeSpan 6s 到点由引擎销毁）
-    D->FadeDuration = 2.f;
-    D->FadeScreenSize = 0.f;                          // 远小不剔除（弹孔的意义就是远看也有）
-    UE_LOG(LogSightline, Log, TEXT("[弹孔] 落点=(%.0f,%.0f,%.0f) 法线=(%.2f,%.2f,%.2f)"),
-           HitPoint.X, HitPoint.Y, HitPoint.Z, HR.Normal.X, HR.Normal.Y, HR.Normal.Z);
+
+    FSightlineDecalRequest R;                         // 纯数据过界（手册 §7.6A：调用方组装，策略归管理器）
+    R.Material = ImpactDecalMaterial;
+    R.Location = HitPoint;
+    R.Rotation = FRotationMatrix::MakeFromX(HR.Normal).Rotator();
+    R.Size = FVector(20.f, 24.f, 24.f);               // X=投射深度（跨面 ±10cm 双保险）YZ=弹孔直径
+    if (auto* Mgr = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineDecalManagerSubsystem>() : nullptr)
+        if (Mgr->SpawnImpactDecal(R))
+            UE_LOG(LogSightline, Log, TEXT("[弹孔] 落点=(%.0f,%.0f,%.0f) 法线=(%.2f,%.2f,%.2f)"),
+                   HitPoint.X, HitPoint.Y, HitPoint.Z, HR.Normal.X, HR.Normal.Y, HR.Normal.Z);
 }

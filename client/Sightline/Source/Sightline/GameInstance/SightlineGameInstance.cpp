@@ -7,6 +7,7 @@
 #include "GameInstance/SightlineGameInstance.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Game/SightlineDecalManagerSubsystem.h"
 #include "Game/SightlineGameMode.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -553,6 +554,8 @@ void USightlineGameInstance::HandleMatchStarted()
     bInArena = true;
     bPendingArenaSpawn = true;
     PendingArenaSpawnAt = FPlatformTime::Seconds() + 0.6;   // 等 OpenLevel 加载落定（M3 简化守门）
+    if (auto* Mgr = GetSubsystem<USightlineDecalManagerSubsystem>())
+        Mgr->Reset();                                 // 新对局=新预算周期（旧世界槽位随切图拆除，这里清账+计数归零）
     if (APlayerController* PC = GetFirstLocalPlayerController())
         PC->ClientTravel(TEXT("/Game/Code/Map/NewMap"), ETravelType::TRAVEL_Absolute);
 }
