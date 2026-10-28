@@ -394,22 +394,29 @@ void ASightlineCharacter::CreateMatchUI() {
 }
 
 // Hitmarker：池 Acquire → 显示 → 0.15s 归池（D5-13 池纪律：Acquire 必配 Release）
+// 单活跃纪律：连发间隔 100ms < 归池时长 150ms——活跃中再次 Acquire 会让上一枚的归池定时器
+// 被同名 Handle 覆盖（控件泄漏在视口且永不回池）。活跃中只续时，不重复取件。
 void ASightlineCharacter::ShowHitmarker() {
     auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr;
     if (!Subsystem || !HitmarkerClass) return;
-    if (UUserWidget* M = Cast<UUserWidget>(Subsystem->Acquire(HitmarkerClass))) {
-        M->AddToViewport(42);
-        M->SetVisibility(ESlateVisibility::Visible);
-        TWeakObjectPtr<UUserWidget> Weak(M);
-        TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
-        GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak, WeakSelf]() {
-            if (Weak.IsValid() && WeakSelf.IsValid()) WeakSelf->ReleaseHitmarker(Weak.Get());
-        }, 0.15f, false);
+    UUserWidget* M = ActiveHitmarker.Get();
+    if (!M) {
+        M = Cast<UUserWidget>(Subsystem->Acquire(HitmarkerClass));
+        ActiveHitmarker = M;
     }
+    if (!M) return;
+    M->AddToViewport(42);
+    M->SetVisibility(ESlateVisibility::Visible);
+    TWeakObjectPtr<UUserWidget> Weak(M);
+    TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
+    GetWorldTimerManager().SetTimer(HitmarkerTimer, [Weak, WeakSelf]() {
+        if (Weak.IsValid() && WeakSelf.IsValid()) WeakSelf->ReleaseHitmarker(Weak.Get());
+    }, 0.15f, false);
 }
 
 void ASightlineCharacter::ReleaseHitmarker(UUserWidget* Marker) {
     if (!Marker) return;
+    if (ActiveHitmarker.Get() == Marker) ActiveHitmarker = nullptr;   // 池保活下 Weak 恒 Valid——活跃判定用显式解除
     Marker->SetVisibility(ESlateVisibility::Collapsed);
     if (auto* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineObjectPoolSubsystem>() : nullptr)
         Subsystem->Release(Marker);                      // 归池（池内 Collapsed+出视口）

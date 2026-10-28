@@ -59,6 +59,11 @@ struct FireResultData {
     float oX = 0.f, oY = 0.f, oZ = 0.f;        // 射线起点（眼位）
     float dX = 0.f, dY = 0.f, dZ = 0.f;        // 射线方向（单位向量）
     float dist = 0.f;                          // 命中距离（未命中=Lmax）
+    // —— 判定时刻几何快照（2026-10-28 用户令：判定链日志可见双方位姿与命中体——TPP 准星
+    // 与服务器判定射线的视差肉眼化，出生点远距 miss 的几何归因就靠这三组数）——
+    float shooterX = 0.f, shooterY = 0.f, shooterZ = 0.f;  // 射手实体权威位（19 上报推算值）
+    float victimX = 0.f, victimY = 0.f, victimZ = 0.f;     // 受害实体权威位（未命中=0）
+    float hbRadius = 0.f, hbHalfH = 0.f;                   // 本次判定用命中体（几何合同烘焙值）
 };
 
 struct MatchEvent {

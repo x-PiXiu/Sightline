@@ -10,7 +10,14 @@ UObject* USightlineObjectPoolSubsystem::Acquire(TSubclassOf<UObject> Class) {
             if (IsValid(Obj)) return Obj;                // GC 已收的池条目顺路剔除
         }
     }
-    return NewObject<UObject>(this, Class);              // 外层=this：池生命周期托管（关卡切换不丢）
+    // widget 必须走 CreateWidget（装配 WorldContext/PlayerContext/WidgetTree 后才可安全
+    // AddToViewport/SetVisibility）——raw NewObject 的 widget 首次显示侥幸可过，归池复用
+    // 即在 UMG 显示路径读空崩溃（PIE 命中链首验 2026-10-28 实锤 0x228 AV）
+    if (Class->IsChildOf<UUserWidget>()) {
+        UWorld* World = GetWorld();
+        return World ? CreateWidget<UUserWidget>(World, TSubclassOf<UUserWidget>(Class)) : nullptr;
+    }
+    return NewObject<UObject>(this, Class);              // 非 widget 外层=this：池生命周期托管
 }
 
 void USightlineObjectPoolSubsystem::Release(UObject* Obj) {

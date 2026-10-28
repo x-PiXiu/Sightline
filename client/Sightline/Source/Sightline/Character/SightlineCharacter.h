@@ -158,6 +158,7 @@ private:
     UPROPERTY() TObjectPtr<UUserWidget> CrosshairWidget = nullptr;
     UPROPERTY() TObjectPtr<UUserWidget> HurtFlashWidget = nullptr;
     FTimerHandle HitmarkerTimer;
+    TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms，重复 Acquire=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）

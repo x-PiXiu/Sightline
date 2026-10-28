@@ -162,7 +162,10 @@ public:
                           " hit=" + std::to_string(F.bHit) +
                           " victim=" + std::to_string(F.victimPid) +
                           " dist=" + std::to_string(F.dist) +
-                          " hp=" + std::to_string(F.victimHp));
+                          " hp=" + std::to_string(F.victimHp) +
+                          " 射手位=(" + std::to_string(F.shooterX) + "," + std::to_string(F.shooterY) + "," + std::to_string(F.shooterZ) + ")" +
+                          " 受害位=(" + std::to_string(F.victimX) + "," + std::to_string(F.victimY) + "," + std::to_string(F.victimZ) + ")" +
+                          " 命中体=(r=" + std::to_string(F.hbRadius) + " 半高=" + std::to_string(F.hbHalfH) + ")");
                 // v4.2：21 号房内全员广播（**含射手自己**——射手要出 Hitmarker；其余画 tracer；
                 // 受击者红闪）——一条消息三方共用（D5-02v2；翻译唯一落点纪律同 15/17/18）
                 const sightline::wire::FireResultMsg m{

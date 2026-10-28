@@ -124,13 +124,15 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
             others.push_back({E.playerId, E.x, E.y, E.z});
     const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
 
-    // ⑥ 结算扣血（钳 0 不死——死亡判定 ep07 启用）
+    // ⑥ 结算扣血（钳 0 不死——死亡判定 ep07 启用）；顺手捕获受害实体判定时刻位（诊断日志用）
     std::uint8_t victimHp = 0;
+    float victimX = 0.f, victimY = 0.f, victimZ = 0.f;
     if (v.hit) {
         for (Entity& E : entities_) {
             if (E.playerId != v.victimPid) continue;
             E.weapon.hp = DamageApply(E.weapon.hp);
             victimHp = static_cast<std::uint8_t>(E.weapon.hp);
+            victimX = E.x; victimY = E.y; victimZ = E.z;
             break;
         }
     }
@@ -147,7 +149,10 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     ev.fire = FireResultData{shooterPid, v.hit, true, static_cast<std::uint8_t>(gate),
                              v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp,
                              o.x, o.y, o.z, d.x, d.y, d.z,
-                             v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f};
+                             v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f,
+                             shooter->x, shooter->y, shooter->z,
+                             victimX, victimY, victimZ,
+                             geometry_.hitbox.radius, geometry_.hitbox.halfHeight};
     out.push_back(std::move(ev));
     return out;
 }

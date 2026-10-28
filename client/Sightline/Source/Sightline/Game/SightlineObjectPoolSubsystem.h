@@ -12,7 +12,8 @@ class SIGHTLINE_API USightlineObjectPoolSubsystem : public UGameInstanceSubsyste
     GENERATED_BODY()
 
 public:
-    /** 取一个闲置实例（空池则新建 NewObject；池对象"出生即隐藏、归还即重置"）
+    /** 取一个闲置实例（空池则新建：widget 走 CreateWidget 带世界上下文，其余 NewObject 外层=池；
+     *  池对象"出生即隐藏、归还即重置"）
      *  widget：调用方自行 AddToViewport；actor：调用方自行放置/显示 */
     UFUNCTION(BlueprintCallable, Category = "Sightline|Pool")
     UObject* Acquire(TSubclassOf<UObject> Class);
