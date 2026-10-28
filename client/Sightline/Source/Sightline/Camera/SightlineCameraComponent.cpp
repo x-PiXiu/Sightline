@@ -28,3 +28,9 @@ void USightlineCameraComponent::TickComponent(float DeltaTime, ELevelTick TickTy
     // 偏移插值混合（旋转不掺和——bUsePawnControlRotation 恒跟控制器视角）
     SetRelativeLocation(FMath::VInterpTo(GetRelativeLocation(), TargetOffset(), DeltaTime, BlendSpeed));
 }
+
+void USightlineCameraComponent::GetCameraView(float DeltaTime, FMinimalViewInfo& DesiredView) {
+    Super::GetCameraView(DeltaTime, DesiredView);
+    if (NearClipPlaneCm > 0.f)
+        DesiredView.PerspectiveNearClipPlane = NearClipPlaneCm;   // 低头/抬头穿模解法（引擎默认 10cm 不够）
+}

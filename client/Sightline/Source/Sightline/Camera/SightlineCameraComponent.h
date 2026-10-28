@@ -40,9 +40,16 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
     FVector ThirdPersonOffset = FVector(-45.f, 35.f, 70.f);
 
-    /** FPP 眼高位（Lyra 同款：GetPivotLocation 用 BaseEyeHeight≈62——枪/手臂经持枪姿势自然入镜，无悬浮枪） */
+    /** FPP 眼高位（Lyra 同款：GetPivotLocation 用 BaseEyeHeight≈62——枪/手臂经持枪姿势自然入镜，无悬浮枪）。
+     *  Y 右移让枪身向屏幕中线收（枪口指向准星感）；细调在 BP Character Class Defaults 里的同名属性 */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
-    FVector FirstPersonOffset = FVector(8.f, 0.f, 62.f);
+    FVector FirstPersonOffset = FVector(8.f, 14.f, 62.f);
+
+    /** FPP 近裁剪面（cm）：相机前此距离内不渲染——低头/抬头手臂躯干怼脸穿模的解法
+     *  （用户 2026-10-28 报穿模；引擎默认 10cm 不够）。贴脸枪身距相机约 25~40cm，>20 会切枪尾；
+     *  ≤0=回到引擎默认 */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera", meta = (ClampMin = "0"))
+    float NearClipPlaneCm = 15.f;
 
     /** 模式切换混合速度（uu/s，VInterpTo 常量速度——约 0.3s 走完 80uu 全程） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
@@ -50,6 +57,10 @@ public:
 
     virtual void TickComponent(float DeltaTime, ELevelTick TickType,
                                FActorComponentTickFunction* ThisTickFunction) override;
+
+    /** 把近裁剪面注进视图（UCameraComponent 只暴露 Ortho 系，透视近面在 FMinimalViewInfo 上——
+     *  引擎默认走 GNearClippingPlane=10cm，不可调；覆写本函数是我们唯一的注入点） */
+    virtual void GetCameraView(float DeltaTime, FMinimalViewInfo& DesiredView) override;
 
 private:
     FVector TargetOffset() const;
