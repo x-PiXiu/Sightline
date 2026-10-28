@@ -53,13 +53,18 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
 
     // 1) 扫描标记件 → 世界系盒（中心/半尺寸/yaw）。自定义覆盖：组件变换进合同（支持 yaw）；
     //    默认：Owner 的组件联合包围盒（世界 AABB——轴对齐，yaw=0）
+    //    诊断双计数（2026-10-29 用户实勘"烘不进去"）：标记数=组件实例数；盒数=入合同数；
+    //    标记>盒=实例包围盒无效被跳过（空 Actor 只挂标记件没有 Mesh 的典型症状）
     TArray<FVector> Centers;
     TArray<FVector> Halves;
     TArray<float>   Yaws;
+    int32 MarkersFound = 0;
+    int32 Skipped = 0;
     for (TActorIterator<AActor> It(World); It; ++It) {
         AActor* Actor = *It;
         USightlineOccluderComponent* Marker = Actor->FindComponentByClass<USightlineOccluderComponent>();
         if (!Marker) continue;
+        ++MarkersFound;
         FVector Center;
         FVector Half;
         float YawDeg = 0.f;
@@ -77,17 +82,20 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
             YawDeg = Rot.Yaw;
         } else {
             const FBox Bounds = Actor->GetComponentsBoundingBox(/*bNonColliding=*/true);
-            if (!Bounds.IsValid) continue;
+            if (!Bounds.IsValid ||
+                Bounds.GetExtent().X <= 0.f || Bounds.GetExtent().Y <= 0.f || Bounds.GetExtent().Z <= 0.f) {
+                ++Skipped;                               // 空 Actor 只挂标记件无 Mesh=包围盒无效（此前静默=用户视角"烘不进去"无解释）
+                continue;
+            }
             Center = Bounds.GetCenter();
             Half = Bounds.GetExtent();
         }
-        if (Half.X <= 0.f || Half.Y <= 0.f || Half.Z <= 0.f) continue;
         Centers.Add(Center);
         Halves.Add(Half);
         Yaws.Add(YawDeg);
     }
-    if (Centers.Num() == 0) {
-        OutSummary = TEXT("关卡内没有挂 SightlineOccluder 的遮挡物");
+    if (MarkersFound == 0) {
+        OutSummary = TEXT("目标世界里没有标记件实例——BP 资产加了组件≠关卡有实例（拖进当前关卡）；PIE 会话里新摆的墙要先重进 PIE");
         return false;
     }
 
@@ -136,6 +144,10 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         OutSummary = TEXT("写盘失败：") + Path;
         return false;
     }
-    OutSummary = FString::Printf(TEXT("盒=%d → %s（entityHitbox r=%.1f h=%.1f）"), Centers.Num(), *Path, HitRadius, HitHalfH);
+    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d → %s（entityHitbox r=%.1f h=%.1f）%s"),
+                                 MarkersFound, Centers.Num(), *Path, HitRadius, HitHalfH,
+                                 Skipped > 0
+                                     ? *FString::Printf(TEXT(" ⚠跳过%d（实例包围盒无效——空Actor只挂标记件？给Mesh或勾bOverrideBounds）"), Skipped)
+                                     : TEXT(""));
     return true;
 }
