@@ -65,7 +65,12 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
     }
 
     // 3) 产出几何合同 v1（手拼 JSON——客户端只写不读，解析在服务器 MapGeometryLoader）
-    const FString LevelName = World->GetName();
+    FString LevelName = World->GetName();
+    // PIE 世界名=UEDPIE_{N}_{关卡名}——剥前缀（否则落盘 UEDPIE_0_NewMap.json，服务器找 NewMap.json 落空）
+    if (LevelName.StartsWith(TEXT("UEDPIE_"))) {
+        const int32 Sep = LevelName.Find(TEXT("_"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+        if (Sep != INDEX_NONE) LevelName = LevelName.Mid(Sep + 1);
+    }
     FString Json = TEXT("{\n");
     Json += TEXT("  \"map\": \"") + LevelName + TEXT("\",\n  \"unit\": \"cm\",\n");
     Json += FString::Printf(TEXT("  \"occluders\": [\n"));
