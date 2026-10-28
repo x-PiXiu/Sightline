@@ -508,7 +508,9 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
             break;
         }
     default:
-        UE_LOG(LogSightline, Verbose, TEXT("[GI] 未知消息 msgid=%u（忽略）"), MsgId);
+        // 已知 S2C 消息全部有归属（1/3/4~13/15/17/18/21）——落到这里的只有真正的未知帧。
+        // Warning 级（曾为 Verbose：21 号漏路由时静默掉进来半年无人知，PIE 命中链验收才实锤）
+        UE_LOG(LogSightline, Warning, TEXT("[GI] 未知消息 msgid=%u 长度=%d（忽略——检查协议版本/路由白名单）"), MsgId, Payload.Num());
         break;
     }
 }
