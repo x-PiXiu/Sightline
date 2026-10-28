@@ -9,6 +9,15 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SightlineObjectPoolSubsystem.generated.h"
 
+/** 池条目列表（UHT 不支持容器嵌套容器——TMap 值挂 TArray 须经 USTRUCT 转接） */
+USTRUCT()
+struct FPoolItemList {
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<UObject*> Items;
+};
+
 UCLASS(DisplayName = "Sightline 对象池")
 class SIGHTLINE_API USightlineObjectPoolSubsystem : public UGameInstanceSubsystem {
     GENERATED_BODY()
@@ -30,6 +39,10 @@ public:
     void Prewarm(TSubclassOf<UObject> Class, int32 Count);
 
 private:
-    TMap<TSubclassOf<UObject>, TArray<TObjectPtr<UObject>>> Idle;
+    /** GC 可见性红线：Idle 必须挂 UPROPERTY——池内引用不进反射，归池对象（已出视口/已隐藏）
+     *  在全工程无可达引用 → GC 直接回收 → 池发悬垂指针。池化两炸（AV 0x228 / Index>=0 断言）
+     *  的共同根因即此缺失 */
+    UPROPERTY()
+    TMap<TSubclassOf<UObject>, FPoolItemList> Idle;
     static constexpr int32 kMaxIdlePerClass = 16;        // 上限：超还即弃（防泄漏上限，非硬并发顶）
 };

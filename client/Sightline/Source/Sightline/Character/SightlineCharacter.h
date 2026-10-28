@@ -152,14 +152,15 @@ private:
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
-    void ShowHitmarker();                        // Hitmarker 常驻实例 Visible→0.15s 隐藏（与红闪同款）
+    void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.15s 归池（池根因修复后回归）
+    void ReleaseHitmarker(UUserWidget* Marker);
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
     UPROPERTY() TObjectPtr<UUserWidget> CrosshairWidget = nullptr;
     UPROPERTY() TObjectPtr<UUserWidget> HurtFlashWidget = nullptr;
-    UPROPERTY() TObjectPtr<UUserWidget> HitmarkerWidget = nullptr;   // 常驻单实例（池化两炸后弃用，与红闪同款）
     FTimerHandle HitmarkerTimer;
+    TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
