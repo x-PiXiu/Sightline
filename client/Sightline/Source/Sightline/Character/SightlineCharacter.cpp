@@ -459,13 +459,13 @@ void ASightlineCharacter::SpawnImpactDecal(const FVector& HitPoint, const int32 
         Eye = Camera ? Camera->GetComponentLocation() : GetActorLocation() + FVector(0, 0, 82);
     } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (const ASightlineCharacter* Remote = Cast<ASightlineCharacter>(GI->GetPawnSpawner()->GetPawnByPid(ShooterPid))) {
-            // 服务器 RayOriginFromEntity 的客户端镜像（FPP 相机合同 8/8/62）——探针方向与服务器射线同源
+            // 服务器 RayOriginFromEntity 的客户端镜像（FPP 相机合同 20/8/63）——探针方向与服务器射线同源
             const float Rad = FMath::DegreesToRadians(Remote->GetActorRotation().Yaw);
             const float Cy = FMath::Cos(Rad), Sy = FMath::Sin(Rad);
             Eye = Remote->GetActorLocation()
-                + FVector(Cy, Sy, 0.f) * 8.f
+                + FVector(Cy, Sy, 0.f) * 20.f
                 + FVector(-Sy, Cy, 0.f) * 8.f
-                + FVector(0.f, 0.f, 62.f);
+                + FVector(0.f, 0.f, 63.f);
         }
     }
     if (Eye.IsZero()) return;                         // 射手已离场（远端 Pawn 销毁）：无方向源，放弃

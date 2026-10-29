@@ -25,9 +25,9 @@ inline constexpr float        kMaxRangeUu         = 1000000.f; // 10km=数值护
 // 服务器眼位必须与客户端 FPP 相机偏移（SightlineCameraComponent FirstPersonOffset=(8,8,62)，胶囊系）逐分量镜像；
 // ⚠ 改相机偏移（BP 或代码）必须同步本组常量——这是双端瞄准合同，不是自由参数。
 // TPP 模式不重合=TPP 固有视差（行业共识，PUBG 同款），TPP 下的弹着点以服务器射线为准。
-inline constexpr float        kEyeForwardOffset   = 8.f;     // 胶囊系前向分量
-inline constexpr float        kEyeRightOffset     = 8.f;     // 胶囊系右向分量（相机 Y=+8 的镜像）
-inline constexpr float        kEyeHeight          = 62.f;    // 胶囊系高度分量
+inline constexpr float        kEyeForwardOffset   = 20.f;    // 胶囊系前向分量（BP FirstPersonOffset X=20）
+inline constexpr float        kEyeRightOffset     = 8.f;     // 胶囊系右向分量（BP Y=+8 的镜像）
+inline constexpr float        kEyeHeight          = 63.f;    // 胶囊系高度分量（BP Z=63）
 inline constexpr float        kDefaultHitboxRadius = 40.f;   // entityHitbox 烘焙缺失时的兜底
 inline constexpr float        kDefaultHitboxHalfH  = 90.f;
 inline constexpr std::size_t  kMaxOccluders       = 64;      // 几何合同数量上限（loader 校验）
@@ -98,7 +98,7 @@ inline Vec3 DirectionFromYawPitch(float yawDeg, float pitchDeg) {
     return {std::cos(rp) * std::cos(ry), std::cos(rp) * std::sin(ry), std::sin(rp)};
 }
 
-/** §4.2 射线起点：权威 pos + Rot(yaw)·(8,8,0) + (0,0,62)——FPP 相机 (8,8,62) 的精确镜像（准星=判定射线；
+/** §4.2 射线起点：权威 pos + Rot(yaw)·(20,8,0) + (0,0,63)——FPP 相机 (20,8,63) 的精确镜像（准星=判定射线；
  *  right=(-sinYaw,cosYaw)：UE yaw+ 转向 +Y=右）。pitch 分量前移忽略=取舍记录 */
 inline Vec3 RayOriginFromEntity(float px, float py, float pz, float yawDeg) {
     const float ry = yawDeg * kPi / 180.f;
