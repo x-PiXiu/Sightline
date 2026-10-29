@@ -319,8 +319,9 @@ void ASightlineCharacter::TryFire() {
     --LocalMag;
     if (LocalMag == 0)
         LocalReloadUntilMs = NowMs + kClientReloadMs;   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
-    UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f"),
-           LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch);
+    UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f t=%.3f"),
+           LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
+           FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）
     if (FireMontage) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
@@ -331,9 +332,10 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);
-    UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 自机射手=%d 自机受击=%d"),
+    UE_LOG(LogSightline, Log, TEXT("[开火] 判定回包 射手=%d 命中=%d 受害=%d 余血=%d 自机射手=%d 自机受击=%d t=%.3f"),
            Result.ShooterPid, Result.bHit ? 1 : 0, Result.VictimPid, Result.VictimHp,
-           bSelfShot ? 1 : 0, bSelfVictim ? 1 : 0);   // 自机双旗外显：全 0=SelfPlayerId 未注入（登录链问题）；三分流的判定依据一屏可见
+           bSelfShot ? 1 : 0, bSelfVictim ? 1 : 0,
+           FPlatformTime::Seconds());   // 自机双旗外显；KPI 采集锚 T4（t−T0=全链 RTT，单发测试可配对）
     if (bSelfShot) {
         if (Result.bHit && HitSound != nullptr) UGameplayStatics::PlaySound2D(this, HitSound.Get());
     } else {
