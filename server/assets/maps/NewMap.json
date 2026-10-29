@@ -3,7 +3,7 @@
   "unit": "cm",
   "occluders": [
     { "primitives": [ { "type": "box", "pos": [-0.00, 0.00, -200.50], "size": [4000.00, 4000.00, 200.00], "yawDeg": 0.00 } ] },
-    { "primitives": [ { "type": "box", "pos": [1507.00, -1161.00, 49.00], "size": [50.00, 50.00, 50.00], "yawDeg": 0.00 } ] }
+    { "primitives": [ { "type": "box", "pos": [1507.00, -777.00, 49.00], "size": [50.00, 412.50, 425.00], "yawDeg": 0.00 } ] }
   ],
   "entityHitbox": { "radius": 34.00, "halfHeight": 88.00 }
 }
