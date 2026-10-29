@@ -133,10 +133,13 @@ inline std::optional<float> RayCylinderVertical(const Vec3& o, const Vec3& d,
     }
     float zLo = 0.f, zHi = kMaxRangeUu;
     if (std::fabs(d.z) < 1e-12f) {
-        if (oz < cz - halfHeight || oz > cz + halfHeight) return std::nullopt;
+        // 修复（2026-10-30 用户实勘"下半身无伤害/头顶有伤害"）：oz 已是相对圆柱中心的坐标，
+        // Z 夹层=±halfHeight——此前误写 (cz±halfHeight) 混入绝对中心，等效命中体浮高 ~cz
+        // （cz=89.65 时有效区间漂到绝对 [91,267]：腰部以下不可命中、头顶上方 84cm 仍命中）
+        if (oz < -halfHeight || oz > halfHeight) return std::nullopt;
     } else {
-        float t1 = (cz - halfHeight - oz) / d.z;
-        float t2 = (cz + halfHeight - oz) / d.z;
+        float t1 = (-halfHeight - oz) / d.z;
+        float t2 = ( halfHeight - oz) / d.z;
         if (t1 > t2) std::swap(t1, t2);
         if (t2 < 0.f) return std::nullopt;
         zLo = t1 > 0.f ? t1 : 0.f;
