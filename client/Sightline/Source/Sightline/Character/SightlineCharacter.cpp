@@ -202,16 +202,25 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
     TickRemoteInterpolation(DeltaSeconds);
 
     // ep06 幽灵（Sightline.Ghost 1）：远端【权威位】标记球——实色 Pawn=插值渲染点，
-    // 半透明球=服务器判定世界；两者分离的视觉Gap=延迟的具象（回溯修复的演示载体）
+    // 蓝球=服务器权威当前位（渲染 Gap=延迟具象）；橙球=判定历史位（now−rtt·客户端钟近似）=
+    // 服务器 judgeAt 查询的"过去世界"——回溯开时橙球≈您瞄准的影子，两球分离即回溯量可视化
     if (IsPlayerControlled() && MatchSession.IsValid() && CGhost.GetValueOnGameThread() != 0)
     {
         if (USightlineEntityRegistry* Reg = MatchSession->GetRegistry())
         {
-            for (const FSightlineEntityState& E : Reg->All())
+            const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance());
+            const double JudgeTime = FPlatformTime::Seconds() - (GI ? GI->GetLastPingMs() / 1000.0 : 0.0);
+            const USightlinePawnSpawner* Spawner = GI ? GI->GetPawnSpawner() : nullptr;            for (const FSightlineEntityState& E : Reg->All())
             {
                 if (E.bSelf) continue;
                 DrawDebugSphere(GetWorld(), E.Pos, 34.f, 12, FColor(0, 128, 255, 90),
                                 /*bPersistent=*/false, /*LifeTime=*/-1.f, 0, 1.5f);
+                if (Spawner)
+                {
+                    if (const ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(E.PlayerId)))
+                        DrawDebugSphere(GetWorld(), Remote->SampleAuthorityAt(JudgeTime), 34.f, 12,
+                                        FColor(255, 140, 0, 110), false, -1.f, 0, 2.5f);
+                }
             }
         }
     }
@@ -237,6 +246,11 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     RemotePitchTarget = PitchDeg;
     AnimInputs.bFalling = bFalling;
 
+    // ep06 幽灵：权威位历史环 push（环形覆盖最老；纯 POD 数组，无 GC 触点）
+    AuthorityHist[AuthHead] = {Now, Pos};
+    AuthHead = (AuthHead + 1) % kAuthorityCap;
+    if (AuthCount < kAuthorityCap) ++AuthCount;
+
     if (SnapCount == 0) {
         // 首个快照：直摆到位 + 作为 SnapA
         SnapA = {Now, Pos, Yaw, AckedSeq};
@@ -255,6 +269,23 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
         SnapA = SnapB;
         SnapB = {Now, Pos, Yaw, AckedSeq};
     }
+}
+
+FVector ASightlineCharacter::SampleAuthorityAt(double TimeSec) const {
+    if (AuthCount == 0) return GetActorLocation();
+    const auto At = [this](int32 I) -> const FAuthoritySample& { return AuthorityHist[(AuthHead - AuthCount + I + kAuthorityCap * 2) % kAuthorityCap]; };
+    if (TimeSec <= At(0).TimeSec) return At(0).Pos;                       // 早于最老 = 钳最老
+    if (TimeSec >= At(AuthCount - 1).TimeSec) return At(AuthCount - 1).Pos; // 晚于最新 = 钳最新
+    for (int32 i = 0; i < AuthCount - 1; ++i)
+    {
+        if (TimeSec >= At(i).TimeSec && TimeSec < At(i + 1).TimeSec)
+        {
+            const double Span = At(i + 1).TimeSec - At(i).TimeSec;
+            const double Alpha = Span > 0.0 ? (TimeSec - At(i).TimeSec) / Span : 0.0;
+            return FMath::Lerp(At(i).Pos, At(i + 1).Pos, Alpha);
+        }
+    }
+    return At(AuthCount - 1).Pos;
 }
 
 void ASightlineCharacter::TickRemoteInterpolation(float DeltaTime) {
@@ -375,6 +406,11 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     }
     if (bSelfVictim && Result.bHit && HurtSound != nullptr) UGameplayStatics::PlaySound2D(this, HurtSound.Get());
     if (bSelfShot && Result.bHit) ShowHitmarker();       // D5-16：Hitmarker 池化显示（全 C++）
+    // ep06 回溯命中标记（Sightline.Ghost 1 联动）：判定命中的精确点瞬态绿球——
+    // 回溯开=球钉在靶身（判定点=您瞄的影子处）；与实色靶同框即"服务器判的是过去世界"的眼见为实
+    if (bSelfShot && Result.bHit && CGhost.GetValueOnGameThread() != 0)
+        DrawDebugSphere(GetWorld(), Result.HitPoint, 10.f, 10, FColor(0, 255, 80, 200),
+                        false, 0.8f, 0, 1.5f);
     if (bSelfVictim && Result.bHit && !HurtFlashWidget.Get()) {
         static bool bWarned = false;
         if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[受击] 红闪未显示：HurtFlashWidget 为空（WBP_HurtFlash 未建或 HurtFlashClass 未填 BP）")); }

@@ -201,4 +201,15 @@ private:
     bool  bRemoteActive = false;
     FVector RemoteVelocity = FVector::ZeroVector; // 恒速插值速度（GetVelocity 覆写返回此值）
     FVector SmoothedRemoteVel = FVector::ZeroVector; // 段速度低通态（发端间隔抖动过滤，τ≈160ms）
+
+    // —— ep06 幽灵：权威位历史环（客户端推演服务器判定世界）——
+    // ApplyState 每快照 push（30Hz×64 槽 ≈ 2.1s 窗 > 回溯上限 1s）；SampleAuthorityAt 线性插值
+    // 查询"now−rtt"时刻位=服务器 judgeAt 查的历史位（客户端钟近似，同 ep05 全链 RTT 单钟口径）
+    struct FAuthoritySample { double TimeSec = 0.0; FVector Pos = FVector::ZeroVector; };
+    static constexpr int32 kAuthorityCap = 64;
+    FAuthoritySample AuthorityHist[kAuthorityCap];
+    int32 AuthCount = 0, AuthHead = 0;
+
+    /** 查询 T 时刻的权威位（环内线性插值；空环/早于最老=最老位/晚于最新=最新位）——幽灵橙球数据源 */
+    FVector SampleAuthorityAt(double TimeSec) const;
 };
