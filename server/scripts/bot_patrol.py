@@ -78,14 +78,22 @@ def main():
     p = c.expect("CREATE_RESULT")
     rid = struct.unpack("<I", p[1:5])[0]
     print(f"机器人建房完成：房间号 {rid}——请在 PIE 登录后加入该房间，加入后本脚本自动开局")
-    # 等真人加入（ROOM_STATE 成员数=2）
+    # 等真人加入（ROOM_STATE [4B RoomId][1B 房主名长][房主名][1B 人数]——人数在房主名后，
+    # 不能按定长 offset 读：v1 把 offset4 的房主名长当人数，永不命中→白等 120s 超时开局）
     deadline = time.time() + 120
+    joined = False
     while time.time() < deadline:
         got = c.recv_frame(1.0)
-        if got and got[0] == S2C["ROOM_STATE"] and got[1][4:5] == b"\x02":
-            break
-    else:
-        pass
+        if got and got[0] == S2C["ROOM_STATE"]:
+            body = got[1]
+            host_len = body[4]
+            members = body[5 + host_len]
+            if members >= 2:
+                joined = True
+                break
+    if not joined:
+        print("⚠ 120s 内未等到第二人进房——不开局退出（防单人名册哑局），请重跑脚本后先进房")
+        return
     c.send(C2S["START_MATCH"])
     assert c.expect("MATCH_START") is not None
     print("开局完成——巡逻开始（沿 Y ±150uu · 300uu/s）")
