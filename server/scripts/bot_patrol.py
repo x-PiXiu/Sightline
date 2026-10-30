@@ -6,8 +6,8 @@
 （准星跟着靶）按住开火——回溯关=追着 300ms 残影打（大量 miss），回溯开=指哪打哪；
 两轮各 30 发，命中率差 = 延迟补偿价值。路线对齐地图几何（assets/maps/NewMap.json）。
 
-用法：python3 bot_patrol.py [host] [port] [时长秒，默认 180]
-退出：Ctrl+C 或时长到；120s 等不到第二人不开局退出。
+用法：python3 bot_patrol.py [host] [port]
+退出：对局结束自动收场（对方离开=18 号/断线）；Ctrl+C 随时停。
 """
 import socket
 import struct
@@ -16,10 +16,9 @@ import time
 
 HOST = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18888
-DUR = int(sys.argv[3]) if len(sys.argv) > 3 else 180
 
 S2C = {"WELCOME": 1, "LOGIN_RESULT": 5, "CREATE_RESULT": 7, "JOIN_RESULT": 9,
-       "ROOM_STATE": 12, "MATCH_START": 15}
+       "ROOM_STATE": 12, "MATCH_START": 15, "ENTITY_LEAVE": 18}
 C2S = {"LOGIN": 4, "CREATE_ROOM": 6, "START_MATCH": 14, "PLAYER_INPUT": 19}
 
 # 巡逻参数（对齐地图几何 assets/maps/NewMap.json：地板 ±2000²，长墙 X[1482,1532]×Y[-983,-571]）
@@ -79,6 +78,29 @@ class Conn:
         return None
 
 
+    def try_recv(self):
+        """非阻塞收一帧：无数据=None / 断线=('CLOSED', b'')；攒够一帧就解一帧"""
+        self.sock.settimeout(0)
+        try:
+            chunk = self.sock.recv(65536)
+        except socket.timeout:
+            return None
+        except OSError:
+            return ("CLOSED", b"")
+        if not chunk:
+            return ("CLOSED", b"")
+        self.buf += chunk
+        while len(self.buf) >= 4:
+            (ln,) = struct.unpack("<H", self.buf[:2])
+            if len(self.buf) < 2 + ln:
+                break
+            (msgid,) = struct.unpack("<H", self.buf[2:4])
+            payload = self.buf[4:2 + ln]
+            self.buf = self.buf[2 + ln:]
+            return (msgid, payload)
+        return None
+
+
 def main():
     c = Conn("bot")
     assert c.recv_frame()[0] == S2C["WELCOME"]
@@ -111,20 +133,28 @@ def main():
     seq = 0
     t0 = time.monotonic()
     nxt = t0
-    while time.monotonic() - t0 < DUR:
-        el = time.monotonic() - t0
-        # 三角波：-AMP..+AMP 恒速往返（off<0 靠近射手 / >0 远离）
-        ph = el % (2 * AMP / SPEED)
-        off = (ph - AMP / SPEED) * SPEED if ph < AMP / SPEED else (AMP / SPEED - (ph - AMP / SPEED)) * SPEED
-        seq += 1
-        c.send(C2S["PLAYER_INPUT"],
-               struct.pack("<I3f2fB", seq, CX + AX * off, CY + AY * off, 90.0, 0.0, 0.0, 0))
-        nxt += 1.0 / 30.0
-        d = nxt - time.monotonic()
-        if d > 0:
-            time.sleep(d)
+    try:
+        while True:                                   # 对局没结束就一直跑：对方离开/断线才收场
+            # 下行监听（非阻塞）：对方实体销毁（18 号）或连接关闭 = 对局实质结束
+            got = c.try_recv()
+            if got and (got == ("CLOSED", b"") or got[0] == S2C["ENTITY_LEAVE"]):
+                print(f"{time.monotonic()-t0:.0f}s —— 对方离开/连接断开，机器人收场")
+                break
+            el = time.monotonic() - t0
+            # 三角波：-AMP..+AMP 恒速往返（off<0 靠近射手 / >0 远离）
+            ph = el % (2 * AMP / SPEED)
+            off = (ph - AMP / SPEED) * SPEED if ph < AMP / SPEED else (AMP / SPEED - (ph - AMP / SPEED)) * SPEED
+            seq += 1
+            c.send(C2S["PLAYER_INPUT"],
+                   struct.pack("<I3f2fB", seq, CX + AX * off, CY + AY * off, 90.0, 0.0, 0.0, 0))
+            nxt += 1.0 / 30.0
+            d = nxt - time.monotonic()
+            if d > 0:
+                time.sleep(d)
+    except (ConnectionResetError, BrokenPipeError, OSError) as e:
+        print(f"{time.monotonic()-t0:.0f}s —— 连接异常收场: {e}")
     c.sock.close()
-    print(f"完成：{seq} 条 19 号（30Hz×{DUR}s）")
+    print(f"完成：{seq} 条 19 号（30Hz）")
 
 
 if __name__ == "__main__":
