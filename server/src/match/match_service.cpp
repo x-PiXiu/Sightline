@@ -169,7 +169,8 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
                              v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f,
                              shooter->x, shooter->y, shooter->z,
                              victimX, victimY, victimZ,
-                             geometry_.hitbox.radius, geometry_.hitbox.halfHeight};
+                             geometry_.hitbox.radius, geometry_.hitbox.halfHeight,
+                             static_cast<std::uint16_t>(nowMs - judgeAtMs)};
     out.push_back(std::move(ev));
     return out;
 }

@@ -11,6 +11,7 @@
 #include "Game/SightlineGameMode.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Async/Async.h"
 #include "Misc/DateTime.h"
@@ -29,6 +30,12 @@ namespace
     constexpr double kReconnectAfterLagMs = 5000.0;  // LAG 持续 5s 不恢复 → 主动断线自动重连
     constexpr float  kReconnectDelay  = 3.0f;     // 断开/失败后 3s 自动重连
     inline double MonotonicMs() { return FPlatformTime::Seconds() * 1000.0; }
+
+    // ep06 KPI 采集开关：0 = 22 号上报 rttMs=0（服务器 judgeAt=now = 回溯关闭），1 = 正常上报。
+    // 上报频率保持 1Hz 不变——服务器状态在两轮间收敛，只差回溯量一个变量。
+    TAutoConsoleVariable<int32> CRttReport(
+        TEXT("Sightline.RttReport"), 1,
+        TEXT("ep06：22 号 RTT 上报开关（0=上报 0 → 服务器不回溯；KPI before/after 采集用）"));
 }
 
 void USightlineGameInstance::Init()
@@ -214,7 +221,7 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
             RttPayload.Add(static_cast<uint8>(V & 0xFF));
             RttPayload.Add(static_cast<uint8>((V >> 8) & 0xFF));
         };
-        Add16(static_cast<uint16>(LastPingMs));
+        Add16(static_cast<uint16>(CRttReport.GetValueOnGameThread() ? LastPingMs : 0));
         Add16(static_cast<uint16>(FMath::Min(UpKbps, 65535u)));
         Add16(static_cast<uint16>(FMath::Min(DownKbps, 65535u)));
         Connection->Send(MSG_C2S_RTT_REPORT, RttPayload);
