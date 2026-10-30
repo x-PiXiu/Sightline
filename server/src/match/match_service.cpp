@@ -133,10 +133,9 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     const Vec3 d = DirectionFromYawPitch(shooter->yaw, shooter->pitch);
     std::vector<EntityPose> others;
     others.reserve(entities_.size());
-    HistorySample lin[kEntityHistoryCap];
     for (const Entity& E : entities_) {
         if (E.playerId == shooterPid || !E.bHasReport) continue;
-        const auto p = SampleHistoryAt(E.history, E.histCount, judgeAtMs);
+        const auto p = SampleHistoryAt(E.history, E.histCount, E.histHead, judgeAtMs);
         if (!p) continue;
         others.push_back({E.playerId, p->x, p->y, p->z});
     }

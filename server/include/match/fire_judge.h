@@ -32,6 +32,7 @@ inline constexpr float        kDefaultHitboxRadius = 40.f;   // entityHitbox 烘
 inline constexpr float        kDefaultHitboxHalfH  = 90.f;
 inline constexpr std::size_t  kMaxOccluders       = 64;      // 几何合同数量上限（loader 校验）
 inline constexpr std::uint64_t kMaxRewindMs       = 1000;    // ep06：回溯硬上限（D6-04·防伪造高 RTT=ep09 预埋；窗口 32 槽 1.07s > 上限）
+inline constexpr int           kEntityHistoryCap  = 32;      // ep06：权威位时间线窗（32×1/30s≈1.07s > 上限 1000ms）
 inline constexpr float        kPi                  = 3.14159265358979323846f;
 
 // ===== 几何合同（纯数据；MapGeometryLoader 适配器从 JSON 填充，D5-08v2）=====
@@ -108,22 +109,28 @@ struct HistorySample {
     float x = 0.f, y = 0.f, z = 0.f;
 };
 
-/** 历史插值采样（ep06）：judgeAt 落在两采样之间→线性插值；早于最老/晚于最新→钳边界（不外推——
- *  断流者不猜未来）；count<=0 → nullopt。纯函数零依赖，可脱离服务器单测。 */
-inline std::optional<Vec3> SampleHistoryAt(const HistorySample* h, int count, std::uint64_t judgeAtMs) {
+/** 历史插值采样（ep06 v2·环形序感知）：judgeAt 落在两采样之间→线性插值；
+ *  早于最老/晚于最新→钳边界（不外推——断流者不猜未来）。
+ *  ⚠ 环形序：count==cap 时数组已回绕（head=最老槽位），逻辑序=(head+i)%cap——
+ *  直接按下标扫描在回绕后时间戳非单调（2026-10-30 审计抓出）。纯函数零依赖。 */
+inline std::optional<Vec3> SampleHistoryAt(const HistorySample* h, int count, int head,
+                                           std::uint64_t judgeAtMs) {
     if (count <= 0 || h == nullptr) return std::nullopt;
-    if (judgeAtMs <= h[0].tMs) return Vec3{h[0].x, h[0].y, h[0].z};
-    const HistorySample& last = h[count - 1];
-    if (judgeAtMs >= last.tMs) return Vec3{last.x, last.y, last.z};
+    const auto at = [&h, &head](int logical) -> const HistorySample& {
+        return h[(head + logical) % kEntityHistoryCap];
+    };
+    if (judgeAtMs <= at(0).tMs) return Vec3{at(0).x, at(0).y, at(0).z};
+    if (judgeAtMs >= at(count - 1).tMs) return Vec3{at(count - 1).x, at(count - 1).y, at(count - 1).z};
     for (int i = 0; i + 1 < count; ++i) {
-        if (judgeAtMs >= h[i].tMs && judgeAtMs < h[i + 1].tMs) {
-            const float a = float(judgeAtMs - h[i].tMs) / float(h[i + 1].tMs - h[i].tMs);
-            return Vec3{h[i].x + (h[i + 1].x - h[i].x) * a,
-                        h[i].y + (h[i + 1].y - h[i].y) * a,
-                        h[i].z + (h[i + 1].z - h[i].z) * a};
+        if (judgeAtMs >= at(i).tMs && judgeAtMs < at(i + 1).tMs) {
+            const float span = float(at(i + 1).tMs - at(i).tMs);
+            const float a = span > 0.f ? float(judgeAtMs - at(i).tMs) / span : 0.f;
+            return Vec3{at(i).x + (at(i + 1).x - at(i).x) * a,
+                        at(i).y + (at(i + 1).y - at(i).y) * a,
+                        at(i).z + (at(i + 1).z - at(i).z) * a};
         }
     }
-    return Vec3{last.x, last.y, last.z};
+    return Vec3{at(count - 1).x, at(count - 1).y, at(count - 1).z};
 }
 
 inline Vec3 RayOriginFromEntity(float px, float py, float pz, float yawDeg) {

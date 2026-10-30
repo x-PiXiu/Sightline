@@ -25,8 +25,6 @@ struct RosterEntry {
 /** 在局实体状态。v4（M3 · R12 位置权威收回）：x/y/z = 服务器权威推算位
  *  （=上次权威位 + 钳制后增量，首报=上报位）——不再是"转发上报值"的朴素版记账
  *  M5：weapon = 武器状态（hp/弹匣/换弹/射速——开火四道门的 ②③④ 作用对象） */
-inline constexpr std::uint32_t kEntityHistoryCap = 32;   // ep06：权威位时间线窗（32×1/30s≈1.07s > 回溯上限 1000ms）
-
 struct Entity {
     std::uint32_t playerId = 0;
     float x = 0.f, y = 0.f, z = 0.f;   // 权威位（快照推的就是它；诚实路径与上报值恒等，钳制后分叉）
