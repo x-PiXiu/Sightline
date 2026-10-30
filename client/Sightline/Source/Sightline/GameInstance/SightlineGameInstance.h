@@ -49,6 +49,10 @@ private:
     bool bConnected = false;
     uint32 HeartbeatSeq = 0;
     uint32 LastPingMs = 0;
+    // —— 22 号 RTT 上报（ep06·1Hz：回溯量源+带宽计数预埋 ep12）——
+    double LastRttReportMonotonicMs = 0.0;
+    uint64 LastReportSentBytes = 0;
+    uint64 LastReportRecvBytes = 0;
     double LastAckMonotonicMs = 0.0;      // 单调时钟：LAG 判定用
     double LagEnteredMonotonicMs = 0.0;   // 单调时钟：LAG 进入时刻（持续超时 → 主动断线重连）
     bool bLag = false;

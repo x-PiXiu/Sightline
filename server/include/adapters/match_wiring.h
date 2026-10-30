@@ -34,12 +34,33 @@ public:
                             " fd=" + std::to_string(fd));
                 return;
             }
+            const auto nowMs = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count());
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                            // 未登录/不在房：上报无效
             match_.UpdateEntity(static_cast<uint32_t>(pid),
                                 msg->x, msg->y, msg->z, msg->yaw, msg->pitch,
-                                msg->flags, msg->seq);
+                                msg->flags, msg->seq, nowMs);   // ep06：接收时刻入历史环（单钟）
         }, true);
+
+        // 22 RTT_REPORT（ep06 回溯量源·1Hz·6B）：客户端心跳自测 RTT 上报——域内钳 1000ms（D6-04）
+        disp_.on(protocol::MSG_C2S_RTT_REPORT, "RTT上报",
+                 [this](int fd, const std::string& payload) {
+            if (payload.size() != 6) {
+                LOG_WARNING("[RTT上报] 非法长度=" + std::to_string(payload.size()) + " fd=" +
+                            std::to_string(fd));
+                return;
+            }
+            const int pid = lobby_.PlayerIdByFd(fd);
+            if (pid < 0) return;                            // 未登录/不在房：上报无效
+            const auto rd16 = [&payload](int o) {
+                return static_cast<std::uint16_t>(static_cast<std::uint8_t>(payload[o])) |
+                       static_cast<std::uint16_t>(static_cast<std::uint8_t>(payload[o + 1])) << 8;
+            };
+            match_.SetShooterRtt(static_cast<std::uint32_t>(pid), rd16(0));
+            // up/down KB/s（offset 2/4）：ep12 带宽统计消费——本期收下不存
+        });
 
         // 16：v4 R10 对局期停用——在局者收到 16 视为无效帧丢弃（19 替代）；对局外 16 本就无效（未知 pid 静默）
         disp_.on(protocol::MSG_C2S_MOVE_REPORT, "位置上报(v4停用)",

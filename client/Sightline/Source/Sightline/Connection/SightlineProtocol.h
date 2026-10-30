@@ -33,6 +33,7 @@ namespace SightlineProtocol
         // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
         MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
         MSG_S2C_FIRE_RESULT   = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B（房内全员广播·含射手）
+        MSG_C2S_RTT_REPORT    = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid

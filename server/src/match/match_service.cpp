@@ -28,6 +28,12 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
     return out;
 }
 
+void MatchService::SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs) {
+    for (Entity& E : entities_)
+        if (E.playerId == playerId) { E.shooterRtt = rttMs; return; }
+    // 未知 pid：静默忽略（与 UpdateEntity 同纪律）
+}
+
 std::vector<MatchEvent> MatchService::RemovePlayer(std::uint32_t playerId) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;
@@ -47,7 +53,8 @@ bool MatchService::IsActive(std::uint32_t playerId) const {
 }
 
 void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float z,
-                                float yaw, float pitch, std::uint8_t flags, std::uint32_t seq) {
+                                float yaw, float pitch, std::uint8_t flags, std::uint32_t seq,
+                                std::uint64_t recvMs) {
     for (Entity& E : entities_) {
         if (E.playerId != playerId) continue;
         if (!E.bHasReport) {
@@ -70,6 +77,10 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
         E.yaw = yaw; E.pitch = pitch;                        // 朝向无动力学：末次上报即权威
         E.flags = flags;
         E.ackedSeq = std::max(E.ackedSeq, seq);              // 确认序号只进不退（乱序防御 · R11）
+        // ep06：历史环 push（钳后权威位+服务器接收时刻·单钟 ADR-1——回溯判定的真相时间线）
+        E.history[E.histHead] = {recvMs, E.x, E.y, E.z};
+        E.histHead = std::uint8_t((E.histHead + 1) % kEntityHistoryCap);
+        E.histCount = std::uint8_t(std::min<int>(E.histCount + 1, kEntityHistoryCap));
         return;
     }
     // 未知 pid：不在局者上报无效——静默忽略（服务器的"信任但只转发"不等于"来者不拒"）
@@ -114,14 +125,21 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         return out;
     }
 
-    // ⑤ hitscan 求交：origin 对齐客户端相机位；候选=其余已上报实体（射手自己排除=无自伤）
+    // ⑤ hitscan 求交（ep06 回溯）：判定时刻 = 请求到达 − 射手 RTT（钳 kMaxRewindMs·防伪造 ep09 预埋），
+    //    目标位姿查其权威位时间线在该时刻的插值——服务器承认射手眼睛看到的世界
+    const std::uint64_t judgeAtMs =
+        nowMs - std::min<std::uint64_t>(shooter->shooterRtt, kMaxRewindMs);
     const Vec3 o = RayOriginFromEntity(shooter->x, shooter->y, shooter->z, shooter->yaw);
     const Vec3 d = DirectionFromYawPitch(shooter->yaw, shooter->pitch);
     std::vector<EntityPose> others;
     others.reserve(entities_.size());
-    for (const Entity& E : entities_)
-        if (E.playerId != shooterPid && E.bHasReport)
-            others.push_back({E.playerId, E.x, E.y, E.z});
+    HistorySample lin[kEntityHistoryCap];
+    for (const Entity& E : entities_) {
+        if (E.playerId == shooterPid || !E.bHasReport) continue;
+        const auto p = SampleHistoryAt(E.history, E.histCount, judgeAtMs);
+        if (!p) continue;
+        others.push_back({E.playerId, p->x, p->y, p->z});
+    }
     const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
 
     // ⑥ 结算扣血（钳 0 不死——死亡判定 ep07 启用）；顺手捕获受害实体判定时刻位（诊断日志用）

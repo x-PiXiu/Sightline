@@ -191,6 +191,30 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         Connect();
     }
 
+    // 22 号 RTT 上报（ep06·1Hz）：RTT=HUD 心跳差（客户端单钟实测）；上下行=连接字节计数秒差分
+    // ——服务器回溯量源（judgeAt=now−rtt 钳 1000ms）+ep12 带宽统计预埋
+    if (bConnected && Connection && MonotonicMs() - LastRttReportMonotonicMs >= 1000.0)
+    {
+        LastRttReportMonotonicMs = MonotonicMs();
+        const uint64 NowSent = Connection->SentBytes.load();
+        const uint64 NowRecv = Connection->RecvBytes.load();
+        const uint32 UpKbps  = static_cast<uint32>((NowSent - LastReportSentBytes) / 1024);
+        const uint32 DownKbps = static_cast<uint32>((NowRecv - LastReportRecvBytes) / 1024);
+        LastReportSentBytes = NowSent;
+        LastReportRecvBytes = NowRecv;
+
+        TArray<uint8> RttPayload;
+        const auto Add16 = [&RttPayload](uint16 V)
+        {
+            RttPayload.Add(static_cast<uint8>(V & 0xFF));
+            RttPayload.Add(static_cast<uint8>((V >> 8) & 0xFF));
+        };
+        Add16(static_cast<uint16>(LastPingMs));
+        Add16(static_cast<uint16>(FMath::Min(UpKbps, 65535u)));
+        Add16(static_cast<uint16>(FMath::Min(DownKbps, 65535u)));
+        Connection->Send(MSG_C2S_RTT_REPORT, RttPayload);
+    }
+
     // 心跳（1s 节拍）——由本 FTSTicker 按节拍驱动（进程级，跨切图存活）；
     // World 级 TimerManager 上的定时器会随 MATCH_START 切图死亡（M6 联调实锤）
     if (bConnected && !bShuttingDown && LastHeartbeatMonotonicMs > 0.0

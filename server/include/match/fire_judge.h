@@ -31,6 +31,7 @@ inline constexpr float        kEyeHeight          = 63.f;    // 胶囊系高度�
 inline constexpr float        kDefaultHitboxRadius = 40.f;   // entityHitbox 烘焙缺失时的兜底
 inline constexpr float        kDefaultHitboxHalfH  = 90.f;
 inline constexpr std::size_t  kMaxOccluders       = 64;      // 几何合同数量上限（loader 校验）
+inline constexpr std::uint64_t kMaxRewindMs       = 1000;    // ep06：回溯硬上限（D6-04·防伪造高 RTT=ep09 预埋；窗口 32 槽 1.07s > 上限）
 inline constexpr float        kPi                  = 3.14159265358979323846f;
 
 // ===== 几何合同（纯数据；MapGeometryLoader 适配器从 JSON 填充，D5-08v2）=====
@@ -100,6 +101,31 @@ inline Vec3 DirectionFromYawPitch(float yawDeg, float pitchDeg) {
 
 /** §4.2 射线起点：权威 pos + Rot(yaw)·(20,8,0) + (0,0,63)——FPP 相机 (20,8,63) 的精确镜像（准星=判定射线；
  *  right=(-sinYaw,cosYaw)：UE yaw+ 转向 +Y=右）。pitch 分量前移忽略=取舍记录 */
+/** 历史采样（ep06 回溯·ADR-1 单钟纪律）：tMs=服务器接收时刻（steady 派生毫秒），pos=钳后权威位。
+ *  ⚠ 时间坐标系单一来源——绝不混入客户端钟（Z 区间混帧 bug 的同族预防） */
+struct HistorySample {
+    std::uint64_t tMs = 0;
+    float x = 0.f, y = 0.f, z = 0.f;
+};
+
+/** 历史插值采样（ep06）：judgeAt 落在两采样之间→线性插值；早于最老/晚于最新→钳边界（不外推——
+ *  断流者不猜未来）；count<=0 → nullopt。纯函数零依赖，可脱离服务器单测。 */
+inline std::optional<Vec3> SampleHistoryAt(const HistorySample* h, int count, std::uint64_t judgeAtMs) {
+    if (count <= 0 || h == nullptr) return std::nullopt;
+    if (judgeAtMs <= h[0].tMs) return Vec3{h[0].x, h[0].y, h[0].z};
+    const HistorySample& last = h[count - 1];
+    if (judgeAtMs >= last.tMs) return Vec3{last.x, last.y, last.z};
+    for (int i = 0; i + 1 < count; ++i) {
+        if (judgeAtMs >= h[i].tMs && judgeAtMs < h[i + 1].tMs) {
+            const float a = float(judgeAtMs - h[i].tMs) / float(h[i + 1].tMs - h[i].tMs);
+            return Vec3{h[i].x + (h[i + 1].x - h[i].x) * a,
+                        h[i].y + (h[i + 1].y - h[i].y) * a,
+                        h[i].z + (h[i + 1].z - h[i].z) * a};
+        }
+    }
+    return Vec3{last.x, last.y, last.z};
+}
+
 inline Vec3 RayOriginFromEntity(float px, float py, float pz, float yawDeg) {
     const float ry = yawDeg * kPi / 180.f;
     const float cy = std::cos(ry), sy = std::sin(ry);

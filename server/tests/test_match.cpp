@@ -272,6 +272,65 @@ int main() {
     CHECK(!adapters::ParseMapGeometry("{ not json").has_value());          // 非法 JSON → nullopt（fail-fast 源头）
     CHECK(!adapters::ParseMapGeometry("{\"unit\":\"m\"}").has_value()); // 单位合同只认 cm
 
+    // —— ep06 延迟补偿回溯：历史环/插值/回溯翻转/钳制（单钟·非零中心回归）——
+    stage("ep06 历史环与回溯判定：插值/回溯翻转/钳制/非零中心 Z 回归");
+    {
+        MatchService hm;
+        std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
+        hm.StartMatch(1, rs);
+        hm.SetGeometry(MapGeometry{});
+        // 目标(pid20)沿 +Y 匀速横穿并出界：t=1000 @ (500,-40,90) → t=2000 @ (500,+80,90)
+        // 射手(pid21) @ (420,0,90) yaw=0（+X）；眼位 (440,8,153)（相机镜像合同 20/8/63）
+        hm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 1, 1000);
+        hm.UpdateEntity(20, 500, -40, 90, 180, 0, 0, 1, 1000);
+        hm.UpdateEntity(20, 500, 80, 90, 180, 0, 0, 2, 2000);   // t=2000 横穿完成（y=+80，已出界）
+        hm.SetShooterRtt(21, 300);
+        // 插值命中：fire@1500 → judgeAt=1500 → 插值 y=+20（横向 |20-8|=12<r=34）→ HIT
+        hm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 3, 1501);
+        auto f1 = hm.Fire(21, 1500);
+        CHECK(f1.size() == 1 && f1[0].fire.bHit && f1[0].fire.victimPid == 20);   // 过去在射线上=命中
+        // 钳最新出界：fire@2500 → judgeAt=2500 ≥ 最新采样 → 钳 (500,+80) → 横向 72>34 → MISS（冻结语义）
+        hm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 4, 2500);
+        auto f2 = hm.Fire(21, 2500);
+        CHECK(f2.size() == 1 && !f2[0].fire.bHit);
+        // 上限钳制：rtt=2000 > 1000 → judgeAt 钳到 now−1000（不越窗）
+        hm.SetShooterRtt(21, 2000);
+        hm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 5, 3500);
+        auto f3 = hm.Fire(21, 3500);                                              // judgeAt=2500 → 钳最新 → MISS
+        CHECK(f3.size() == 1 && !f3[0].fire.bHit);                                // 上限钳制生效（越窗不补偿）
+        // Z 回归（非零中心）：射手降到 z=45（眼 z=108）水平打 z=90 目标 → HIT
+        hm.UpdateEntity(20, 500, 0, 90, 180, 0, 0, 5, 4000);
+        hm.UpdateEntity(21, 420, 0, 45, 0, 0, 0, 6, 4000);
+        auto f4 = hm.Fire(21, 4000);
+        CHECK(f4.size() == 1 && f4[0].fire.bHit);                                 // 同高水平=命中（Z 回归）
+    }
+    // 环形裁剪：35 条上报 → histCount=32（覆盖最老）——以判定行为验收
+    {
+        MatchService tm;
+        std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
+        tm.StartMatch(1, rs);
+        tm.SetGeometry(MapGeometry{});
+        for (int i = 0; i < 35; ++i)
+            tm.UpdateEntity(20, float(500 + i), 0.f, 90.f, 0.f, 0.f, 0.f,
+                            std::uint32_t(i + 1), std::uint64_t(1000 + i * 33));
+        tm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 1, 4600);
+        auto f5 = tm.Fire(21, 4700);                                              // judgeAt=4700
+        CHECK(f5.size() == 1 && f5[0].fire.bHit);                                 // 最新位在射线上=命中
+    }
+    // 环形裁剪：35 条上报 → histCount=32（覆盖最老）——以判定行为验收
+    {
+        MatchService tm;
+        std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
+        tm.StartMatch(1, rs);
+        tm.SetGeometry(MapGeometry{});
+        for (int i = 0; i < 35; ++i)
+            tm.UpdateEntity(20, float(500 + i), 0.f, 90.f, 0.f, 0.f, 0.f,
+                            std::uint32_t(i + 1), std::uint64_t(1000 + i * 33));
+        tm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 1, 4600);
+        auto f5 = tm.Fire(21, 4700);                                              // judgeAt=4700
+        CHECK(f5.size() == 1 && f5[0].fire.bHit);                                 // 最新位在射线上=命中
+    }
+
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";
     return 0;
 }

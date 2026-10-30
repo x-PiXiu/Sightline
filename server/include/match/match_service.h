@@ -25,6 +25,8 @@ struct RosterEntry {
 /** 在局实体状态。v4（M3 · R12 位置权威收回）：x/y/z = 服务器权威推算位
  *  （=上次权威位 + 钳制后增量，首报=上报位）——不再是"转发上报值"的朴素版记账
  *  M5：weapon = 武器状态（hp/弹匣/换弹/射速——开火四道门的 ②③④ 作用对象） */
+inline constexpr std::uint32_t kEntityHistoryCap = 32;   // ep06：权威位时间线窗（32×1/30s≈1.07s > 回溯上限 1000ms）
+
 struct Entity {
     std::uint32_t playerId = 0;
     float x = 0.f, y = 0.f, z = 0.f;   // 权威位（快照推的就是它；诚实路径与上报值恒等，钳制后分叉）
@@ -34,6 +36,11 @@ struct Entity {
     bool bHasReport = false;           // 首次上报前不入快照（位置未知的玩家不进世界）
     float lx = 0.f, ly = 0.f, lz = 0.f; // 上次上报位（增量基准——权威增量=本次上报-上次上报）
     WeaponState weapon;                // M5：开火状态（MatchStart 时满血满匣）
+    // —— ep06 回溯：权威位时间线（服务器接收时刻·单钟 ADR-1）——
+    HistorySample history[kEntityHistoryCap]; // 环形（32 槽×1/30s ≈ 1.07s 窗口 > 回溯上限 1000ms）
+    std::uint8_t histCount = 0;        // 有效条数（≤kEntityHistoryCap）
+    std::uint8_t histHead = 0;         // 下一写槽（环形覆盖最老）
+    std::uint16_t shooterRtt = 0;      // 该玩家上报的 RTT（22 号·1Hz；0=未上报 → 不回溯=ep05 行为）
 };
 
 /** 快照项（17 载荷的一行） */
@@ -91,8 +98,10 @@ public:
     /** 19 号输入入库（v4 · R12 权威收回）：最小合法性钳制（本拍位移超界钳回——保和解完整性的
      *  最小版，完整反作弊 ep08）→ 服务器按输入自推权威位（上次权威+钳制增量）→ 存权威位+ackedSeq；
      *  未知 pid 静默忽略（不在局者上报无效）。16 号对局期由适配层拒收（R10），不进此函数 */
+    void SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs);   // ep06：22 号 RTT 上报（回溯量源）
     void UpdateEntity(std::uint32_t playerId, float x, float y, float z,
-                      float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0);
+                      float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0,
+                      std::uint64_t recvMs = 0);   // ep06：接收时刻（单钟·历史环时间戳）
 
     /** 每帧驱动 tick 调用：在局则返回一条 Snapshot 事件（全员实体，FrameWriter 按接收者滤自己） */
     std::vector<MatchEvent> TickSnapshot();

@@ -22,8 +22,8 @@ DECLARE_DELEGATE_OneParam(FOnDisconnected, const FString& /*Reason*/);
 class FSightlineReceiver : public FRunnable
 {
 public:
-    FSightlineReceiver(FSocket* InSocket, FOnFrame InOnFrame)
-        : Socket(InSocket), OnFrame(MoveTemp(InOnFrame)) {}
+    FSightlineReceiver(FSocket* InSocket, FOnFrame InOnFrame, std::atomic<std::uint64_t>* InRecvCtr)
+        : Socket(InSocket), OnFrame(MoveTemp(InOnFrame)), RecvCtr(InRecvCtr) {}
 
     /** M5 损伤滑块：入站延迟毫秒（原子——游戏线程写、接收线程读；0 = 直通） */
     void SetInboundDelayMs(int32 Ms) { InboundDelayMs.store(static_cast<int32>(Ms)); }
@@ -44,6 +44,7 @@ public:
                 int32 Read = 0;
                 if (Socket->Recv(Tmp.GetData(), Tmp.Num(), Read, ESocketReceiveFlags::None))
                 {
+                    if (RecvCtr) *RecvCtr += static_cast<std::uint64_t>(Read);
                     Buffer.Append(Tmp.GetData(), Read);
                     SightlineProtocol::FFrame Frame;
                     while (SightlineProtocol::TryDecode(Buffer, Frame))
@@ -107,6 +108,7 @@ private:
 
     FSocket* Socket = nullptr;
     FOnFrame OnFrame;
+    std::atomic<std::uint64_t>* RecvCtr = nullptr;   // 收流字节计数（22 号带宽上报源）
     std::atomic<bool> bStop{false};
     std::atomic<int32> InboundDelayMs{0};
     std::deque<FDelayedFrame> DelayQueue;
@@ -154,7 +156,7 @@ public:
         bConnected = Socket->Connect(*Addr);   // 非阻塞 connect：立即返回，成功与否由后续收发判定
         if (!bConnected) return false;
 
-        Receiver = new FSightlineReceiver(Socket, OnFrame);
+        Receiver = new FSightlineReceiver(Socket, OnFrame, &RecvBytes);
         ReceiverThread = FRunnableThread::Create(
             Receiver, TEXT("SightlineRecv"), 0, TPri_Normal);
         return ReceiverThread != nullptr;
@@ -182,12 +184,16 @@ public:
         if (!Socket || !bConnected) return false;
         const TArray<uint8> Frame = SightlineProtocol::Encode(MsgId, Payload);
         int32 Sent = 0;
-        return Socket->Send(Frame.GetData(), Frame.Num(), Sent) && Sent == Frame.Num();
+        const bool bOk = Socket->Send(Frame.GetData(), Frame.Num(), Sent) && Sent == Frame.Num();
+        if (bOk) SentBytes += Frame.Num();
+        return bOk;
     }
 
     FOnFrame OnFrame;                 // 游戏线程回调（由持有者注入并绑定）
     FOnDisconnected OnDisconnected;
     bool IsConnected() const { return bConnected; }
+    std::atomic<std::uint64_t> SentBytes{0};   // ep06：22 号带宽计数（收发各挂·秒差分）
+    std::atomic<std::uint64_t> RecvBytes{0};
 
 private:
     ISocketSubsystem* SocketSubsystem = nullptr;
