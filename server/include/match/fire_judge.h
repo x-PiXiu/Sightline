@@ -116,8 +116,10 @@ struct HistorySample {
 inline std::optional<Vec3> SampleHistoryAt(const HistorySample* h, int count, int head,
                                            std::uint64_t judgeAtMs) {
     if (count <= 0 || h == nullptr) return std::nullopt;
-    const auto at = [&h, &head](int logical) -> const HistorySample& {
-        return h[(head + logical) % kEntityHistoryCap];
+    // 逻辑序起点：未满=0（条目packed在[0,count)）；已满=head（最老槽位，环形覆盖语义）
+    const int start = (count == kEntityHistoryCap) ? head : 0;
+    const auto at = [&h, &start](int logical) -> const HistorySample& {
+        return h[(start + logical) % kEntityHistoryCap];
     };
     if (judgeAtMs <= at(0).tMs) return Vec3{at(0).x, at(0).y, at(0).z};
     if (judgeAtMs >= at(count - 1).tMs) return Vec3{at(count - 1).x, at(count - 1).y, at(count - 1).z};
