@@ -54,6 +54,7 @@
 |-------|------|------|--------------|------|
 | 20 | MSG_C2S_FIRE | C → S | 空 payload | 开火请求。**空 payload 是设计核心（D5-01）**：方向/位置/命中结果一概不收——判定全用服务器权威状态（pos/yaw/pitch 来自 19 号上报的权威推算），客户端连"往哪打"都不让插嘴。预埋：第 7 期第二把武器时加 weaponType 字段（D5-11，契约演进） |
 | 21 | MSG_S2C_FIRE_RESULT | S → C | `[4B shooterPid][1B result][4B victimPid][12B hitPoint f32×3][1B victimHp]`（22B） | **房内全员广播**：射手出 Hitmarker、其余画 tracer（终点=hitPoint）、受击者红闪——一条消息三方共用。result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中（hitPoint=命中面交点）。**victimHp=命中后余血**：第 5 期供 Debug HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动）。射速/换弹/空匣拒绝=静默丢（第 9 期起违规可见） |
+| 22 | MSG_C2S_RTT_REPORT | C → S | `[2B rttMs][2B upKB/s][2B downKB/s]`（6B · 1Hz） | ep06 回溯量源：客户端心跳自测 RTT 上报，服务器钳 1000ms 用于判定回溯（judgeAt=now−rtt）；上下行带宽计数=ep12 数据层消费。旧客户端不报 → 服务器 rtt=0 → 不回溯=向后兼容 |
 
 设计依据：`docs/episodes/ep05/服务端设计草案.md`（D5-01~12 决策在册）· 命中体/遮挡几何=**构建期合同** `server/assets/maps/*.json`（编辑器烘焙产物，非协议消息）。
 
