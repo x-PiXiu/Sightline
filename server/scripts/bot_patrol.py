@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """bot_patrol.py —— ep06 KPI 移动靶机器人（单人采集用）
 
-角色：登录 → 建房（打印房间号）→ 等待真人加入 → 开局 → 在出生区域沿 Y 轴
-±150uu 往返巡逻（300uu/s 三角波，30Hz 上报）。真人射手瞄准路径中点按住开火，
-机器人反复穿过火线——回溯关/开两轮各 30 发，命中率差 = 延迟补偿价值。
+角色：登录 → 建房（打印房间号）→ 等待真人加入 → 开局 → 沿"射手→中心"纵深轴
+±350uu 正对射手跑近跑远（400uu/s 三角波·全程 7m，30Hz 上报）。真人射手**跟踪瞄准**
+（准星跟着靶）按住开火——回溯关=追着 300ms 残影打（大量 miss），回溯开=指哪打哪；
+两轮各 30 发，命中率差 = 延迟补偿价值。路线对齐地图几何（assets/maps/NewMap.json）。
 
 用法：python3 bot_patrol.py [host] [port] [时长秒，默认 180]
-退出：Ctrl+C 或时长到；真人断线也会自动结束。
+退出：Ctrl+C 或时长到；120s 等不到第二人不开局退出。
 """
 import socket
 import struct
@@ -21,10 +22,17 @@ S2C = {"WELCOME": 1, "LOGIN_RESULT": 5, "CREATE_RESULT": 7, "JOIN_RESULT": 9,
        "ROOM_STATE": 12, "MATCH_START": 15}
 C2S = {"LOGIN": 4, "CREATE_ROOM": 6, "START_MATCH": 14, "PLAYER_INPUT": 19}
 
-# 巡逻参数（Spawn_2 区域 · Y 轴三角波）
-CX, CY, CZ = 820.0, -820.0, 90.0     # 巡逻中心（首报即真值=机器人自选落点）
-AMP = 150.0                          # 半程（路径全长 300cm）
-SPEED = 300.0                        # uu/s（三角波恒速）
+# 巡逻参数（对齐地图几何 assets/maps/NewMap.json：地板 ±2000²，长墙 X[1482,1532]×Y[-983,-571]）
+# 纵深轴 = 射手出生点(PlayerStart_1 实测 442,-474) → 巡逻中心方向：靶正对射手跑近跑远
+# （跟踪瞄准=经典追枪演示；KPI 协议改"跟踪瞄准按住开火"）。最远点 (1354,-994) 距墙西面 128cm 不穿模。
+import math
+SHOOTER = (442.0, -474.0)          # PlayerStart_1（ep05 判定链日志实测射出位）
+CX, CY  = 1050.0, -820.0           # 巡逻中心=首报落点（首报即真值，机器人自选）
+AMP     = 350.0                    # 半程（全程 7m）
+SPEED   = 400.0                    # uu/s（贴合角色 MaxWalkSpeed）
+_dxx, _dyy = CX - SHOOTER[0], CY - SHOOTER[1]
+_L = math.hypot(_dxx, _dyy)
+AX, AY = _dxx / _L, _dyy / _L      # 纵深单位轴
 
 
 class Conn:
@@ -96,19 +104,19 @@ def main():
         return
     c.send(C2S["START_MATCH"])
     assert c.expect("MATCH_START") is not None
-    print("开局完成——巡逻开始（沿 Y ±150uu · 300uu/s）")
+    print(f"开局完成——纵深巡逻开始（沿射手视线轴 ±{AMP:.0f}uu · {SPEED:.0f}uu/s · 单程 {2*AMP/SPEED:.1f}s）")
 
     seq = 0
     t0 = time.monotonic()
     nxt = t0
     while time.monotonic() - t0 < DUR:
         el = time.monotonic() - t0
-        # 三角波：-AMP..+AMP 恒速往返
+        # 三角波：-AMP..+AMP 恒速往返（off<0 靠近射手 / >0 远离）
         ph = el % (2 * AMP / SPEED)
         off = (ph - AMP / SPEED) * SPEED if ph < AMP / SPEED else (AMP / SPEED - (ph - AMP / SPEED)) * SPEED
         seq += 1
         c.send(C2S["PLAYER_INPUT"],
-               struct.pack("<I3f2fB", seq, CX, CY + off, CZ, 0.0, 0.0, 0))
+               struct.pack("<I3f2fB", seq, CX + AX * off, CY + AY * off, 90.0, 0.0, 0.0, 0))
         nxt += 1.0 / 30.0
         d = nxt - time.monotonic()
         if d > 0:
