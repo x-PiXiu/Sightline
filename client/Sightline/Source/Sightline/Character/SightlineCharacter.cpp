@@ -12,6 +12,9 @@
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "DrawDebugHelpers.h"
+#include "HAL/IConsoleManager.h"
+#include "Match/SightlineEntityRegistry.h"
 #include "Game/SightlineBakeLib.h"
 #include "Game/SightlineDecalManagerSubsystem.h"
 #include "Game/SightlineOccluderComponent.h"
@@ -45,6 +48,12 @@ namespace {
     // —— M5 弹孔贴花（落点短程探针参数；回收走引擎 LifeSpan 无需 FIFO）——
     constexpr float  kDecalProbeBackCm = 15.f; // 探针起点=落点向射手侧回退（墙面外侧）
     constexpr float  kDecalProbeFwdCm  = 5.f;  // 探针终点=落点向墙内推进（短程：天端点探不到=自动跳过）
+    // —— ep06 回溯可视化/KPI（Sightline.Ghost 1 开关联动）——
+    int32  GHitCount = 0;                      // 命中计数（KPI before/after 数据源）
+    int32  GShotCount = 0;                     // 射击计数（含拒绝——命中率分母）
+    TAutoConsoleVariable<int32> CGhost(
+        TEXT("Sightline.Ghost"), 0,
+        TEXT("ep06 幽灵：绘制远端权威位标记球（1=开·半透明球=服务器判定世界）"));
 }
 
 ASightlineCharacter::ASightlineCharacter() {
@@ -191,6 +200,21 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
     }
     TickRemoteInterpolation(DeltaSeconds);
+
+    // ep06 幽灵（Sightline.Ghost 1）：远端【权威位】标记球——实色 Pawn=插值渲染点，
+    // 半透明球=服务器判定世界；两者分离的视觉Gap=延迟的具象（回溯修复的演示载体）
+    if (IsPlayerControlled() && MatchSession.IsValid() && CGhost.GetValueOnGameThread() != 0)
+    {
+        if (USightlineEntityRegistry* Reg = MatchSession->GetRegistry())
+        {
+            for (const FSightlineEntityState& E : Reg->All())
+            {
+                if (E.bSelf) continue;
+                DrawDebugSphere(GetWorld(), E.Pos, 34.f, 12, FColor(0, 128, 255, 90),
+                                /*bPersistent=*/false, /*LifeTime=*/-1.f, 0, 1.5f);
+            }
+        }
+    }
 }
 
 void ASightlineCharacter::SampleLocalState() {

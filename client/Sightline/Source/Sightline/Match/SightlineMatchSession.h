@@ -97,9 +97,20 @@ private:
         FVector Pos = FVector::ZeroVector;
         float Yaw = 0.f;
     };
-    /** 三方对账（M3b）：权威位 vs 环形缓冲同 seq 样本——ε 内无感 / 超 ε 回滚重放 / 断档全量兑底 */
+    /** 三方对账（M3b）：权威位 vs 环形缓冲同 seq 样本——ε 内无感 / ≥ ε 回滚重放 / 断档 全量兑底 */
     void ReconcileSelf(uint32 AckedSeq, const FVector& AuthPos);
 
+public:
+    /** ep06 幽灵数据源：最近一次服务器权威位（17 号自实体·每快照刷新） */
+    UFUNCTION(BlueprintPure, Category = "Sightline Match")
+    FVector GetServerAuthPos() const { return LastAuthPos; }
+    UFUNCTION(BlueprintPure, Category = "Sightline Match")
+    bool HasServerAuthPos() const { return bHasAuthPos; }
+    USightlineEntityRegistry* GetRegistry() const { return Registry; }   // ep06：幽灵遍历入口
+
+private:
+    FVector LastAuthPos = FVector::ZeroVector;          // ep06：幽灵数据源（最新权威位·随快照刷新）
+    bool bHasAuthPos = false;
     ISendPort* Conn = nullptr;                          // 非拥有指针（GI 持有生命周期；D3-18 只认端口）
     UPROPERTY()
     TObjectPtr<USightlineEntityRegistry> Registry;

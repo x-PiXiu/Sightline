@@ -161,11 +161,16 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
     // 预测误差（当前/峰值）· 和解次数 · 重放帧数 · ack 差（管线深度）· 滑块值
     if (GEngine && MatchSession && MatchSession->IsInMatch())
     {
-        GEngine->AddOnScreenDebugMessage(kReconcileHudKey, 0.f, FColor::Cyan,
-                                         FString::Printf(TEXT("[和解] 误差 %.1fcm(峰 %.1f)   和解 %d 次   重放 %d 帧   ack差 %u   滑块 %dms"),
-                                                         MatchSession->GetErrCurrent(), MatchSession->GetErrPeak(),
-                                                         MatchSession->GetReconcileCount(), MatchSession->GetReplayFrames(),
-                                                         MatchSession->GetAckGap(), LastInboundDelayMs));
+        FString Recon = FString::Printf(TEXT("[和解] 误差 %.1fcm(峰 %.1f)   和解 %d 次   重放 %d 帧   ack差 %u   滑块 %dms"),
+                                        MatchSession->GetErrCurrent(), MatchSession->GetErrPeak(),
+                                        MatchSession->GetReconcileCount(), MatchSession->GetReplayFrames(),
+                                        MatchSession->GetAckGap(), LastInboundDelayMs);
+        if (MatchSession->HasServerAuthPos())               // ep06：权威位数字通道（与日志核对用）
+        {
+            const FVector A = MatchSession->GetServerAuthPos();
+            Recon += FString::Printf(TEXT("   权威位 (%.0f,%.0f,%.0f)"), A.X, A.Y, A.Z);
+        }
+        GEngine->AddOnScreenDebugMessage(kReconcileHudKey, 0.f, FColor::Cyan, Recon);
     }
 
     // 第 3 期：切对局关卡后延迟批量生成远端角色（0.6s 守门 = 等 OpenLevel 加载落定，M3 简化；

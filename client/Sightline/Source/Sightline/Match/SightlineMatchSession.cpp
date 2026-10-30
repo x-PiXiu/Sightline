@@ -168,6 +168,8 @@ TArray<int32> USightlineMatchSession::GetEntityIds() const {
 // 权威位 vs 本地同 seq 预测位：< ε 无感｜≥ ε 回滚+重放｜断档 全量回滚兜底
 void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthPos) {
     LastAckedSeq = AckedSeq;
+    LastAuthPos = AuthPos;                              // ep06：幽灵数据源（最新权威位·随快照刷新）
+    bHasAuthPos = true;
 
     // FInputSample → 纯 InputSample 转换（≤64 条，开销可忽略）
     TArray<sightline::reconcile::InputSample> Pure;
