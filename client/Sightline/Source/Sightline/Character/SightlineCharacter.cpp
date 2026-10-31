@@ -206,20 +206,30 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
     // 服务器 judgeAt 查询的"过去世界"——回溯开时橙球≈您瞄准的影子，两球分离即回溯量可视化
     if (IsPlayerControlled() && MatchSession.IsValid() && CGhost.GetValueOnGameThread() != 0)
     {
+        // ep06 幽灵三色（2026-10-31 v2 修正：橙球曾用 now−rtt 查"接收时刻"历史环——快照流已被
+        // 滑块平移 rtt，再多退 rtt = 画成 2×rtt 前，用户实测"橙色在后面追"实锤）：
+        //   橙球 = 渲染时刻的历史插值位 → 与渲染角色精确重合 = 射手所见影子 = 服务器判定世界；
+        //   蓝球 = 影子 + 速度×rtt 外推 = 目标"真实的现在"（客户端只收得到 rtt 前的快照，此刻必须外推）。
+        // 回溯开：瞄影子打 → 绿球钉在橙球（判定=所见）；回溯关：子弹落在橙蓝之间（miss 几何可见）。
         if (USightlineEntityRegistry* Reg = MatchSession->GetRegistry())
         {
             const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance());
-            const double JudgeTime = FPlatformTime::Seconds() - (GI ? GI->GetLastPingMs() / 1000.0 : 0.0);
-            const USightlinePawnSpawner* Spawner = GI ? GI->GetPawnSpawner() : nullptr;            for (const FSightlineEntityState& E : Reg->All())
+            const double RttSec = GI ? GI->GetLastPingMs() / 1000.0 : 0.0;
+            const double RenderTime = FPlatformTime::Seconds() - kInterpDelaySec;
+            const USightlinePawnSpawner* Spawner = GI ? GI->GetPawnSpawner() : nullptr;
+            for (const FSightlineEntityState& E : Reg->All())
             {
                 if (E.bSelf) continue;
-                DrawDebugSphere(GetWorld(), E.Pos, 34.f, 12, FColor(0, 128, 255, 90),
-                                /*bPersistent=*/false, /*LifeTime=*/-1.f, 0, 1.5f);
                 if (Spawner)
                 {
                     if (const ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(E.PlayerId)))
-                        DrawDebugSphere(GetWorld(), Remote->SampleAuthorityAt(JudgeTime), 34.f, 12,
+                    {
+                        const FVector Shadow = Remote->SampleAuthorityAt(RenderTime);   // 所见=判定世界
+                        DrawDebugSphere(GetWorld(), Shadow, 34.f, 12,
                                         FColor(255, 140, 0, 110), false, -1.f, 0, 2.5f);
+                        DrawDebugSphere(GetWorld(), Shadow + Remote->GetVelocity() * RttSec, 34.f, 12,
+                                        FColor(0, 128, 255, 90), false, -1.f, 0, 1.5f);
+                    }
                 }
             }
         }
