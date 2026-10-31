@@ -519,7 +519,8 @@ void ASightlineCharacter::ShowHitmarker() {
         if (!bWarned2) { bWarned2 = true; UE_LOG(LogSightline, Warning, TEXT("[命中] Hitmarker 池取件失败（检查对象池/类引用）")); }
         return;
     }
-    M->AddToViewport(42);
+    if (!M->IsInViewport())                              // 池复用：显示期内再来一发时已在屏——
+        M->AddToViewport(42);                            // 重复 AddToViewport 会刷 Script Warning（2026-10-31 实锤）
     M->SetVisibility(ESlateVisibility::Visible);
     TWeakObjectPtr<UUserWidget> Weak(M);
     TWeakObjectPtr<ASightlineCharacter> WeakSelf(this);
