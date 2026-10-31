@@ -562,11 +562,14 @@ void ASightlineCharacter::CreateMatchUI() {
     // （2026-10-31 日志实锤：预热从未执行）。两条时序收敛于此，每角色实例只跑一次）
     if (IsPlayerControlled())
     {
+        // 企业方案 PIE 极限版：Pawn 出生即热（0.15s=切图落定余量）——1s 的空窗也压掉；
+        // Pawn 出生前无法预热（载体是 Pawn 上的组件），出生即热就是 PIE 下的最早时点。
+        // 声明式预载/PSO Cache 属打包管线，ep07+ 立项
         FTimerHandle WarmupHandle;
         GetWorldTimerManager().SetTimer(WarmupHandle, [WC = TWeakObjectPtr<ASightlineCharacter>(this)]()
         {
             if (WC.IsValid()) WC->WarmupFireChain();
-        }, 1.0f, false);
+        }, 0.15f, false);
     }
 }
 
