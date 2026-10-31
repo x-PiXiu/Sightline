@@ -128,9 +128,11 @@ def play_one_round(c, round_no):
     # 无限等真人加入（ROOM_STATE [4B RoomId][1B 房主名长][房主名][1B 人数]——人数在房主名后）
     while True:
         got = c.recv_frame(1.0)
-        if got == ("CLOSED", b"") or got is None:
-            return "closed" if got == ("CLOSED", b"") else "over"
-        if got[0] == S2C["ROOM_STATE"]:
+        if got == ("CLOSED", b""):
+            return "closed"
+        if got is None:
+            continue                                   # 帧级超时=继续等（v3 把 None 当 over →
+        if got[0] == S2C["ROOM_STATE"]:                # 每秒重开一局，12 秒 12 房实锤）
             body = got[1]
             members = body[5 + body[4]]
             if members >= 2:
