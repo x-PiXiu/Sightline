@@ -133,6 +133,14 @@ void ASightlineCharacter::BeginPlay() {
         MuzzleFXComp = FindComponentByClass<UNiagaraComponent>();
         if (MuzzleFXComp) MuzzleFXComp->Activate();
         else UE_LOG(LogTemp, Log, TEXT("[开火] 枪口火光组件未找到（特效静默降级；BP 挂 Niagara 组件后重启生效）"));
+        // ep06：左手 IK 的枪网格自动发现（零手填——WeaponMeshComp 属性面板曾诡异不显示，绕开：
+        // 取身上"非自身"的那具骨骼网格=枪；双枪模已被否，命中唯一。手动填引用时优先用手工值）
+        if (!WeaponMeshComp)
+        {
+            TInlineComponentArray<USkeletalMeshComponent*> SkComps(this);
+            for (USkeletalMeshComponent* Sk : SkComps)
+                if (Sk && Sk != GetMesh()) { WeaponMeshComp = Sk; break; }
+        }
     } else {
         GetCharacterMovement()->DisableMovement();
         GetCharacterMovement()->GravityScale = 0.f;
@@ -233,6 +241,8 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         {
             const FTransform SocketWorld = WeaponMeshComp->GetSocketTransform(LeftHandSocketName, RTS_World);
             AnimInputs.LH_IK_Target = SocketWorld * GetMesh()->GetComponentTransform().Inverse();
+            // 肘部引导：目标点向身体左下偏（组件空间 y 负=左）——肘弯向身体左前下，防 IK 绕背解
+            AnimInputs.LH_IK_Joint = AnimInputs.LH_IK_Target.GetTranslation() + FVector(0.f, -30.f, -40.f);
             const UAnimInstance* AI = GetMesh()->GetAnimInstance();
             const bool bMontageBusy = AI && ((ReloadMontage && AI->Montage_IsActive(ReloadMontage)) ||
                                              (EquipMontage && AI->Montage_IsActive(EquipMontage)));

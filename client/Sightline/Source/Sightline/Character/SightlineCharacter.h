@@ -53,6 +53,11 @@ struct FAnimInputs {
     /** 左手 IK 权重：持枪=1；换弹/拔枪蒙太奇播放中=0（蒙太奇里左手要离开枪做动作，IK 必须让位） */
     UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
     float LH_IK_Weight = 0.f;
+
+    /** 肘部引导点（组件空间）：Joint Target=(0,0,0) 会把弯曲平面引向脚下→肘部从背后绕（实锤）；
+     *  动态=目标位置+左下偏移，肘弯向身体左前下=持枪自然姿态 */
+    UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
+    FVector LH_IK_Joint = FVector::ZeroVector;
 };
 
 UCLASS()
