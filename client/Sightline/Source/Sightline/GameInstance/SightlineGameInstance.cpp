@@ -31,6 +31,12 @@ namespace
     constexpr float  kReconnectDelay  = 3.0f;     // 断开/失败后 3s 自动重连
     inline double MonotonicMs() { return FPlatformTime::Seconds() * 1000.0; }
 
+    // ep06：服务器地址可配（默认本机）——PIE 启动前在编辑器控制台敲
+    // `Sightline.ServerAddr 172.23.34.108` 即切 WSL 直连（对比 localhost 转发延迟）；PIE 间会话内持久
+    TAutoConsoleVariable<FString> CServerAddr(
+        TEXT("Sightline.ServerAddr"), TEXT("127.0.0.1"),
+        TEXT("Sightline 服务器地址（Init 时读取；PIE 前在编辑器控制台设置）"));
+
     // ep06 KPI 采集开关：0 = 22 号上报 rttMs=0（服务器 judgeAt=now = 回溯关闭），1 = 正常上报。
     // 上报频率保持 1Hz 不变——服务器状态在两轮间收敛，只差回溯量一个变量。
     TAutoConsoleVariable<int32> CRttReport(
@@ -67,7 +73,7 @@ void USightlineGameInstance::Init()
 
     // M5 损伤滑块面板改由 HandleTick 对账（对局中挂载/离场隐藏——Init 期视口未就绪，M6 实锤）
 
-    UE_LOG(LogSightline, Log, TEXT("[GI] 初始化完成，发起连接 127.0.0.1:18888"));
+    UE_LOG(LogSightline, Log, TEXT("[GI] 初始化完成，发起连接 %s:18888"), *CServerAddr.GetValueOnGameThread());
     Connect();   // PIE 即连；心跳在收到 WELCOME（连接确认）后才启动
 }
 
@@ -93,7 +99,7 @@ void USightlineGameInstance::Connect()
         return;
     }
 
-    UE_LOG(LogSightline, Log, TEXT("[GI] 连接 127.0.0.1:18888 ……"));
+    UE_LOG(LogSightline, Log, TEXT("[GI] 连接 %s:18888 ……"), *CServerAddr.GetValueOnGameThread());
     Connection = MakeUnique<FSightlineConnection>();
     if (LobbySession) LobbySession->BindConnection(Connection.Get());   // 会话绑定新连接
     if (MatchSession) MatchSession->BindConnection(Connection.Get());   // 对局会话绑定新连接（M3）
@@ -114,7 +120,8 @@ void USightlineGameInstance::Connect()
         }
     });
 
-    if (Connection->Connect(TEXT("127.0.0.1"), 18888))
+    const FString ServerAddr = CServerAddr.GetValueOnGameThread();
+    if (Connection->Connect(ServerAddr, 18888))
     {
         UE_LOG(LogSightline, Log, TEXT("[GI] 连接请求已发起（等待 WELCOME 确认）"));
     }
@@ -161,8 +168,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         if (bConnected && bLag) Status += TEXT("  LAG");
         const FColor Color = bConnected ? (bLag ? FColor::Orange : FColor::Green) : FColor::Red;
         GEngine->AddOnScreenDebugMessage(kHudMessageKey, 0.f, Color,
-                                         FString::Printf(TEXT("%s   ping=%ums   ↑%uKB/s ↓%uKB/s   seq=%u"),
-                                                         *Status, LastPingMs, LastUpKbps, LastDownKbps, HeartbeatSeq));
+                                         FString::Printf(TEXT("%s   ping=%ums   ↑%uB/s ↓%uB/s   seq=%u"),
+                                                         *Status, LastPingMs, LastUpBps, LastDownBps, HeartbeatSeq));
     }
 
     // M3c 和解 HUD（演示基建第二件套 · D4-08）：对局激活才显示——
@@ -211,12 +218,12 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         LastRttReportMonotonicMs = MonotonicMs();
         const uint64 NowSent = Connection->SentBytes.load();
         const uint64 NowRecv = Connection->RecvBytes.load();
-        const uint32 UpKbps  = static_cast<uint32>((NowSent - LastReportSentBytes) / 1024);
-        const uint32 DownKbps = static_cast<uint32>((NowRecv - LastReportRecvBytes) / 1024);
+        const uint32 UpBps   = static_cast<uint32>(NowSent - LastReportSentBytes);    // 本机流量仅 ~KB/s：
+        const uint32 DownBps = static_cast<uint32>(NowRecv - LastReportRecvBytes);    // KB 整数除法会截成 0，显 B/s
         LastReportSentBytes = NowSent;
         LastReportRecvBytes = NowRecv;
-        LastUpKbps = UpKbps;                                 // HUD 流量显示（1s 差分）
-        LastDownKbps = DownKbps;
+        LastUpBps = UpBps;                                  // HUD 流量显示（1s 差分·B/s）
+        LastDownBps = DownBps;
 
         TArray<uint8> RttPayload;
         const auto Add16 = [&RttPayload](uint16 V)
@@ -225,8 +232,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
             RttPayload.Add(static_cast<uint8>((V >> 8) & 0xFF));
         };
         Add16(static_cast<uint16>(CRttReport.GetValueOnGameThread() ? LastPingMs : 0));
-        Add16(static_cast<uint16>(FMath::Min(UpKbps, 65535u)));
-        Add16(static_cast<uint16>(FMath::Min(DownKbps, 65535u)));
+        Add16(static_cast<uint16>(FMath::Min(UpBps, 65535u)));
+        Add16(static_cast<uint16>(FMath::Min(DownBps, 65535u)));
         Connection->Send(MSG_C2S_RTT_REPORT, RttPayload);
     }
 

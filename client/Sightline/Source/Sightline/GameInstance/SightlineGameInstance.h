@@ -53,8 +53,8 @@ private:
     double LastRttReportMonotonicMs = 0.0;
     uint64 LastReportSentBytes = 0;
     uint64 LastReportRecvBytes = 0;
-    uint32 LastUpKbps = 0;                // 上行 KB/s（1s 差分·HUD 流量显示+ep12 消费）
-    uint32 LastDownKbps = 0;              // 下行 KB/s（同上）
+    uint32 LastUpBps = 0;                // 上行 KB/s（1s 差分·HUD 流量显示+ep12 消费）
+    uint32 LastDownBps = 0;              // 下行 KB/s（同上）
     double LastAckMonotonicMs = 0.0;      // 单调时钟：LAG 判定用
     double LagEnteredMonotonicMs = 0.0;   // 单调时钟：LAG 进入时刻（持续超时 → 主动断线重连）
     bool bLag = false;
