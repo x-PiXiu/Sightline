@@ -440,6 +440,45 @@ void ASightlineCharacter::OnCameraToggle() {
 void ASightlineCharacter::OnMatchStartedHandler() {
     BP_OnMatchStarted();                                 // BP 钩子（未实现=no-op）
     CreateMatchUI();
+    // ep06 首枪预热：切图落定 1s 后静音热一遍开火链——火光 Niagara 首次加载+GPU sim 编译、
+    // MetaSound 首播编译、DecalActor 渲染路径首次创建，全部提前到无感时刻（首枪零 hitch）
+    if (IsPlayerControlled())
+    {
+        FTimerHandle WarmupHandle;
+        GetWorldTimerManager().SetTimer(WarmupHandle, [WC = TWeakObjectPtr<ASightlineCharacter>(this)]()
+        {
+            if (WC.IsValid()) WC->WarmupFireChain();
+        }, 1.0f, false);
+    }
+}
+
+void ASightlineCharacter::WarmupFireChain() {
+    // ① 火光 Niagara：Activate 触发系统加载+编译（AutoActivate 关→原是首枪才付这笔账）；0.15s 后关
+    if (MuzzleFXComp && !MuzzleFXComp->IsActive())
+    {
+        MuzzleFXComp->Activate(true);
+        FTimerHandle OffHandle;
+        GetWorldTimerManager().SetTimer(OffHandle, [WC = TWeakObjectPtr<UNiagaraComponent>(MuzzleFXComp)]()
+        {
+            if (WC.IsValid()) WC->Deactivate();
+        }, 0.15f, false);
+    }
+    // ② 枪声/命中音 0 音量各一声（MetaSound 首播运行时编译）——本地角色这两支是硬引用，热的是 DSP 编译
+    if (FireSound) UGameplayStatics::PlaySound2D(this, FireSound.Get(), 0.f);
+    if (HitSound)  UGameplayStatics::PlaySound2D(this, HitSound.Get(), 0.f);
+    // ③ 弹孔：脚下地板真生成一个（ADecalActor/DecalComponent 首次创建）→ 立刻 Reset 清场（不留脚印弹孔）
+    if (ImpactDecalMaterial)
+        if (auto* Mgr = GetGameInstance() ? GetGameInstance()->GetSubsystem<USightlineDecalManagerSubsystem>() : nullptr)
+        {
+            FSightlineDecalRequest R;
+            R.Material  = ImpactDecalMaterial;
+            R.Location  = GetActorLocation() - FVector(0.f, 0.f, 88.f);            // 脚底地板面
+            R.Rotation  = FRotationMatrix::MakeFromX(FVector(0.f, 0.f, 1.f)).Rotator(); // 法线朝上
+            R.Size      = FVector(20.f, 24.f, 24.f);
+            Mgr->SpawnImpactDecal(R);
+            Mgr->Reset();
+        }
+    UE_LOG(LogSightline, Log, TEXT("[预热] 开火链资产已热（火光/枪声/命中音/弹孔）——首枪零 hitch"));
 }
 
 void ASightlineCharacter::CreateMatchUI() {

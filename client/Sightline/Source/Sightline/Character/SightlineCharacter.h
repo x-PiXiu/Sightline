@@ -166,6 +166,7 @@ private:
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
     void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线·引擎原生 Spawn）
+    void WarmupFireChain();                      // ep06 首枪预热：对局开始后静音热一遍开火链（火光/枪声/弹孔首次加载）
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
