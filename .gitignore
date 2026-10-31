@@ -38,3 +38,4 @@ desktop.ini
 
 # 渲染产物不入库（2026-10-08 用户令）：docs/episodes 只入库 .drawio 源与脚本，PNG 留本地
 docs/episodes/**/*.png
+__pycache__/
