@@ -63,9 +63,18 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
         } else {
             float dx = x - E.lx, dy = y - E.ly, dz = z - E.lz;   // 客户端声明的本拍位移
             // seq 间隙感知：丢帧时 dx 含多帧位移，bound 按实际间隔倍数放大（cap 3x 防刷）
+            // 时间版（ep06 补）：seq 是条数计数器不反映真实间隔——客户端 GameThread 冻结后恢复的
+            // 首条上报 gap=1 但位移=冻结时长×速度（500ms→200uu），纯 seq 版误钳诚实玩家 → 和解回拉
+            // （2026-10-31 用户实测"按 W 被往后拉"的根因）。bound 取两版 max：seq 版防 TCP 攒批、
+            // 时间版放行长间隔诚实位移（cap 0.6s 防断线重连瞬移）。
             const std::uint32_t gap = (seq > E.ackedSeq) ? (seq - E.ackedSeq) : 1u;
             const float gapScale = std::min(static_cast<float>(gap), 3.0f);
-            const float bound = kMaxSpeedUuPerSec * kMaxInputGapSec * gapScale;
+            const float seqBound = kMaxSpeedUuPerSec * kMaxInputGapSec * gapScale;
+            float timeBound = 0.f;
+            if (recvMs != 0 && E.lastRecvMs != 0 && recvMs > E.lastRecvMs)
+                timeBound = kMaxSpeedUuPerSec *
+                            std::min(static_cast<float>(recvMs - E.lastRecvMs) / 1000.f, 0.6f);
+            const float bound = std::max(seqBound, timeBound);
             const float len2 = dx * dx + dy * dy + dz * dz;
             if (len2 > bound * bound) {                      // 超界钳回界上：保方向弃模长（传送黑客打不动权威位）
                 const float k = bound / std::sqrt(len2);
@@ -74,6 +83,7 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             E.x += dx; E.y += dy; E.z += dz;                 // 权威=上次权威+钳制增量（诚实路径与上报恒等）
         }
         E.lx = x; E.ly = y; E.lz = z;                        // 增量基准永远=客户端声明轨迹
+        E.lastRecvMs = recvMs;                               // 钳制时间版基准（下一次间隔）
         E.yaw = yaw; E.pitch = pitch;                        // 朝向无动力学：末次上报即权威
         E.flags = flags;
         E.ackedSeq = std::max(E.ackedSeq, seq);              // 确认序号只进不退（乱序防御 · R11）

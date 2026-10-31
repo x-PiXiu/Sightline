@@ -39,6 +39,7 @@ struct Entity {
     std::uint8_t histCount = 0;        // 有效条数（≤kEntityHistoryCap）
     std::uint8_t histHead = 0;         // 下一写槽（环形覆盖最老）
     std::uint16_t shooterRtt = 0;      // 该玩家上报的 RTT（22 号·1Hz；0=未上报 → 不回溯=ep05 行为）
+    std::uint64_t lastRecvMs = 0;      // 上一条 19 号到达时刻（钳制时间版：卡顿后恢复的长间隔诚实位移放行）
 };
 
 /** 快照项（17 载荷的一行） */

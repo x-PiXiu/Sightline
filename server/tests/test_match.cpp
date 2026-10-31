@@ -317,18 +317,26 @@ int main() {
         auto f5 = tm.Fire(21, 4700);                                              // judgeAt=4700
         CHECK(f5.size() == 1 && f5[0].fire.bHit);                                 // 最新位在射线上=命中
     }
-    // 环形裁剪：35 条上报 → histCount=32（覆盖最老）——以判定行为验收
+    // 钳制时间版（ep06·2026-10-31 联调实锤）：GameThread 冻结后恢复的首条上报 seq gap=1
+    // 但位移=冻结时长×速度——纯 seq 版误钳诚实玩家 → 和解回拉（用户"按 W 被往后拉"根因）。
+    // bound=max(seq版, 时间版)——时间版按到达间隔放行（cap 0.6s 防瞬移）。
     {
-        MatchService tm;
-        std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
-        tm.StartMatch(1, rs);
-        tm.SetGeometry(MapGeometry{});
-        for (int i = 0; i < 35; ++i)
-            tm.UpdateEntity(20, float(500 + i), 0.f, 90.f, 0.f, 0.f, 0.f,
-                            std::uint32_t(i + 1), std::uint64_t(1000 + i * 33));
-        tm.UpdateEntity(21, 420, 0, 90, 0, 0, 0, 1, 4600);
-        auto f5 = tm.Fire(21, 4700);                                              // judgeAt=4700
-        CHECK(f5.size() == 1 && f5[0].fire.bHit);                                 // 最新位在射线上=命中
+        MatchService cm;
+        std::vector<RosterEntry> rs{{30, "a", 0}};
+        cm.StartMatch(1, rs);
+        cm.UpdateEntity(30, 0.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1, 1000);            // 首报
+        // 冻结 500ms 恢复：gap=1、位移 200uu、到达间隔 500ms → 时间版 bound=500 → 放行（不钳）
+        cm.UpdateEntity(30, 200.f, 0.f, 100.f, 0.f, 0.f, 0x00, 2, 1500);
+        auto ev1 = cm.TickSnapshot();
+        CHECK(ev1.size() == 1 && ev1[0].entities[0].x == 200.f);                  // 诚实位移原样入权威
+        // 时间版 cap：间隔 2s → cap 0.6s → bound 600；位移 800uu → 钳 600 → 权威=800（防瞬移）
+        cm.UpdateEntity(30, 1000.f, 0.f, 100.f, 0.f, 0.f, 0x00, 3, 3500);
+        auto ev2 = cm.TickSnapshot();
+        CHECK(ev2.size() == 1 && std::fabs(ev2[0].entities[0].x - 800.f) < 0.01f);
+        // seq 版回归：recvMs=0（旧签名路径）瞬移 400uu → 照旧钳 100
+        cm.UpdateEntity(30, 1200.f, 0.f, 100.f, 0.f, 0.f, 0x00, 4);               // 无 recvMs
+        auto ev3 = cm.TickSnapshot();
+        CHECK(ev3.size() == 1 && std::fabs(ev3[0].entities[0].x - 900.f) < 0.01f);// 800+100=界上
     }
 
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";
