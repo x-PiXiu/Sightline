@@ -161,7 +161,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         if (bConnected && bLag) Status += TEXT("  LAG");
         const FColor Color = bConnected ? (bLag ? FColor::Orange : FColor::Green) : FColor::Red;
         GEngine->AddOnScreenDebugMessage(kHudMessageKey, 0.f, Color,
-                                         FString::Printf(TEXT("%s   ping=%ums   seq=%u"), *Status, LastPingMs, HeartbeatSeq));
+                                         FString::Printf(TEXT("%s   ping=%ums   ↑%uKB/s ↓%uKB/s   seq=%u"),
+                                                         *Status, LastPingMs, LastUpKbps, LastDownKbps, HeartbeatSeq));
     }
 
     // M3c 和解 HUD（演示基建第二件套 · D4-08）：对局激活才显示——
@@ -214,6 +215,8 @@ bool USightlineGameInstance::HandleTick(float DeltaTime)
         const uint32 DownKbps = static_cast<uint32>((NowRecv - LastReportRecvBytes) / 1024);
         LastReportSentBytes = NowSent;
         LastReportRecvBytes = NowRecv;
+        LastUpKbps = UpKbps;                                 // HUD 流量显示（1s 差分）
+        LastDownKbps = DownKbps;
 
         TArray<uint8> RttPayload;
         const auto Add16 = [&RttPayload](uint16 V)

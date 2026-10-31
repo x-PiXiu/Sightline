@@ -35,6 +35,10 @@ public:
         TArray<uint8> Buffer;
         while (!bStop)
         {
+            // 事件驱动唤醒（ep06：替代 10ms 轮询——数据到达亚毫秒级即醒，ping 不再背 0~10ms 发现延迟；
+            // 无数据 10ms 超时醒来=延迟队列出队节拍+停机检查兜底。Wait 对非阻塞 socket 走 select，纯传输细节
+            // 不穿透边界——上游帧投递契约不变（整洁架构：谦卑对象内局部优化，用例层零感知））
+            Socket->Wait(ESocketWaitConditions::WaitForRead, FTimespan::FromMilliseconds(10));
             uint32 Pending = 0;
             if (Socket->HasPendingData(Pending) && Pending > 0)
             {
@@ -81,7 +85,7 @@ public:
                     ++It;
                 }
             }
-            FPlatformProcess::Sleep(0.01f);   // 10ms 轮询——心跳粒度足够，避免阻塞 recv 的关停竞态
+            // 节拍由循环头部的 Wait(10ms) 承担——数据到达即醒、无数据 10ms 醒，不再叠加固定 Sleep
         }
         UE_LOG(LogSightline, Verbose, TEXT("[RecvThread] 退出"));
         return 0;
