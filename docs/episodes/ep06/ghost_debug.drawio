@@ -1,0 +1,27 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="幽灵三色" id="ghost_dbg">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="幽灵三色——射手的过去，就是判定的世界" style="text;fontSize=38;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="36" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="幽灵三色示意 · 上镜版 · 草案 v1 · 2026-11-01" style="text;fontSize=18;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1350" y="50" width="500" height="34" as="geometry"/></mxCell>
+
+        <mxCell id="shooter" value="射手&#10;（准星指向护木点）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=20;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="120" y="420" width="280" height="120" as="geometry"/></mxCell>
+        <mxCell id="aim" style="endArrow=none;strokeWidth=2;strokeColor=#666666;dashed=1;dashPattern=6 6;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="400" y="480" as="sourcePoint"/><mxPoint x="1150" y="480" as="targetPoint"/></mxGeometry></mxCell>
+
+        <mxCell id="orange" value="橙球 = 判定历史位&#10;= 您看到的影子 = 所见快照拍摄时刻的它" style="ellipse;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1060" y="380" width="240" height="200" as="geometry"/></mxCell>
+        <mxCell id="blue" value="蓝球 = 真实的现在&#10;= 影子 + 速度 × rtt（外推）" style="ellipse;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1420" y="380" width="240" height="200" as="geometry"/></mxCell>
+        <mxCell id="green" value="绿球 = 命中标记" style="ellipse;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1080" y="640" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="ghostArr" style="endArrow=block;strokeWidth=3;strokeColor=#6c8ebf;sketch=1;curveFitting=1;jiggle=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1300" y="480" as="sourcePoint"/><mxPoint x="1420" y="480" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="ghostArrT" value="延迟 Gap = rtt × 靶速&#10;（500ms × 4m/s = 2m）" style="text;fontSize=18;fontColor=#6c8ebf;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1260" y="330" width="220" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="caseOn" value="回溯开（RttReport 1）：判定查橙球 → 绿球钉在橙球上 → 指哪打哪" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=21;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="150" y="800" width="820" height="70" as="geometry"/></mxCell>
+        <mxCell id="caseOff" value="回溯关（RttReport 0）：判定查蓝球 → 子弹落在橙蓝之间 → 打影子全 miss" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=21;fontStyle=1;sketch=1;curveFitting=1;jiggle=2;align=left;spacingLeft=16;" vertex="1" parent="1"><mxGeometry x="1000" y="800" width="820" height="70" as="geometry"/></mxCell>
+
+        <mxCell id="eq" value="橙 = SampleAuthorityAt(渲染时刻)——与实色角色精确重合（所见）；蓝 = 橙 + GetVelocity × rtt——客户端只收得到 rtt 前的快照，此刻必须外推" style="text;fontSize=18;fontColor=#666666;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="150" y="900" width="1500" height="40" as="geometry"/></mxCell>
+        <mxCell id="note" value="两球距离 = 延迟的具象；折返瞬间橙蓝交换前后——延迟量被眼睛看见" style="text;fontSize=19;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="150" y="950" width="1400" height="40" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
