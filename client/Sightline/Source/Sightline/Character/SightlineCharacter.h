@@ -114,6 +114,19 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> FireMontage;
 
+    // —— ep06 表现层：换弹（本地动作+音效；换弹钟 2.5s 是权威，蒙太奇只是表现层随行）——
+    /** 换弹蒙太奇（AM_MM_Rifle_Reload——与 Fire 同族同槽声明；打空上弦瞬间播，钟到期补满） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<UAnimMontage> ReloadMontage;
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<USoundBase> ReloadSound;          // 换弹音（Lyra Rifle_Load01）
+
+    /** 拔枪蒙太奇（AM_MM_Rifle_Equip——对局出生播一次，入场仪式感；大厅不播） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<UAnimMontage> EquipMontage;
+
+    virtual void PossessedBy(AController* NewController) override;   // ep06：俯仰钳 ±60（AO 素材范围）
+
     // —— M5 视角（D5-15v3 终稿：Lyra 同款——FPP=眼高相机+3P 姿势借入，不藏身体不建 1P 枪）——
     // 沿革：双枪模（悬浮枪，用户否）→ FPP 藏身体（背离 Lyra 实现作废）→ 终稿=纯相机位置差异。
     // Lyra 实勘（完整工程）：CM_ThirdPerson 是唯一相机资产，无 FPP 相机模式类、无 1P 手臂网格。

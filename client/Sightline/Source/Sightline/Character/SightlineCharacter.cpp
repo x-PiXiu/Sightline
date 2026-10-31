@@ -87,6 +87,19 @@ ASightlineCharacter::ASightlineCharacter() {
     }
 }
 
+// ep06 表现层：俯仰钳 ±60°（Lyra AO 素材采样范围量级）——低头/抬头时前手握枪穿模的根因=
+// 俯仰超出 AO 素材范围后 AO 钳边界姿势而躯干（相机）继续转，手/枪相对关系被拉开；
+// 解法=玩法约束迁就素材（Lyra/CS/OW 全都有俯仰上限，素材保证而非 IK 修正——2026-10-31 实锤）
+void ASightlineCharacter::PossessedBy(AController* NewController) {
+    Super::PossessedBy(NewController);
+    if (const APlayerController* PC = Cast<APlayerController>(NewController))
+        if (PC->PlayerCameraManager)
+        {
+            PC->PlayerCameraManager->ViewPitchMin = -60.f;
+            PC->PlayerCameraManager->ViewPitchMax = 60.f;
+        }
+}
+
 void ASightlineCharacter::BeginPlay() {
     Super::BeginPlay();
     const APlayerController* PC = Cast<APlayerController>(Controller);
@@ -110,7 +123,10 @@ void ASightlineCharacter::BeginPlay() {
             // OnCameraModeChanged 委托保留在相机组件上，供后续系统（HUD 模式自适应等）订阅
         }
         if (MatchSession->IsInMatch())
-            CreateMatchUI();                             // 晚于开局入局（切图后生成）也补建对局 UI
+        {
+            CreateMatchUI();                         // 晚于开局入局（切图后生成）也补建对局 UI
+            if (EquipMontage) PlayAnimMontage(EquipMontage);   // ep06：出生拔枪（入场仪式感；对局门内才播）
+        }
         else
             MatchSession->OnMatchStarted.AddDynamic(this, &ASightlineCharacter::OnMatchStartedHandler);
         // D5-16：枪口火光组件自动发现 + 系统常驻激活（触发由每发 User.Trigger 参数驱动）
@@ -174,6 +190,17 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
                                                      // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
                                                      // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
         const bool bTrigger = bMatchLive && bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
+        // ep06 表现层：弹药/换弹 HUD 行（key=3，GI 的 ping 行=1、和解行=2；本地弹匣预测态直读，
+        // 与服务器扣弹镜像同步——换弹钟倒数即"换弹时间"上屏）
+        if (GEngine)
+        {
+            if (NowMs < LocalReloadUntilMs)
+                GEngine->AddOnScreenDebugMessage(3, 0.f, FColor::Yellow,
+                    FString::Printf(TEXT("换弹中 %.1fs"), (LocalReloadUntilMs - NowMs) / 1000.0));
+            else
+                GEngine->AddOnScreenDebugMessage(3, 0.f, LocalMag > 10 ? FColor::White : FColor::Red,
+                    FString::Printf(TEXT("弹药 %d/%d"), LocalMag, kClientMag));
+        }
         if (MuzzleFXComp) {
             if (bTrigger && !MuzzleFXComp->IsActive())
                 MuzzleFXComp->Activate(true);        // 系统自完成后复活（寿命型 Niagara 资产兜底）
@@ -383,7 +410,13 @@ void ASightlineCharacter::TryFire() {
     NextFireAllowedMs = NowMs + kClientFireIntervalMs;
     --LocalMag;
     if (LocalMag == 0)
+    {
         LocalReloadUntilMs = NowMs + kClientReloadMs;   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
+        // ep06 表现层：换弹动作+音（打空瞬间播；钟是权威、蒙太奇只是表现层随行——
+        // 时长不齐不强扭：Lyra 换弹节奏≈2.4s vs 钟 2.5s，差 0.1s 无感）
+        if (ReloadMontage) PlayAnimMontage(ReloadMontage);
+        if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
+    }
     UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f t=%.3f"),
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
            FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）
