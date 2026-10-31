@@ -83,8 +83,8 @@ class Conn:
         self.sock.settimeout(0)
         try:
             chunk = self.sock.recv(65536)
-        except socket.timeout:
-            return None
+        except (socket.timeout, BlockingIOError):   # 非阻塞无数据（EWOULDBLOCK）≠断线——
+            return None                              # BlockingIOError 是 OSError 子类，必须先捕（v1 把它当断线→开局秒退）
         except OSError:
             return ("CLOSED", b"")
         if not chunk:
