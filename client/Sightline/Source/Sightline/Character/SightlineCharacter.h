@@ -43,6 +43,16 @@ struct FAnimInputs {
     /** 武器类型：0=徒手（ep05 武器表起用） */
     UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
     uint8 WeaponType = 0;
+
+    // —— ep06 表现层：左手 IK 吸附（动画定风格，IK 修末端——消除素材姿势与枪的毫米级偏差穿模）——
+    /** 左手 IK 目标：枪上左手护握 socket 的【角色 mesh 组件空间】变换（TwoBoneIK Target Space=Component 直喂；
+     *  枪挂在手 socket 下有层级差，C++ 已做 世界→角色组件空间 换算） */
+    UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
+    FTransform LH_IK_Target = FTransform::Identity;
+
+    /** 左手 IK 权重：持枪=1；换弹/拔枪蒙太奇播放中=0（蒙太奇里左手要离开枪做动作，IK 必须让位） */
+    UPROPERTY(BlueprintReadOnly, Category = "Sightline|Anim")
+    float LH_IK_Weight = 0.f;
 };
 
 UCLASS()
@@ -124,6 +134,14 @@ protected:
     /** 拔枪蒙太奇（AM_MM_Rifle_Equip——对局出生播一次，入场仪式感；大厅不播） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> EquipMontage;
+
+    // —— ep06 表现层：左手 IK 吸附（枪上左手护握 socket 为目标；ABP TwoBoneIK 消费 LH_IK_*）——
+    /** 枪网格组件引用（BP Character Class Defaults 填——左手 IK 目标的宿主；换枪=换引用） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Anim")
+    TObjectPtr<USceneComponent> WeaponMeshComp;
+    /** 左手护握 socket 名（枪 mesh 上自建——位置=护木下沿；换枪统一命名则代码零改动） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Anim")
+    FName LeftHandSocketName = TEXT("HandGuard_L");
 
     virtual void PossessedBy(AController* NewController) override;   // ep06：俯仰钳 ±60（AO 素材范围）
 

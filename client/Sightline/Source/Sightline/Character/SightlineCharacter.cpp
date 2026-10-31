@@ -225,6 +225,23 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         }
         AnimInputs.Pitch = GetBaseAimRotation().Pitch;
         AnimInputs.bFalling = GetCharacterMovement()->IsFalling();
+
+        // ep06 表现层：左手 IK 供给（动画定风格，IK 修末端——消除素材姿势与枪的毫米级偏差穿模）。
+        // 坐标系：socket 世界变换 → 角色 mesh 组件空间（TwoBoneIK Target Space=Component 直喂）——
+        // 枪挂在手 socket 下，socket 的 RTS_Component 是相对枪组件的，必须乘枪→角色的层级差。
+        if (WeaponMeshComp && GetMesh())
+        {
+            const FTransform SocketWorld = WeaponMeshComp->GetSocketTransform(LeftHandSocketName, RTS_World);
+            AnimInputs.LH_IK_Target = SocketWorld * GetMesh()->GetComponentTransform().Inverse();
+            const UAnimInstance* AI = GetMesh()->GetAnimInstance();
+            const bool bMontageBusy = AI && ((ReloadMontage && AI->Montage_IsActive(ReloadMontage)) ||
+                                             (EquipMontage && AI->Montage_IsActive(EquipMontage)));
+            AnimInputs.LH_IK_Weight = bMontageBusy ? 0.f : 1.f;   // 换弹/拔枪中 IK 让位（左手要离枪做动作）
+        }
+        else
+        {
+            AnimInputs.LH_IK_Weight = 0.f;                        // 枪引用未填：IK 静默关闭（不干预动画）
+        }
     }
     TickRemoteInterpolation(DeltaSeconds);
 
