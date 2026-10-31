@@ -36,9 +36,10 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnSightlineCameraModeChanged OnCameraModeChanged;
 
-    /** TPP 越肩偏移（相对胶囊；X 负=身后，Y 正=右肩，Z=高度） */
+    /** TPP 越肩偏移（相对胶囊；X 负=身后，Y 正=右肩，Z=高度）。
+     *  2026-10-31 用户实测再高再靠左：70→80 / 35→25（Y 减=离右肩远=画面更靠左） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Camera")
-    FVector ThirdPersonOffset = FVector(-45.f, 35.f, 70.f);
+    FVector ThirdPersonOffset = FVector(-45.f, 25.f, 80.f);
 
     /** FPP 眼高位（Lyra 同款：GetPivotLocation 用 BaseEyeHeight≈62——枪/手臂经持枪姿势自然入镜，无悬浮枪）。
      *  用户定稿 (8,8,62)（2026-10-28：Y=14 右移过头回调）；细调在 BP Character Class Defaults 同名属性 */

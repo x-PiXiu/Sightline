@@ -420,7 +420,8 @@ void ASightlineCharacter::TryFire() {
     UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f t=%.3f"),
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
            FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）
-    if (FireMontage) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
+    // 打空帧不播开火蒙太奇：同帧已播换弹蒙太奇，后播会中断覆盖（2026-10-31 实锤：换弹动作"不播"）
+    if (FireMontage && LocalMag > 0) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
