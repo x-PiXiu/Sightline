@@ -440,16 +440,6 @@ void ASightlineCharacter::OnCameraToggle() {
 void ASightlineCharacter::OnMatchStartedHandler() {
     BP_OnMatchStarted();                                 // BP 钩子（未实现=no-op）
     CreateMatchUI();
-    // ep06 首枪预热：切图落定 1s 后静音热一遍开火链——火光 Niagara 首次加载+GPU sim 编译、
-    // MetaSound 首播编译、DecalActor 渲染路径首次创建，全部提前到无感时刻（首枪零 hitch）
-    if (IsPlayerControlled())
-    {
-        FTimerHandle WarmupHandle;
-        GetWorldTimerManager().SetTimer(WarmupHandle, [WC = TWeakObjectPtr<ASightlineCharacter>(this)]()
-        {
-            if (WC.IsValid()) WC->WarmupFireChain();
-        }, 1.0f, false);
-    }
 }
 
 void ASightlineCharacter::WarmupFireChain() {
@@ -496,6 +486,17 @@ void ASightlineCharacter::CreateMatchUI() {
     UE_LOG(LogTemp, Log, TEXT("[对局UI] 准星=%s 红闪=%s"),
            CrosshairWidget ? TEXT("OK") : TEXT("未配置"),
            HurtFlashWidget ? TEXT("OK") : TEXT("未配置"));
+    // ep06 首枪预热（挂这里而非 OnMatchStartedHandler——本项目常规时序=15 号先到、切图后角色
+    // 才出生，新角色 BeginPlay 走 IsInMatch→CreateMatchUI 分支、OnMatchStartedHandler 不会被绑
+    // （2026-10-31 日志实锤：预热从未执行）。两条时序收敛于此，每角色实例只跑一次）
+    if (IsPlayerControlled())
+    {
+        FTimerHandle WarmupHandle;
+        GetWorldTimerManager().SetTimer(WarmupHandle, [WC = TWeakObjectPtr<ASightlineCharacter>(this)]()
+        {
+            if (WC.IsValid()) WC->WarmupFireChain();
+        }, 1.0f, false);
+    }
 }
 
 // Hitmarker：池 Acquire → 显示 → 0.15s 归池（D5-13 池纪律：Acquire 必配 Release）。
