@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""bot_patrol.py —— ep06 KPI 移动靶机器人（单人采集用）
+"""bot_patrol.py —— ep06 KPI 移动靶机器人（单人采集用·无限局循环）
 
-角色：登录 → 建房（打印房间号）→ 等待真人加入 → 开局 → 沿"射手→中心"纵深轴
+角色：登录 → 建房（打印房间号）→ 无限等待真人加入 → 开局 → 沿"射手→中心"纵深轴
 ±1000uu 正对射手跑近跑远（400uu/s 三角波·全程 20m，30Hz 上报）。真人射手**跟踪瞄准**
-（准星跟着靶）按住开火——回溯关=追着 300ms 残影打（大量 miss），回溯开=指哪打哪；
-两轮各 30 发，命中率差 = 延迟补偿价值。路线对齐地图几何（assets/maps/NewMap.json）。
+（准星跟着靶）按住开火——回溯关=追着 300ms 残影打（大量 miss），回溯开=指哪打哪。
+一局结束（对方离开/断线）→ 自动 LEAVE 旧房→新建房→继续无限等——服务器房间无数量
+上限、开局无时限（lobby.h 只有房员 ≤4/房名长度限制），可挂机跑一整天。
 
 用法：python3 bot_patrol.py [host] [port]
-退出：对局结束自动收场（对方离开=18 号/断线）；Ctrl+C 随时停。
+退出：Ctrl+C 收摊；断线自动重连+重新登录后继续循环。
 """
 import socket
 import struct
@@ -19,7 +20,7 @@ PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18888
 
 S2C = {"WELCOME": 1, "LOGIN_RESULT": 5, "CREATE_RESULT": 7, "JOIN_RESULT": 9,
        "ROOM_STATE": 12, "MATCH_START": 15, "ENTITY_LEAVE": 18}
-C2S = {"LOGIN": 4, "CREATE_ROOM": 6, "START_MATCH": 14, "PLAYER_INPUT": 19}
+C2S = {"LOGIN": 4, "CREATE_ROOM": 6, "LEAVE_ROOM": 10, "START_MATCH": 14, "PLAYER_INPUT": 19}
 
 # 巡逻参数（对齐地图几何 assets/maps/NewMap.json：地板 ±2000²，长墙 X[1482,1532]×Y[-983,-571]）
 # 纵深轴 = 射手出生点(PlayerStart_1 实测 442,-474) → 巡逻中心方向：靶正对射手跑近跑远
@@ -101,45 +102,56 @@ class Conn:
         return None
 
 
-def main():
-    c = Conn("bot")
-    assert c.recv_frame()[0] == S2C["WELCOME"]
-    c.send(C2S["LOGIN"], bytes([3]) + "bot".encode())
-    assert c.expect("LOGIN_RESULT") is not None
+def connect_and_login():
+    """建连接+登录（断线重连共用）；连接失败/断线返回 None"""
+    try:
+        c = Conn("bot")
+        if c.recv_frame()[0] != S2C["WELCOME"]:
+            return None
+        c.send(C2S["LOGIN"], bytes([3]) + "bot".encode())
+        assert c.expect("LOGIN_RESULT") is not None
+        return c
+    except (OSError, AssertionError):
+        return None
+
+
+def play_one_round(c, round_no):
+    """一整局：LEAVE 旧房→新建房→无限等人→开局→巡逻到对方离开/断线。
+    返回 'over'（对方离开，连接仍活着）/ 'closed'（连接断开，需重连）。"""
+    c.send(C2S["LEAVE_ROOM"])                        # 上一局的房还在（对局无终止机制，房里只剩 bot）
+    time.sleep(0.2)                                  # 排空 LEAVE 期间的广播（ROOM_LIST 等）
+    c.buf = b""
     c.send(C2S["CREATE_ROOM"], bytes([3]) + "bot".encode())
     p = c.expect("CREATE_RESULT")
     rid = struct.unpack("<I", p[1:5])[0]
-    print(f"机器人建房完成：房间号 {rid}——请在 PIE 登录后加入该房间，加入后本脚本自动开局")
-    # 等真人加入（ROOM_STATE [4B RoomId][1B 房主名长][房主名][1B 人数]——人数在房主名后，
-    # 不能按定长 offset 读：v1 把 offset4 的房主名长当人数，永不命中→白等 120s 超时开局）
-    deadline = time.time() + 120
-    joined = False
-    while time.time() < deadline:
+    print(f"第 {round_no} 局建房完成：房间号 {rid}——无限等待第二人加入（Ctrl+C 收摊）")
+    # 无限等真人加入（ROOM_STATE [4B RoomId][1B 房主名长][房主名][1B 人数]——人数在房主名后）
+    while True:
         got = c.recv_frame(1.0)
-        if got and got[0] == S2C["ROOM_STATE"]:
+        if got == ("CLOSED", b"") or got is None:
+            return "closed" if got == ("CLOSED", b"") else "over"
+        if got[0] == S2C["ROOM_STATE"]:
             body = got[1]
-            host_len = body[4]
-            members = body[5 + host_len]
+            members = body[5 + body[4]]
             if members >= 2:
-                joined = True
                 break
-    if not joined:
-        print("⚠ 120s 内未等到第二人进房——不开局退出（防单人名册哑局），请重跑脚本后先进房")
-        return
     c.send(C2S["START_MATCH"])
     assert c.expect("MATCH_START") is not None
-    print(f"开局完成——纵深巡逻开始（沿射手视线轴 ±{AMP:.0f}uu · {SPEED:.0f}uu/s · 单程 {2*AMP/SPEED:.1f}s）")
+    print(f"开局——纵深巡逻（沿射手视线轴 ±{AMP:.0f}uu · {SPEED:.0f}uu/s · 单程 {2*AMP/SPEED:.1f}s）")
 
     seq = 0
     t0 = time.monotonic()
     nxt = t0
     try:
-        while True:                                   # 对局没结束就一直跑：对方离开/断线才收场
-            # 下行监听（非阻塞）：对方实体销毁（18 号）或连接关闭 = 对局实质结束
-            got = c.try_recv()
-            if got and (got == ("CLOSED", b"") or got[0] == S2C["ENTITY_LEAVE"]):
-                print(f"{time.monotonic()-t0:.0f}s —— 对方离开/连接断开，机器人收场")
-                break
+        while True:                                   # 对局没结束就一直跑
+            got = c.try_recv()                        # 下行监听（非阻塞）：18 号=对方离开
+            if got:
+                if got == ("CLOSED", b""):
+                    print(f"{time.monotonic()-t0:.0f}s —— 连接断开")
+                    return "closed"
+                if got[0] == S2C["ENTITY_LEAVE"]:
+                    print(f"{time.monotonic()-t0:.0f}s —— 对方离开，本局收场")
+                    return "over"
             el = time.monotonic() - t0
             # 三角波：-AMP..+AMP 恒速往返（off<0 靠近射手 / >0 远离）
             ph = el % (2 * AMP / SPEED)
@@ -152,9 +164,30 @@ def main():
             if d > 0:
                 time.sleep(d)
     except (ConnectionResetError, BrokenPipeError, OSError) as e:
-        print(f"{time.monotonic()-t0:.0f}s —— 连接异常收场: {e}")
-    c.sock.close()
-    print(f"完成：{seq} 条 19 号（30Hz）")
+        print(f"{time.monotonic()-t0:.0f}s —— 连接异常: {e}")
+        return "closed"
+
+
+def main():
+    round_no = 0
+    c = connect_and_login()
+    while c is None:
+        print("服务器未就绪，3s 后重试……")
+        time.sleep(3)
+        c = connect_and_login()
+    total = 0
+    while True:                                       # 无限局循环：一局收场→自动开新局
+        round_no += 1
+        outcome = play_one_round(c, round_no)
+        if outcome == "closed":
+            c.sock.close()
+            print("重连中……")
+            time.sleep(2)
+            c = connect_and_login()
+            while c is None:
+                print("服务器未就绪，3s 后重试……")
+                time.sleep(3)
+                c = connect_and_login()
 
 
 if __name__ == "__main__":
