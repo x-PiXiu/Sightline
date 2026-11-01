@@ -25,10 +25,10 @@ SCALE = "2"
 T5R_FRAME = {"bg", "title", "stamp", "lg1", "lg1t", "lg2", "lg2t", "lg3", "lg3t", "lg4", "lg4t",
              "cliHead", "srvHead", "cliLife", "srvLife"}
 T5R_ORDER = {
-    "hist":  ["bgZone", "bgZoneT", "histBox", "histArr", "histUp"],
+    "hist":  ["bgZone", "bgZoneT", "histBox", "histArr", "histUp", "histNote"],
     "rtt":   ["rttArr", "rttArrT"],
-    "seen":  ["snapArr", "snapArrT", "seenBox"],
-    "fire":  ["fireArr", "fireArrT", "fireBox", "nowBox"],
+    "seen":  ["snapArr", "snapArrT", "seenBox", "seenNote"],
+    "fire":  ["fireArr", "fireArrT", "fireBox", "fireNote", "nowBox"],
     "judge": ["judgeBox", "judgeIn1", "judgeIn1T", "judgeIn2", "judgeIn2T", "judgeNote"],
     "clamp": ["clampBox", "clampArr"],
     "pipe":  ["pipeArr", "pipeBox"],
