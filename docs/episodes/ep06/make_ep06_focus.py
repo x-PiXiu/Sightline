@@ -25,16 +25,18 @@ SCALE = "2"
 T5R_FRAME = {"bg", "title", "stamp", "lg1", "lg1t", "lg2", "lg2t", "lg3", "lg3t", "lg4", "lg4t",
              "cliHead", "srvHead", "cliLife", "srvLife"}
 T5R_ORDER = {
-    "bg1":   ["histBox", "histArr", "histUp"],
-    "bg2":   ["rttBox", "rttArr", "rttArrT"],
-    "flow1": ["snapArr", "snapArrT", "seenBox"],
-    "flow2": ["fireArr", "fireArrT", "fireBox", "nowBox"],
-    "axis":  ["axis", "axisPast", "axisNow", "histBar", "judgeTick", "judgeTickT", "snapTick", "snapTickT", "starEq", "clampT"],
-    "pipe":  ["pipeBox", "pipeArr", "feedBox"],
+    "hist":  ["bgZone", "bgZoneT", "histBox", "histArr", "histUp"],
+    "rtt":   ["rttArr", "rttArrT"],
+    "seen":  ["snapArr", "snapArrT", "seenBox"],
+    "fire":  ["fireArr", "fireArrT", "fireBox", "nowBox"],
+    "judge": ["judgeBox", "judgeIn1", "judgeIn1T", "judgeIn2", "judgeIn2T", "judgeNote"],
+    "clamp": ["clampBox", "clampArr"],
+    "pipe":  ["pipeArr", "pipeBox"],
+    "feed":  ["feedArr", "feedBox"],
 }
 T5R_FRAMES = [
-    ("t5r_0", []), ("t5r_1", ["bg1"]), ("t5r_2", ["bg2"]), ("t5r_3", ["flow1"]),
-    ("t5r_4", ["flow2"]), ("t5r_5", ["axis"]), ("t5r_6", ["pipe"]),
+    ("t5r_0", []), ("t5r_1", ["hist"]), ("t5r_2", ["rtt"]), ("t5r_3", ["seen"]),
+    ("t5r_4", ["fire"]), ("t5r_5", ["judge", "clamp"]), ("t5r_6", ["pipe"]), ("t5r_7", ["feed"]),
 ]
 
 
@@ -107,12 +109,12 @@ def render(xml, name):
 
 def main():
     cells = parse_cells(ROOT / "rewind_sequence.drawio")
-    stamp_base = "回溯时序图 · 入镜主图 · 焦点帧 {n}/6 · 2026-11-01"
+    stamp_base = "回溯时序图 · 入镜主图 · 焦点帧 {n}/8 · 2026-11-01"
     for i, (name, groups) in enumerate(T5R_FRAMES):
         stamp = stamp_base.format(n=i)
         xml = wrap(build(cells, T5R_FRAME, T5R_ORDER, groups, stamp), name)
         render(xml, name)
-        print(f"{name} ✓ ({i}/6)")
+        print(f"{name} ✓ ({i}/8)")
 
 
 if __name__ == "__main__":
