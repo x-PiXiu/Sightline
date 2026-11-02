@@ -20,7 +20,8 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
     for (std::size_t i = 0; i < roster.size(); ++i) {
         roster[i].spawnIndex = static_cast<std::uint8_t>(i);   // 出生点 = 名册序（v3 契约规则 7）
         Entity E;
-        E.playerId = roster[i].playerId;                       // 位置先落原点——首个 16 上报覆盖
+        E.playerId = roster[i].playerId;                       // 位置先落原点——首个 19 上报覆盖
+        E.spawnIx = static_cast<std::uint8_t>(i);              // ep07：重生选点回传序号（24 号）
         entities_.push_back(E);
     }
     std::vector<MatchEvent> out;
@@ -32,6 +33,18 @@ void MatchService::SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs) {
     for (Entity& E : entities_)
         if (E.playerId == playerId) { E.shooterRtt = rttMs; return; }
     // 未知 pid：静默忽略（与 UpdateEntity 同纪律）
+}
+
+const Entity* MatchService::EntityById(std::uint32_t pid) const {
+    for (const Entity& E : entities_)
+        if (E.playerId == pid) return &E;
+    return nullptr;
+}
+
+void MatchService::AbortMatch() {                      // ep07：终局中止（❗12——最后真人离开）
+    bActive_ = false;
+    bEnded_ = true;
+    entities_.clear();
 }
 
 std::vector<MatchEvent> MatchService::RemovePlayer(std::uint32_t playerId) {
@@ -55,8 +68,22 @@ bool MatchService::IsActive(std::uint32_t playerId) const {
 void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float z,
                                 float yaw, float pitch, std::uint8_t flags, std::uint32_t seq,
                                 std::uint64_t recvMs) {
+    if (bEnded_) return;                                   // ep07：终局静默（❗5）
     for (Entity& E : entities_) {
         if (E.playerId != playerId) continue;
+        if (E.bDead) {                                     // ep07：死亡冻结（❗13——只推增量基准防旧包堆积）
+            E.lx = x; E.ly = y; E.lz = z;
+            return;
+        }
+        if (E.rebasePending) {                             // ep07：重生握手（❗9）
+            const float dx0 = x - E.spawnX, dy0 = y - E.spawnY;
+            if (dx0 * dx0 + dy0 * dy0 < 100.f * 100.f) {   // 出生点附近首条 → 重定基准放行
+                E.rebasePending = false;
+            } else {
+                E.lx = x; E.ly = y; E.lz = z;              // 在途旧报（死亡位置）→ 忽略
+                return;
+            }
+        }
         if (!E.bHasReport) {
             E.x = x; E.y = y; E.z = z;                       // 首报：权威位=上报位（本地生成点即真值）
             E.bHasReport = true;                             // 实体激活（此后入快照）
@@ -96,14 +123,75 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
     // 未知 pid：不在局者上报无效——静默忽略（服务器的"信任但只转发"不等于"来者不拒"）
 }
 
-std::vector<MatchEvent> MatchService::TickSnapshot() {
+std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;
+    // —— ep07：死亡 → 重生倒计时处理（服务器选点=离最近活敌最远·D7-03）——
+    for (Entity& E : entities_) {
+        if (!E.bDead || nowMs < E.respawnAtMs) continue;
+        E.bDead = false;
+        E.weapon.hp = kMaxHp;
+        E.weapon.magUsed = 0;
+        E.weapon.reloadUntilMs = 0;
+        E.bornAtMs = nowMs;                              // 命中候选过滤锚（❗8）
+        E.invulnUntilMs = nowMs + kInvulnMs;             // 出生保护（D7-03）
+        E.rebasePending = true;                          // 重生握手（❗9）
+        E.histCount = 0; E.histHead = 0;                 // 历史环清空——死前轨迹不得跨越重生（❗8）
+        std::size_t best = 0; float bestD = -1.f;
+        for (std::size_t i = 0; i < geometry_.spawnPoints.size(); ++i) {
+            const auto& sp = geometry_.spawnPoints[i];
+            float dMin = 1e9f;
+            for (const Entity& O : entities_) {
+                if (O.playerId == E.playerId || O.bDead || !O.bHasReport) continue;
+                const float dx = sp.x - O.x, dy = sp.y - O.y;
+                dMin = std::min(dMin, dx * dx + dy * dy);
+            }
+            if (dMin > bestD) { bestD = dMin; best = i; }
+        }
+        if (!geometry_.spawnPoints.empty()) {            // 有合同点：服务器权威落位（人机首报同源）
+            const auto& sp = geometry_.spawnPoints[best];
+            E.x = sp.x; E.y = sp.y; E.z = sp.z;
+            E.yaw = sp.yawDeg;
+            E.spawnIx = static_cast<std::uint8_t>(best);
+        } else {                                          // 无合同点：原位复活（ep05 兼容路径）
+            E.x = E.spawnX = E.lx; E.y = E.spawnY = E.ly; E.z = E.spawnZ = E.lz;
+        }
+        E.spawnX = E.x; E.spawnY = E.y; E.spawnZ = E.z;   // rebase 判定锚（❗9）
+        E.lx = E.x; E.ly = E.y; E.lz = E.z;
+        MatchEvent r;
+        r.type = MatchEvent::Type::Respawn;
+        r.roomId = roomId_;
+        r.respawnPid = E.playerId;
+        r.spawnIndex = E.spawnIx;
+        r.invulnMs = static_cast<std::uint16_t>(kInvulnMs);
+        out.push_back(std::move(r));
+    }
+    // —— ep07：结束判定（真人全部离开由 AbortMatch 直达——此处只管击杀上限）——
+    if (bEnded_ && endReason_ == 0) {                      // 击杀上限已在 Fire 置 bEnded_+reason=1
+        endReason_ = 1;
+    }
+    if (bEnded_ && endReason_ != 0 && snapshotStopAtMs == 0) {
+        snapshotStopAtMs = nowMs + 2000;                   // Ended 事件只发一次：这里补时刻（Abort 直达路径）
+        MatchEvent end;
+        end.type = MatchEvent::Type::Ended;
+        end.roomId = roomId_;
+        end.endReason = endReason_;
+        for (const Entity& E : entities_)
+            end.scores.push_back({E.playerId, static_cast<std::uint16_t>(E.kills),
+                                  static_cast<std::uint16_t>(E.deaths)});
+        out.push_back(std::move(end));
+    }
+    if (bEnded_ && snapshotStopAtMs != 0 && nowMs >= snapshotStopAtMs) {
+        bActive_ = false;                                  // 结算背景 2s 用毕停快照（❗5）
+        return out;
+    }
     MatchEvent E{MatchEvent::Type::Snapshot, roomId_, {}, 0};
     E.entities.reserve(entities_.size());
     for (const Entity& Src : entities_) {
         if (!Src.bHasReport) continue;                       // 未上报者不入快照（避免 (0,0,0) 幻影出生）
-        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, Src.flags, Src.ackedSeq});
+        const std::uint8_t flags2 =
+            static_cast<std::uint8_t>(Src.flags | (Src.bDead ? 0x02 : 0x00));  // bit1=dead（ep07 表现）
+        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, flags2, Src.ackedSeq});
     }
     out.push_back(std::move(E));
     return out;
@@ -135,6 +223,16 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         return out;
     }
 
+    // ⓪ 存活门（ep07）：死亡者开火静默丢（客户端镜像同款）
+    if (shooter->bDead || bEnded_) {
+        MatchEvent ev;
+        ev.type = MatchEvent::Type::FireResult;
+        ev.roomId = roomId_;
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate),
+                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        out.push_back(std::move(ev));
+        return out;
+    }
     // ⑤ hitscan 求交（ep06 回溯）：判定时刻 = 请求到达 − 射手 RTT（钳 kMaxRewindMs·防伪造 ep09 预埋），
     //    目标位姿查其权威位时间线在该时刻的插值——服务器承认射手眼睛看到的世界
     const std::uint64_t judgeAtMs =
@@ -145,13 +243,16 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     others.reserve(entities_.size());
     for (const Entity& E : entities_) {
         if (E.playerId == shooterPid || !E.bHasReport) continue;
+        if (E.bDead) continue;                                   // ep07：死者不入候选（❗4）
+        if (judgeAtMs < E.bornAtMs) continue;                    // ep07：重生前的旧影子打不中（❗8）
+        if (nowMs < E.invulnUntilMs) continue;                   // ep07：无敌期不被命中（出生保护）
         const auto p = SampleHistoryAt(E.history, E.histCount, E.histHead, judgeAtMs);
         if (!p) continue;
         others.push_back({E.playerId, p->x, p->y, p->z});
     }
     const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
 
-    // ⑥ 结算扣血（钳 0 不死——死亡判定 ep07 启用）；顺手捕获受害实体判定时刻位（诊断日志用）
+    // ⑥ 结算扣血（ep07：hp≤0 → 死亡状态机启用）；顺手捕获受害实体判定时刻位（诊断日志用）
     std::uint8_t victimHp = 0;
     float victimX = 0.f, victimY = 0.f, victimZ = 0.f;
     if (v.hit) {
@@ -160,6 +261,24 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
             E.weapon.hp = DamageApply(E.weapon.hp);
             victimHp = static_cast<std::uint8_t>(E.weapon.hp);
             victimX = E.x; victimY = E.y; victimZ = E.z;
+            if (E.weapon.hp <= 0.f && !E.bDead) {                // 死亡状态机（D5-02v2 预埋兑现）
+                E.bDead = true;
+                E.deaths++;
+                shooter->kills++;
+                E.respawnAtMs = nowMs + kRespawnMs;
+                E.rebasePending = true;                          // 重生握手（❗9 预置——落位时确定 spawn 坐标）
+                MatchEvent k;
+                k.type = MatchEvent::Type::Kill;
+                k.roomId = roomId_;
+                k.killVictim = E.playerId;
+                k.killKiller = shooterPid;
+                k.respawnDelayMs = static_cast<std::uint16_t>(kRespawnMs);
+                out.push_back(std::move(k));
+                if (shooter->kills >= kKillLimit && !bEnded_) {  // 结束判定（D7-02）
+                    bEnded_ = true;
+                    endReason_ = 1;                              // Ended 事件由下一拍 Tick 统一产出（比分齐整）
+                }
+            }
             break;
         }
     }

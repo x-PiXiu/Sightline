@@ -40,6 +40,15 @@ struct Entity {
     std::uint8_t histHead = 0;         // 下一写槽（环形覆盖最老）
     std::uint16_t shooterRtt = 0;      // 该玩家上报的 RTT（22 号·1Hz；0=未上报 → 不回溯=ep05 行为）
     std::uint64_t lastRecvMs = 0;      // 上一条 19 号到达时刻（钳制时间版：卡顿后恢复的长间隔诚实位移放行）
+    // —— ep07 死亡/重生状态机 ——
+    bool bDead = false;                // hp≤0 置位（开火门0=存活门；命中候选过滤；快照 flags bit1）
+    std::uint64_t respawnAtMs = 0;     // 死亡→重生时刻（Tick 到期处理）
+    std::uint64_t invulnUntilMs = 0;   // 重生无敌截止（受击不扣血）
+    std::uint64_t bornAtMs = 0;        // 本次出生时刻（命中候选过滤 judgeAt≥bornAt——❗8）
+    bool rebasePending = false;        // 重生握手：忽略在途上报，出生点附近首条重定基准（❗9）
+    float spawnX = 0.f, spawnY = 0.f, spawnZ = 90.f;  // 最近一次落点（rebase 判定锚）
+    std::uint8_t spawnIx = 0;          // 出生点序（24 号回传——客户端 Spawn_{n+1} 同源落位）
+    std::uint32_t kills = 0, deaths = 0;  // 比分（结算 25 号载荷源）
 };
 
 /** 快照项（17 载荷的一行） */
@@ -73,14 +82,29 @@ struct FireResultData {
     std::uint16_t rewindMs = 0;                // ep06：本次回溯量 now−judgeAt（0=不回溯；KPI 分桶+日志动画数据源）
 };
 
+struct ScoreRow {                          // ep07：结算行（25 号载荷源）
+    std::uint32_t playerId = 0;
+    std::uint16_t kills = 0;
+    std::uint16_t deaths = 0;
+};
+
 struct MatchEvent {
-    enum class Type { MatchStart, EntityLeave, Snapshot, FireResult };
+    enum class Type { MatchStart, EntityLeave, Snapshot, FireResult,
+                      Kill, Respawn, Ended };   // ep07：+三态
     Type type;
     std::uint32_t roomId = 0;
     std::vector<RosterEntry> roster;      // MatchStart：全员名册
     std::uint32_t leavePlayerId = 0;      // EntityLeave
     std::vector<EntitySnapshot> entities; // Snapshot：在局实体全量（按接收者滤自己）
     FireResultData fire;                  // FireResult
+    // —— ep07 ——
+    std::uint32_t killVictim = 0, killKiller = 0;      // Kill（23 号）
+    std::uint16_t respawnDelayMs = 0;                  // Kill（倒计时下发·ep08 进数值表零改动）
+    std::uint32_t respawnPid = 0;                      // Respawn（24 号）
+    std::uint8_t spawnIndex = 0;                       // Respawn（落点序·客户端 Spawn_{n+1} 同源）
+    std::uint16_t invulnMs = 0;                        // Respawn（无敌窗）
+    std::uint8_t endReason = 0;                        // Ended（1=击杀上限 2=真人全离）
+    std::vector<ScoreRow> scores;                      // Ended（结算比分）
 };
 
 class MatchService {
@@ -103,8 +127,18 @@ public:
                       float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0,
                       std::uint64_t recvMs = 0);   // ep06：接收时刻（单钟·历史环时间戳）
 
-    /** 每帧驱动 tick 调用：在局则返回一条 Snapshot 事件（全员实体，FrameWriter 按接收者滤自己） */
-    std::vector<MatchEvent> TickSnapshot();
+    /** 每帧驱动 tick 调用（ep07：时间注入——快照+死亡倒计时+重生+结束判定统一在此）：
+     *  在局则返回 Snapshot/Kill/Respawn/Ended 事件（FrameWriter 按接收者翻译） */
+    std::vector<MatchEvent> Tick(std::uint64_t nowMs);
+
+    /** ep07：终局中止（最后真人离开❗12——立即停用+清场，无事件） */
+    void AbortMatch();
+
+    /** ep07：只读访问（BotBrain 感知/驱动器组装视图用——域内只读，无绕过写口） */
+    const std::vector<Entity>& Entities() const { return entities_; }
+    const MapGeometry& Geometry() const { return geometry_; }
+    bool IsEnded() const { return bEnded_; }
+    const Entity* EntityById(std::uint32_t pid) const;
 
     // —— M5：开火裁决（D5 系列；几何合同=构建期烘焙注入，拒绝运行时上报）——
     /** 装配注入：main 启动时经 MapGeometryLoader 读几何合同后调用（缺失=空表，兼容无图环境） */
@@ -121,6 +155,10 @@ private:
     std::uint32_t roomId_ = 0;
     bool bActive_ = false;
     MapGeometry geometry_;                 // 几何合同（构建期烘焙注入；缺省=空遮挡+默认胶囊 40/90）
+    bool bEnded_ = false;                  // ep07：终局置位（Fire/UpdateEntity 静默丢）
+    std::uint8_t endReason_ = 0;
+    std::uint64_t snapshotStopAtMs = 0;    // ep07：Ended 后保留快照 2s（结算面板背景）再停
+    Entity* FindEntity(std::uint32_t pid);             // 内部查找（非 const 版复用）
 };
 
 } // namespace sightline::match

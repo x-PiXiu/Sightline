@@ -37,12 +37,18 @@ std::vector<Event> LobbyService::LeaveInternal(int fd) {
 
     if (room.empty()) {
         rooms_.erase(roomId);                           // 人数归 0 → 解散
+        for (auto it2 = bots_.begin(); it2 != bots_.end();) {   // ep07：席位随房清（❗12）
+            if (it2->roomId == roomId) it2 = bots_.erase(it2);
+            else ++it2;
+        }
+        roomInMatch_.erase(roomId);
     } else {
         // 房内推送：房主 = memberFds 首位（房主转移由"按加入顺序"自动成立）
         Event st{EvType::RoomStatePush};
         st.roomId = roomId;
         st.hostName = playersByFd_.at(room.memberFds.front()).name;
         for (int m : room.memberFds) st.members.push_back(playersByFd_.at(m).name);
+    for (const auto& b : bots_) if (b.roomId == roomId) st.members.push_back(b.name);   // ep07：人机上榜
         out.push_back(std::move(st));
     }
     // 人数变化/房间解散 → 大厅列表刷新（推给所有大厅订阅者）
@@ -57,7 +63,9 @@ std::vector<RoomBrief> LobbyService::Snapshot() const {
     std::vector<RoomBrief> out;
     out.reserve(rooms_.size());
     for (const auto& [id, room] : rooms_) {
-        out.push_back({room.roomId, room.name, room.memberFds.size(),
+        size_t cnt = room.memberFds.size();
+        for (const auto& b : bots_) if (b.roomId == room.roomId) ++cnt;   // ep07：人机占席计入
+        out.push_back({room.roomId, room.name, cnt,
                        playersByFd_.at(room.memberFds.front()).name});
     }
     return out;
@@ -70,6 +78,7 @@ std::vector<Event> LobbyService::RoomStateAndList(uint32_t roomId) {
     st.roomId = roomId;
     st.hostName = playersByFd_.at(room.memberFds.front()).name;
     for (int m : room.memberFds) st.members.push_back(playersByFd_.at(m).name);
+    for (const auto& b : bots_) if (b.roomId == roomId) st.members.push_back(b.name);   // ep07：人机上榜
     out.push_back(std::move(st));
     Event list{EvType::RoomListPush};
     list.rooms = Snapshot();
@@ -223,6 +232,48 @@ int LobbyService::PlayerIdByFd(int fd) const {
     return pit == playersByFd_.end() ? -1 : static_cast<int>(pit->second.playerId);
 }
 
+// —— ep07：人机席位 ——
+int LobbyService::AddBot(uint32_t roomId) {
+    auto it = rooms_.find(roomId);
+    if (it == rooms_.end()) return -1;
+    auto& room = it->second;
+    size_t botCount = 0;
+    for (const auto& b : bots_) if (b.roomId == roomId) ++botCount;
+    if (room.memberFds.size() + botCount >= kMaxRoomMembers) return -1;   // 4 人上限（人机占席）
+    if (RoomInMatch(roomId)) return -1;                                // 对局中不加人
+    const uint32_t pid = nextPlayerId_++;                              // fd=-1：无连接（天然收不到 S2C）
+    bots_.push_back({pid, "Bot", roomId});
+    return static_cast<int>(pid);
+}
+
+std::vector<Event> LobbyService::RemoveBot(uint32_t botPid) {
+    std::vector<Event> out;
+    for (auto it = bots_.begin(); it != bots_.end(); ++it)
+        if (it->playerId == botPid) {
+            const uint32_t roomId = it->roomId;
+            bots_.erase(it);
+            if (rooms_.count(roomId)) out = RoomStateAndList(roomId);   // 成员变化 → 标准推送
+            return out;
+        }
+    return out;
+}
+
+bool LobbyService::IsBot(uint32_t pid) const {
+    for (const auto& b : bots_) if (b.playerId == pid) return true;
+    return false;
+}
+
+bool LobbyService::HasRoom(uint32_t roomId) const { return rooms_.count(roomId) != 0; }
+
+void LobbyService::SetRoomInMatch(uint32_t roomId, bool inMatch) {
+    if (rooms_.count(roomId)) roomInMatch_[roomId] = inMatch;
+}
+
+bool LobbyService::RoomInMatch(uint32_t roomId) const {
+    auto it = roomInMatch_.find(roomId);
+    return it != roomInMatch_.end() && it->second;
+}
+
 std::vector<RoomMemberInfo> LobbyService::RoomRoster(uint32_t roomId) const {
     std::vector<RoomMemberInfo> out;
     const auto roomIt = rooms_.find(roomId);
@@ -232,6 +283,8 @@ std::vector<RoomMemberInfo> LobbyService::RoomRoster(uint32_t roomId) const {
         const auto pit = playersByFd_.find(fd);
         if (pit != playersByFd_.end()) out.push_back({pit->second.playerId, pit->second.name});
     }
+    for (const auto& b : bots_)                          // ep07：人机排尾部（名册序=出生点序的延续）
+        if (b.roomId == roomId) out.push_back({b.playerId, b.name});
     return out;
 }
 

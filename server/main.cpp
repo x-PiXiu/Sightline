@@ -182,7 +182,8 @@ int main() {
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
-    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer};
+    adapters::BotDriver botDriver;                        // ep07：人机驱动（主线程单线程·零锁）
+    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver};
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
@@ -225,7 +226,12 @@ int main() {
             }
         }
         writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
-        writer.deliverMatch(match.TickSnapshot());           // 33ms 实体快照广播（17v2，不含自机）
+        botDriver.Tick(nowMs(), match, lobby);               // ep07：人机 感知→决策→行动（同真人入口）
+        auto matchEvents = match.Tick(nowMs());              // ep07：快照+死亡倒计时+重生+结束判定
+        for (const auto& e : matchEvents)
+            if (e.type == sightline::match::MatchEvent::Type::Ended)
+                lobby.SetRoomInMatch(e.roomId, false);       // 终局过桥复位（对局中拒 JOIN 解除）
+        writer.deliverMatch(matchEvents);                    // 33ms 实体快照广播（17v2，不含自机）
 
         // 子 reactor 状态行：首拍一行（开机自证"帧循环在跑、计数管线通"）+ 计数变化才再落行——
         // 空闲零噪音，连接进出/均分变化各有存照（逐连接明细另有 新连接/连接关闭 行，此行只管账面）

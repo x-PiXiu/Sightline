@@ -2,6 +2,9 @@
 // 不起网络：喂查询/请求，断言事件与名册（整洁架构体检第 3 条）
 // 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp -o /tmp/test_match && /tmp/test_match
 #include "match/match_service.h"
+#include "match/nav_grid.h"
+#include "match/perception.h"
+#include "match/bot_brain.h"
 #include "match/fire_judge.h"
 #include "adapters/map_geometry.h"
 #include "lobby/lobby.h"
@@ -77,7 +80,7 @@ int main() {
     m.UpdateEntity(301, 100.f, 200.f, 150.f, 45.f, -10.f, 0x01);
     m.UpdateEntity(302, 300.f, 400.f, 150.f, -90.f, 20.f, 0x00);
     m.UpdateEntity(999, 1.f, 1.f, 1.f, 0.f, 0.f, 0x00);     // 不在局：静默忽略
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev.size() == 1);
     CHECK(ev[0].type == MatchEvent::Type::Snapshot && ev[0].roomId == 11);
     CHECK(ev[0].entities.size() == 2);
@@ -88,21 +91,21 @@ int main() {
     CHECK(ev[0].entities[1].playerId == 302 && ev[0].entities[1].flags == 0x00);
     ev = m.RemovePlayer(301);                               // 离场后快照不再含 301
     CHECK(ev.size() == 1 && ev[0].type == MatchEvent::Type::EntityLeave);
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev.size() == 1 && ev[0].entities.size() == 1 && ev[0].entities[0].playerId == 302);
 
     stage("M6 补丁：未上报实体不入快照（防 (0,0,0) 幻影出生）");
     std::vector<RosterEntry> roster4 = {{401, "甲", 0}, {402, "乙", 0}};
     ev = m.StartMatch(21, roster4);
     CHECK(ev.size() == 1);
-    ev = m.TickSnapshot();                                  // 双双未上报：快照为空
+    ev = m.Tick(1000);                                  // 双双未上报：快照为空
     CHECK(ev.size() == 1 && ev[0].entities.empty());
     m.UpdateEntity(401, 10.f, 20.f, 30.f, 0.f, 0.f, 0x00);  // 只有甲上报
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev.size() == 1 && ev[0].entities.size() == 1);
     CHECK(ev[0].entities[0].playerId == 401);               // 乙仍未上报：不出现
     CHECK(m.RemovePlayer(402).size() == 1);                 // 未上报者也可离场
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev.size() == 1 && ev[0].entities.size() == 1
           && ev[0].entities[0].playerId == 401);            // 乙离场后：快照只剩甲
 
@@ -116,7 +119,7 @@ int main() {
     m.UpdateEntity(501, 16.5f, 0.f, 100.f, 90.f, 0.f, 0x00, 2);
     // 超界路径：瞬移声明 400uu → 钳回界上（保方向弃模长）
     m.UpdateEntity(502, 400.f, 0.f, 100.f, 0.f, 0.f, 0x00, 2);
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev.size() == 1 && ev[0].entities.size() == 2);
     CHECK(ev[0].entities[0].playerId == 501);
     CHECK(ev[0].entities[0].x == 16.5f && ev[0].entities[0].ackedSeq == 2);
@@ -126,7 +129,7 @@ int main() {
     CHECK(ev[0].entities[1].ackedSeq == 2);
     // 越序输入：seq 回退不改 ackedSeq；位移 3.5uu 诚实照算（权威继续跟声明轨迹）
     m.UpdateEntity(501, 20.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1);
-    ev = m.TickSnapshot();
+    ev = m.Tick(1000);
     CHECK(ev[0].entities[0].ackedSeq == 2);                 // 只进不退
     CHECK(ev[0].entities[0].x == 20.f);
 
@@ -327,16 +330,190 @@ int main() {
         cm.UpdateEntity(30, 0.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1, 1000);            // 首报
         // 冻结 500ms 恢复：gap=1、位移 200uu、到达间隔 500ms → 时间版 bound=500 → 放行（不钳）
         cm.UpdateEntity(30, 200.f, 0.f, 100.f, 0.f, 0.f, 0x00, 2, 1500);
-        auto ev1 = cm.TickSnapshot();
+        auto ev1 = cm.Tick(1000);
         CHECK(ev1.size() == 1 && ev1[0].entities[0].x == 200.f);                  // 诚实位移原样入权威
         // 时间版 cap：间隔 2s → cap 0.6s → bound 600；位移 800uu → 钳 600 → 权威=800（防瞬移）
         cm.UpdateEntity(30, 1000.f, 0.f, 100.f, 0.f, 0.f, 0x00, 3, 3500);
-        auto ev2 = cm.TickSnapshot();
+        auto ev2 = cm.Tick(1000);
         CHECK(ev2.size() == 1 && std::fabs(ev2[0].entities[0].x - 800.f) < 0.01f);
         // seq 版回归：recvMs=0（旧签名路径）瞬移 400uu → 照旧钳 100
         cm.UpdateEntity(30, 1200.f, 0.f, 100.f, 0.f, 0.f, 0x00, 4);               // 无 recvMs
-        auto ev3 = cm.TickSnapshot();
+        auto ev3 = cm.Tick(1000);
         CHECK(ev3.size() == 1 && std::fabs(ev3[0].entities[0].x - 900.f) < 0.01f);// 800+100=界上
+    }
+
+    // —— ep07 死亡/重生/结算/导航/感知/人机脑 ——
+    stage("ep07 死亡状态机：4 枪击杀/Kill 事件/死亡门/死者不入候选/重生满血/无敌/历史清/握手");
+    {
+        MatchService dm;
+        std::vector<RosterEntry> rs{{40, "s", 0}, {41, "v", 1}};
+        dm.StartMatch(1, rs);
+        dm.SetGeometry(MapGeometry{});
+        dm.UpdateEntity(40, 0, 0, 90, 0, 0, 0, 1, 1000);
+        dm.UpdateEntity(41, 200, 0, 90, 180, 0, 0, 1, 1000);
+        std::uint64_t now = 1000;
+        std::uint64_t lastFireAt = 0;
+        bool sawKill = false;
+        for (int i = 0; i < 4; ++i) {
+            now += 200;
+            dm.UpdateEntity(40, 0, 0, 90, 0, 0, 0, static_cast<std::uint32_t>(2 + i), now);
+            lastFireAt = now + 10;
+            auto ev = dm.Fire(40, now + 10);
+            bool fired = false;
+            for (const auto& e : ev) {
+                if (e.type == MatchEvent::Type::Kill) {
+                    sawKill = true;
+                    CHECK(e.killVictim == 41 && e.killKiller == 40 && e.respawnDelayMs == 3000);
+                }
+                if (e.type == MatchEvent::Type::FireResult) fired = true;
+            }
+            CHECK(fired);
+        }
+        CHECK(sawKill);
+        auto d40 = dm.EntityById(40), d41 = dm.EntityById(41);
+        CHECK(d40 && d41);
+        CHECK(d41->bDead && d41->deaths == 1 && d40->kills == 1);
+        CHECK(d41->respawnAtMs == lastFireAt + 3000);   // Kill 时刻 = 第 4 发 Fire 时刻
+        // 死者开火：静默拒绝（FireResult bAccepted=false）
+        now += 100;
+        dm.UpdateEntity(41, 200, 0, 90, 180, 0, 0, 2, now);
+        auto dead = dm.Fire(41, now);
+        CHECK(dead.size() == 1 && !dead[0].fire.bAccepted);
+        // 死者不入候选：40 打 41 原位 → miss
+        now += 100;
+        dm.UpdateEntity(40, 0, 0, 90, 0, 0, 0, 8, now);
+        auto miss = dm.Fire(40, now);
+        CHECK(miss.size() == 1 && miss[0].fire.bHit == false);
+        // 重生倒计时：Tick 到期 → Respawn（无合同点=原位复活回退路径）
+        now += 4000;
+        auto evr = dm.Tick(now);
+        bool sawRespawn = false;
+        for (const auto& e : evr) {
+            if (e.type == MatchEvent::Type::Respawn) {
+                sawRespawn = true;
+                CHECK(e.respawnPid == 41 && e.invulnMs == 2000);
+            }
+        }
+        CHECK(sawRespawn);
+        d41 = dm.EntityById(41);
+        CHECK(d41 && !d41->bDead && d41->weapon.hp == 100.f && d41->invulnUntilMs > now);
+        CHECK(d41->histCount == 0 && d41->bornAtMs == now);
+        // 无敌期不被命中（候选过滤）
+        auto inv = dm.Fire(40, now);
+        CHECK(inv.size() == 1 && inv[0].fire.bHit == false);
+        // 重生握手：出生点附近首条放行（原位复活=锚=死亡位）
+        now += 100;
+        dm.UpdateEntity(41, 200, 0, 90, 180, 0, 0, 3, now);
+        auto d41b = dm.EntityById(41);
+        CHECK(d41b && !d41b->rebasePending);
+    }
+    stage("ep07 终局：10 杀 Ended（原因 1·比分两行）/终局静默/AbortMatch");
+    {
+        MatchService em;
+        std::vector<RosterEntry> rs{{50, "a", 0}, {51, "b", 1}};
+        em.StartMatch(2, rs);
+        em.SetGeometry(MapGeometry{});
+        std::uint64_t now = 1000;
+        std::uint32_t seqA = 1, seqB = 1;
+        bool sawEnded = false;
+        for (int round = 0; round < 12; ++round) {
+            now += 5000;
+            auto tev = em.Tick(now);                 // Ended 由 Tick 统一产出（Fire 只置位）
+            for (const auto& e : tev)
+                if (e.type == MatchEvent::Type::Ended) {
+                    sawEnded = true;
+                    CHECK(e.endReason == 1 && e.scores.size() == 2);
+                }
+            now += 2100;
+            em.UpdateEntity(50, 0, 0, 90, 0, 0, 0, ++seqA, now);
+            em.UpdateEntity(51, 200, 0, 90, 180, 0, 0, ++seqB, now);
+            for (int i = 0; i < 4; ++i) {
+                now += 150;
+                em.UpdateEntity(50, 0, 0, 90, 0, 0, 0, ++seqA, now);
+                auto ev = em.Fire(50, now);
+                for (const auto& e : ev)
+                    if (e.type == MatchEvent::Type::Ended) {
+                        sawEnded = true;
+                        CHECK(e.endReason == 1 && e.scores.size() == 2);
+                    }
+            }
+            if (sawEnded) break;
+        }
+        CHECK(sawEnded);
+        CHECK(em.IsEnded());
+        now += 100;
+        em.UpdateEntity(50, 0, 0, 90, 0, 0, 0, ++seqA, now);
+        auto after = em.Fire(50, now);
+        CHECK(after.size() == 1 && !after[0].fire.bAccepted);
+        em.AbortMatch();
+        CHECK(!em.IsActive(50));
+    }
+    stage("ep07 导航栅格：地板排除/墙 blocked/绕墙路径/围死不可达");
+    {
+        OccluderTable occ;
+        OccluderBox floor; floor.cx = 0; floor.cy = 0; floor.cz = -200.5f;
+        floor.hx = 2000; floor.hy = 2000; floor.hz = 200;
+        occ.boxes.push_back(floor);
+        OccluderBox wall; wall.cx = 1507; wall.cy = -777; wall.cz = 49;
+        wall.hx = 25; wall.hy = 206; wall.hz = 212.5;
+        occ.boxes.push_back(wall);
+        const NavGrid g = BuildNavGrid(occ);
+        CHECK(!g.Blocked(g.CellIx(0.f), g.CellIy(0.f)));
+        CHECK(g.Blocked(g.CellIx(1507.f), g.CellIy(-777.f)));
+        auto path = FindPath(g, 0.f, -777.f, 1800.f, -777.f);
+        CHECK(path.has_value() && path->size() >= 3);
+        bool crossBlocked = false;
+        for (const auto& p : *path)
+            if (g.Blocked(g.CellIx(p.x), g.CellIy(p.y))) crossBlocked = true;
+        CHECK(!crossBlocked);
+        OccluderTable box;
+        auto addWall = [&](float x, float y, float hx, float hy) {
+            OccluderBox w2; w2.cx = x; w2.cy = y; w2.cz = 90; w2.hx = hx; w2.hy = hy; w2.hz = 180;
+            box.boxes.push_back(w2);
+        };
+        addWall(500, 500, 200, 25); addWall(500, 900, 200, 25);
+        addWall(300, 700, 25, 200); addWall(700, 700, 25, 200);
+        const NavGrid g2 = BuildNavGrid(box);
+        auto none = FindPath(g2, 0.f, 0.f, 500.f, 700.f);
+        CHECK(!none.has_value());
+    }
+    stage("ep07 感知：无墙可见/墙后不可见（复用 fire_judge 求交=所见即所及）");
+    {
+        OccluderTable occ;
+        OccluderBox wall; wall.cx = 1507; wall.cy = -777; wall.cz = 49;
+        wall.hx = 25; wall.hy = 206; wall.hz = 212.5;
+        occ.boxes.push_back(wall);
+        CHECK(CanSee(occ, Vec3{800, -777, 90}, 0.f, Vec3{1200, -777, 150}));
+        CHECK(!CanSee(occ, Vec3{800, -777, 90}, 0.f, Vec3{1800, -777, 150}));
+    }
+    stage("ep07 BotBrain FSM：发现→Engage 开火/背对不射/丢视线 Search/遗忘 Patrol/低血 Cover");
+    {
+        BotState st = BotState::Patrol;
+        BotMemory m;
+        BotTuning t;
+        BotWorldView w;
+        w.self = {0, 0, 90, 0, 100, 0, false};
+        w.patrolTarget = Vec2{300, -300};
+        auto i0 = Decide(w, st, m, 1000, t);
+        CHECK(st == BotState::Patrol && i0.hasMove);
+        w.visible = SeenEnemy{2, 500.f, 0.f, 500.f};
+        auto i1 = Decide(w, st, m, 1100, t);
+        CHECK(st == BotState::Engage && !i1.bFire);   // 看见那一拍只切状态（反应延迟语义）
+        auto i1b = Decide(w, st, m, 1133, t);          // 下一拍：对准（aim 0±4°·delta≤6）→ 开火
+        CHECK(i1b.bFire);
+        w.self.yaw = 180.f;                            // 背对目标
+        auto i2 = Decide(w, st, m, 1200, t);
+        CHECK(!i2.bFire && !i2.hasMove);               // 不射（未对准）·不追（500<900 射程内）
+        w.self.yaw = 0.f;
+        w.visible.reset();
+        Decide(w, st, m, 1300, t);
+        CHECK(st == BotState::Search);
+        Decide(w, st, m, 1300 + 3001, t);
+        CHECK(st == BotState::Patrol);
+        w.visible = SeenEnemy{2, 500.f, 0.f, 500.f};
+        w.self.hp = 20.f;
+        auto i3 = Decide(w, st, m, 1300 + 3100, t);
+        CHECK(st == BotState::TakeCover && i3.hasMove);
     }
 
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";

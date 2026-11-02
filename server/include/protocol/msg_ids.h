@@ -31,6 +31,13 @@ namespace protocol {
         MSG_C2S_FIRE            = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
         MSG_S2C_FIRE_RESULT     = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B——房内全员广播（含射手）
         MSG_C2S_RTT_REPORT      = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
+        // —— 第 7 期：死亡/重生/结算 + 人机席位（v4.4）——
+        MSG_S2C_KILL            = 23, // S→C  [4B victimPid][4B killerPid][2B respawnDelayMs]=10B——房内全员广播（击杀播报+比分源）
+        MSG_S2C_RESPAWN         = 24, // S→C  [4B pid][1B spawnIndex][2B invulnMs]=7B——服务器选点下发序号（客户端复用 Spawn_{n+1} 落位）
+        MSG_S2C_MATCH_END       = 25, // S→C  [1B 原因][1B n]{[4B pid][2B kills][2B deaths]}×8n+2——对局结束+结算比分
+        MSG_C2S_BOT_ADD         = 26, // C→S  [1B 难度]——仅房主（满 4 人拒绝）
+        MSG_C2S_BOT_REMOVE      = 27, // C→S  [4B botPid]——仅房主
+        // 9 号 JOIN_RESULT 码表 +5 = 对局进行中（对局中拒 JOIN）
     };
 
 } // namespace protocol

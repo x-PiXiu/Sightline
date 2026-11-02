@@ -94,6 +94,27 @@ inline std::optional<sightline::match::MapGeometry> ParseMapGeometry(std::string
             }
         }
     }
+    // —— ep07 地图合同 v2：spawnPoints/patrolPoints（可选字段——缺省=空表降级，调用方回退场心）——
+    if (root.contains("spawnPoints")) {
+        const auto& sp = root["spawnPoints"];
+        if (!sp.is_array()) return std::nullopt;
+        for (const auto& pt : sp) {
+            if (!pt.is_object() || !pt.contains("pos") || !finite3(pt["pos"])) return std::nullopt;
+            sightline::match::SpawnPoint s;
+            s.x = pt["pos"][0].get<float>(); s.y = pt["pos"][1].get<float>(); s.z = pt["pos"][2].get<float>();
+            if (pt.contains("yawDeg") && pt["yawDeg"].is_number()) s.yawDeg = pt["yawDeg"].get<float>();
+            out.spawnPoints.push_back(s);
+        }
+    }
+    if (root.contains("patrolPoints")) {
+        const auto& pp = root["patrolPoints"];
+        if (!pp.is_array()) return std::nullopt;
+        for (const auto& pt : pp) {
+            if (!pt.is_object() || !pt.contains("pos") || !finite3(pt["pos"])) return std::nullopt;
+            out.patrolPoints.push_back({pt["pos"][0].get<float>(), pt["pos"][1].get<float>(), pt["pos"][2].get<float>()});
+        }
+    }
+    // "nav" 参数（cellCm/stepCm 等）本期住 nav_grid.h 常量——JSON 可带但忽略（向前兼容占位）
     return out;
 }
 

@@ -126,6 +126,37 @@ public:
                 LOG_INFO("[出站] ENTITY_LEAVE pid=" + std::to_string(e.leavePlayerId));
                 break;
             }
+            case MT::Kill: {                       // ep07：23 号击杀事件（房内全员·播报+比分源）
+                const std::string p = sightline::wire::KillMsg{
+                    e.killVictim, e.killKiller, e.respawnDelayMs}.Encode();
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    send(fd, protocol::MSG_S2C_KILL, p);
+                LOG_INFO("[出站] KILL victim=" + std::to_string(e.killVictim) +
+                         " killer=" + std::to_string(e.killKiller));
+                break;
+            }
+            case MT::Respawn: {                    // ep07：24 号重生（spawnIndex 下发——Spawn_{n+1} 同源落位）
+                const std::string p = sightline::wire::RespawnMsg{
+                    e.respawnPid, e.spawnIndex, e.invulnMs}.Encode();
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    send(fd, protocol::MSG_S2C_RESPAWN, p);
+                LOG_INFO("[出站] RESPAWN pid=" + std::to_string(e.respawnPid) +
+                         " spawnIx=" + std::to_string(e.spawnIndex));
+                break;
+            }
+            case MT::Ended: {                      // ep07：25 号结算（比分行）
+                sightline::wire::MatchEndMsg msg;
+                msg.reason = e.endReason;
+                for (const auto& r : e.scores)
+                    msg.rows.push_back({r.playerId, r.kills, r.deaths});
+                const std::string p = msg.Encode();
+                for (int fd : lobby_.RoomMemberFds(e.roomId))
+                    send(fd, protocol::MSG_S2C_MATCH_END, p);
+                LOG_INFO("[出站] MATCH_END 房=" + std::to_string(e.roomId) +
+                         " 原因=" + std::to_string(e.endReason) + " 行数=" +
+                         std::to_string(msg.rows.size()));
+                break;
+            }
             case MT::Snapshot: {
                 // 按接收者编码。v4.1（M3b 和解对账）：**含接收者自己**——自实体的权威位+ackedSeq
                 // 即客户端回滚/重放的对账基准（R12 权威收回后，自实体=老师批改后的标准答案）；

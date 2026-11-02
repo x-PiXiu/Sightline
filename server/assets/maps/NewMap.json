@@ -2,8 +2,93 @@
   "map": "NewMap",
   "unit": "cm",
   "occluders": [
-    { "primitives": [ { "type": "box", "pos": [-0.00, 0.00, -200.50], "size": [4000.00, 4000.00, 200.00], "yawDeg": 0.00 } ] },
-    { "primitives": [ { "type": "box", "pos": [1507.00, -777.00, 49.00], "size": [50.00, 412.50, 425.00], "yawDeg": 0.00 } ] }
+    {
+      "primitives": [
+        {
+          "type": "box",
+          "pos": [
+            -0.0,
+            0.0,
+            -200.5
+          ],
+          "size": [
+            4000.0,
+            4000.0,
+            200.0
+          ],
+          "yawDeg": 0.0
+        }
+      ]
+    },
+    {
+      "primitives": [
+        {
+          "type": "box",
+          "pos": [
+            1507.0,
+            -777.0,
+            49.0
+          ],
+          "size": [
+            50.0,
+            412.5,
+            425.0
+          ],
+          "yawDeg": 0.0
+        }
+      ]
+    }
   ],
-  "entityHitbox": { "radius": 34.00, "halfHeight": 88.00 }
+  "entityHitbox": {
+    "radius": 34.0,
+    "halfHeight": 88.0
+  },
+  "version": 2,
+  "spawnPoints": [
+    {
+      "pos": [
+        442.0,
+        -474.0,
+        90.0
+      ],
+      "yawDeg": 133.0
+    },
+    {
+      "pos": [
+        820.0,
+        -820.0,
+        90.0
+      ],
+      "yawDeg": -47.0
+    }
+  ],
+  "patrolPoints": [
+    {
+      "pos": [
+        1050.0,
+        -820.0,
+        90.0
+      ]
+    },
+    {
+      "pos": [
+        200.0,
+        -1200.0,
+        90.0
+      ]
+    },
+    {
+      "pos": [
+        1200.0,
+        -200.0,
+        90.0
+      ]
+    }
+  ],
+  "nav": {
+    "cellCm": 50,
+    "stepCm": 45,
+    "bodyTopCm": 176,
+    "inflateCm": 34
+  }
 }

@@ -12,14 +12,16 @@
 #include "match/match_service.h"
 #include "protocol/messages.h"   // v4 wire 结构体（variant 编解码——业务层禁 include，红线见 messages.h）
 #include "protocol/msg_ids.h"
+#include "adapters/bot_driver.h"
 
 namespace adapters {
 
 class MatchWiring {
 public:
     MatchWiring(MessageDispatcher& disp, sightline::match::MatchService& match,
-                sightline::lobby::LobbyService& lobby, FrameWriter& writer)
-        : disp_(disp), match_(match), lobby_(lobby), writer_(writer) {}
+                sightline::lobby::LobbyService& lobby, FrameWriter& writer,
+                BotDriver* bot = nullptr)
+        : disp_(disp), match_(match), lobby_(lobby), writer_(writer), bot_(bot) {}
 
     void Register() {
         // 19：位置上报 v2（v4 R10——对局期内替代 16）——Parse 集中校验（messages.h 唯一长度守门）
@@ -113,10 +115,43 @@ public:
                 LOG_INFO("[开始对局] 拒绝：fd=" + std::to_string(fd) + " 非房主");
                 return;
             }
-            std::vector<sightline::match::RosterEntry> entries;   // 名册序 = 出生点序
+            std::vector<sightline::match::RosterEntry> entries;   // 名册序 = 出生点序（含 ep07 人机席位·排尾）
             for (const auto& m : lobby_.RoomRoster(roomId))
                 entries.push_back({m.playerId, m.name, 0});
-            writer_.deliverMatch(match_.StartMatch(roomId, std::move(entries)));
+            lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
+            writer_.deliverMatch(match_.StartMatch(roomId, entries));
+            if (bot_) bot_->OnMatchStart(roomId, entries, match_.Geometry(), match_, NowMs());
+        });
+        // 26/27：人机席位指令（仅房主——D2-11 同款校验线）
+        disp_.on(protocol::MSG_C2S_BOT_ADD, "添加人机",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            const auto msg = sightline::wire::BotAddMsg::Parse(bytes);
+            if (!msg) return;
+            uint32_t roomId = 0;
+            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) return;
+            const int pid = lobby_.AddBot(roomId);
+            if (pid < 0) {
+                LOG_WARNING("[人机] 添加失败（房间满/对局中）房=" + std::to_string(roomId));
+                return;
+            }
+            if (bot_) bot_->OnBotAdded(roomId, static_cast<uint32_t>(pid), "Bot", msg->difficulty);
+            writer_.deliver(lobby_.RoomStateAndList(roomId));
+            LOG_INFO("[人机] 已添加 房=" + std::to_string(roomId) + " pid=" + std::to_string(pid));
+        });
+        disp_.on(protocol::MSG_C2S_BOT_REMOVE, "移除人机",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            const auto msg = sightline::wire::BotRemoveMsg::Parse(bytes);
+            if (!msg) return;
+            uint32_t roomId = 0;
+            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) return;
+            if (!lobby_.IsBot(msg->botPid)) return;
+            writer_.deliver(lobby_.RemoveBot(msg->botPid));
+            if (bot_) bot_->RemoveBot(msg->botPid);
+            LOG_INFO("[人机] 已移除 pid=" + std::to_string(msg->botPid));
         });
 
         // 10 的对局侧钩子（仅对局离场；大厅离开逻辑仍在 wireLobby 的 10 号处理器里）
@@ -128,6 +163,11 @@ public:
     void HandleDisconnect(int fd) { HandleMemberGone(fd); }
 
 private:
+    static std::uint64_t NowMs() {
+        return static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
     // fd → PlayerId 翻译 → 对局离场（不在局则空转）
     void HandleMemberGone(int fd) {
         const int pid = lobby_.PlayerIdByFd(fd);
@@ -136,6 +176,7 @@ private:
     }
 
     MessageDispatcher& disp_;
+    BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）
     sightline::match::MatchService& match_;
     sightline::lobby::LobbyService& lobby_;
     FrameWriter& writer_;

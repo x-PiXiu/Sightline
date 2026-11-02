@@ -33,7 +33,18 @@ inline constexpr float        kDefaultHitboxHalfH  = 90.f;
 inline constexpr std::size_t  kMaxOccluders       = 64;      // 几何合同数量上限（loader 校验）
 inline constexpr std::uint64_t kMaxRewindMs       = 1000;    // ep06：回溯硬上限（D6-04·防伪造高 RTT=ep09 预埋；窗口 32 槽 1.07s > 上限）
 inline constexpr int           kEntityHistoryCap  = 32;      // ep06：权威位时间线窗（32×1/30s≈1.07s > 上限 1000ms）
+inline constexpr std::uint64_t kRespawnMs         = 3000;    // ep07：死亡→重生倒计时（服务器权威）
+inline constexpr std::uint64_t kInvulnMs          = 2000;    // ep07：重生无敌（防出生即死·行业惯例）
+inline constexpr int           kKillLimit         = 10;      // ep07：先到 10 杀结束（D7-02·ep08 进数值表）
+inline constexpr float         kNavCellCm         = 50.f;    // ep07：导航栅格粒度（80×80@4000² 地图）
+inline constexpr float         kNavStepCm         = 45.f;    // ep07：可跨越台阶高（低于此的盒不挡路）
+inline constexpr float         kNavBodyTopCm      = 176.f;   // ep07：身体高度带顶（88×2——挡路判定用）
+inline constexpr float         kNavInflateCm      = 34.f;    // ep07：障碍按命中体半径膨胀（贴墙不卡胶囊）
 inline constexpr float        kPi                  = 3.14159265358979323846f;
+
+struct Vec3 {
+    float x = 0.f, y = 0.f, z = 0.f;
+};
 
 // ===== 几何合同（纯数据；MapGeometryLoader 适配器从 JSON 填充，D5-08v2）=====
 struct OccluderBox {
@@ -53,9 +64,15 @@ struct EntityHitbox {
     float radius = kDefaultHitboxRadius;   // 命中体 = 角色胶囊真身（烘焙值，非硬编码）
     float halfHeight = kDefaultHitboxHalfH;
 };
+struct SpawnPoint {                                    // ep07：出生/重生点（烘焙自 PlayerStart）
+    float x = 0.f, y = 0.f, z = 90.f;
+    float yawDeg = 0.f;
+};
 struct MapGeometry {
     OccluderTable occluders;
     EntityHitbox hitbox;
+    std::vector<SpawnPoint> spawnPoints;               // ep07：服务器权威重生选点池（缺=回退场心 (0,0,90)）
+    std::vector<Vec3> patrolPoints;                    // ep07：人机巡逻点（烘焙自 TargetPoint·可选）
 };
 
 // ===== 武器状态（挂在 Entity 上；四道门的 ②③④ 作用对象）=====
@@ -89,10 +106,6 @@ inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
 inline float DamageApply(float hp) { return std::max(0.f, hp - kDamagePerShot); }   // 钳 0 不死（D5-02v2）
 
 // ===== 解析几何（§4.1/§4.4/§4.5——全部解析解，无物理引擎 D5 叙事）=====
-struct Vec3 {
-    float x = 0.f, y = 0.f, z = 0.f;
-};
-
 /** §4.1 方向重建（合同公式，双端一致；客户端准星=相机 forward=同一 yaw/pitch——天然同源） */
 inline Vec3 DirectionFromYawPitch(float yawDeg, float pitchDeg) {
     const float ry = yawDeg * kPi / 180.f;

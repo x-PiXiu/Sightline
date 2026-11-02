@@ -37,6 +37,13 @@ struct RoomMemberInfo {
     std::string name;
 };
 
+/** ep07：人机席位（无 fd——天然收不到任何 S2C；Kick/顶号逻辑对人机跳过） */
+struct BotInfo {
+    uint32_t playerId = 0;
+    std::string name;
+    uint32_t roomId = 0;
+};
+
 // 名字合法性：非空、≤16B（两处调用：登录校验 / 房间名 ≤24B 走同函数传上限）
 bool ValidName(const std::string& name, size_t maxBytes);
 
@@ -92,7 +99,14 @@ public:
     bool IsHost(int fd) const;                                   // fd 是否其所在房的现任房主（首位）
     bool RoomIdByFd(int fd, uint32_t& outRoomId) const;          // fd 是否在房中
     int  PlayerIdByFd(int fd) const;                             // fd→PlayerId 翻译；无则 -1
-    std::vector<RoomMemberInfo> RoomRoster(uint32_t roomId) const;  // 按加入序（首位=房主）
+    std::vector<RoomMemberInfo> RoomRoster(uint32_t roomId) const;  // 按加入序（首位=房主；ep07 尾部并人机）
+    // —— ep07：人机席位 + 对局状态过桥 ——
+    int  AddBot(uint32_t roomId);                       // 分配 pid+登记（房不存在/满 → -1）
+    std::vector<Event> RemoveBot(uint32_t botPid);      // 移除 + 标准推送组
+    bool IsBot(uint32_t pid) const;
+    bool HasRoom(uint32_t roomId) const;
+    void SetRoomInMatch(uint32_t roomId, bool inMatch);  // 适配层过桥（开局/终局）——Join 遇 true 拒（码5）
+    bool RoomInMatch(uint32_t roomId) const;             // 对局态查询（AddBot 守门）
 
     // —— 适配器查询（FrameWriter 编码用）——
     bool IsLoggedIn(int fd) const;
@@ -101,7 +115,8 @@ public:
 
 private:
     std::vector<Event> LeaveInternal(int fd);    // 离房（Leave/Disconnect/顶号共用）
-    std::vector<Event> RoomStateAndList(uint32_t roomId);  // 成员变化后的标准推送组
+public:
+    std::vector<Event> RoomStateAndList(uint32_t roomId);  // ep07：RemoveBot 也产出（公有化）  // 成员变化后的标准推送组
     std::vector<RoomBrief> Snapshot() const;     // 全量房间快照（列表推送的载荷）
     void RemovePlayer(int fd);                   // 注销玩家 + 名字索引
 
@@ -110,6 +125,8 @@ private:
     std::unordered_map<int, uint32_t> roomByFd_;          // fd → RoomId（在房中才有）
     std::unordered_map<int, int64_t> graceByFd_;          // 未登录连接 → 接入时刻
     std::unordered_map<uint32_t, Room> rooms_;
+    std::vector<BotInfo> bots_;                          // ep07：人机席位（无 fd·房间解散时清）
+    std::unordered_map<uint32_t, bool> roomInMatch_;     // ep07：房间对局态（Join 过桥·D3-15 经适配层）
     uint32_t nextPlayerId_ = 1;
     uint32_t nextRoomId_ = 1;
 };
