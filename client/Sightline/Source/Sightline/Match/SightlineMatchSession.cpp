@@ -67,6 +67,24 @@ void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
     if (EvictCount > 0) InputHistory.RemoveAt(0, EvictCount);
 }
 
+// —— ep07 人机席位意图（26/27 号·仅房主——服务器校验房主+满员+对局态）——
+void USightlineMatchSession::SendBotAdd(int32 Difficulty)
+{
+    if (!Conn) return;
+    TArray<uint8> P;
+    P.Add(static_cast<uint8>(FMath::Clamp(Difficulty, 0, 2)));
+    Conn->Send(SightlineProtocol::MSG_C2S_BOT_ADD, P);
+}
+
+void USightlineMatchSession::SendBotRemove(int32 BotPid)
+{
+    if (!Conn) return;
+    TArray<uint8> P;
+    const uint32 V = static_cast<uint32>(BotPid);
+    for (int i = 0; i < 4; ++i) P.Add(static_cast<uint8>((V >> (8 * i)) & 0xFF));
+    Conn->Send(SightlineProtocol::MSG_C2S_BOT_REMOVE, P);
+}
+
 void USightlineMatchSession::ClearPredictionInput()   // ep07（❗9）：重生落位前清预测底账
 {
     InputHistory.Reset();                              // 输入史清（和解对账无从对起→断档全量兑底=落位态）

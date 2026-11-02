@@ -72,7 +72,8 @@ public:
     /** GameInstance 在新建连接 / 断开时调用（非拥有指针，同 LobbySession 模式） */
     void BindConnection(ISendPort* InConn);
     void SetRegistry(USightlineEntityRegistry* InRegistry);
-    void SetSelfPlayerId(int32 InPid) { SelfPlayerId = InPid; }   // 登录回执到位后由 GI 注入
+    void SetSelfPlayerId(int32 InPid) { SelfPlayerId = InPid; }
+    int32 GetSelfPlayerId() const { return SelfPlayerId; }   // ep07：战斗 UI BindSession 用   // 登录回执到位后由 GI 注入
     bool IsInMatch() const { return bInMatch; }                  // 对局激活查询（GI 面板显隐/生命周期判定）
     bool IsSelfPlayer(int32 Pid) const { return Pid == SelfPlayerId; }   // M5：21 号三分流判己用
     /** 链路断开：Registry 清场（对局视角 = 会话结束） */
@@ -94,7 +95,13 @@ public:
     // —— 收帧入口（GameInstance.OnFrameReceived 路由 15/17/18/21 + ep07 23/24/25）——
     void HandleFrame(uint16 MsgId, const TArray<uint8>& Payload);
     bool IsSelfDead() const { return bSelfDead; }
-    void ClearPredictionInput();                      // ep07：重生落位前清预测底账（❗9）   // ep07: 死亡期输入/开火禁用（Character 查询）
+    void ClearPredictionInput();                      // ep07：重生落位前清预测底账（❗9）
+
+    // —— ep07 人机席位意图（仅房主；26/27 号——服务器 AddBot/RemoveBot）——
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendBotAdd(int32 Difficulty);                // 难度：0=易 1=中 2=难
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendBotRemove(int32 BotPid);
 
     UPROPERTY(BlueprintAssignable) FOnMatchStarted OnMatchStarted;
     UPROPERTY(BlueprintAssignable) FOnMatchEntityLeft OnEntityLeft;
