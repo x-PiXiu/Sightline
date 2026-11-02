@@ -139,6 +139,8 @@ protected:
     /** 拔枪蒙太奇（AM_MM_Rifle_Equip——对局出生播一次，入场仪式感；大厅不播） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> EquipMontage;
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TObjectPtr<UAnimMontage> DeathMontage;      // ep07：死亡蒙太奇（AM_MM_Death_Front_01·Slot FullBody）
 
     // —— ep06 表现层：左手 IK 吸附（枪上左手护握 socket 为目标；ABP TwoBoneIK 消费 LH_IK_*）——
     /** 枪网格组件引用（BP Character Class Defaults 填——左手 IK 目标的宿主；换枪=换引用） */
@@ -197,12 +199,15 @@ private:
     void OnFireReleased();
     void TryFire();                              // 本地节流（100ms/30 发/2.5s 镜像服务器常量）+ 蒙太奇 + 枪声 + 20 号
     UFUNCTION() void OnFireResult(const FSightlineFireResult& Result);   // 21 号三分流：命中音/受击音/远端枪声+远端动画
+    UFUNCTION() void OnKill(const FSightlineKill& Kill);               // ep07：23 号（自己死亡表现+播报）
+    UFUNCTION() void OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs);  // ep07：24 号（落位/插值重置）
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
     void SpawnImpactDecal(const FVector& HitPoint, int32 ShooterPid);   // 未命中墙面弹孔（落点短程探针取法线·引擎原生 Spawn）
-    void WarmupFireChain();                      // ep06 首枪预热：对局开始后静音热一遍开火链（火光/枪声/弹孔首次加载）
+    void WarmupFireChain();
+    void ResetRemoteOnRespawn(int32 SpawnIndex);   // ep07：远端重生（插值重置+幽灵环清+落位——❗10）                      // ep06 首枪预热：对局开始后静音热一遍开火链（火光/枪声/弹孔首次加载）
     bool bFireHeld = false;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——

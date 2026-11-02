@@ -67,6 +67,13 @@ void USightlineMatchSession::ReportLocalState(const FSightlineLocalState& S) {
     if (EvictCount > 0) InputHistory.RemoveAt(0, EvictCount);
 }
 
+void USightlineMatchSession::ClearPredictionInput()   // ep07（❗9）：重生落位前清预测底账
+{
+    InputHistory.Reset();                              // 输入史清（和解对账无从对起→断档全量兑底=落位态）
+    LastAckedSeq = InputSeq;                           // 管线深度清零（旧 ack 不再追溯）
+    ErrCurrentCm = 0.0; ErrPeakCm = 0.0;
+}
+
 void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>& Payload) {
     if (!Registry) return;
 
@@ -90,6 +97,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         }
         bInMatch = true;                               // 对局激活：19 上报窗口开启（v4·R10）
         InputHistory.Reset();                          // M3b：新对局=新底账（环形缓冲与 HUD 统计归零）
+        bSelfDead = false;                             // ep07：新局死亡态复位
         ReconcileCount = 0; ReplayFrames = 0;
         ErrCurrentCm = 0.0; ErrPeakCm = 0.0; LastAckedSeq = 0;
         EntityHp.Reset();                              // M5：新对局血量清账（D5-09 事件流等价状态流）
@@ -132,6 +140,47 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         return;
     }
 
+
+    if (MsgId == SightlineProtocol::MSG_S2C_KILL) {            // ep07：23 号（播报+比分+自己死亡态）
+        SightlineProtocol::FKillMsg K;
+        if (!SightlineProtocol::FKillMsg::Parse(Payload, K)) return;
+        const int32 Victim = static_cast<int32>(K.victimPid);
+        if (IsSelfPlayer(Victim)) bSelfDead = true;            // 死亡期禁输入/开火（Character 查询）
+        EntityHp.Add(Victim, 0);                               // 账本锁 0
+        FSightlineKill Out;
+        Out.VictimPid = Victim;
+        Out.KillerPid = static_cast<int32>(K.killerPid);
+        Out.RespawnDelayMs = static_cast<int32>(K.respawnDelayMs);
+        Out.VictimHp = 0;
+        OnKill.Broadcast(Out);
+        return;
+    }
+    if (MsgId == SightlineProtocol::MSG_S2C_RESPAWN) {         // ep07：24 号（落位+无敌+死亡态清）
+        SightlineProtocol::FRespawnMsg R;
+        if (!SightlineProtocol::FRespawnMsg::Parse(Payload, R)) return;
+        const int32 Pid = static_cast<int32>(R.pid);
+        if (IsSelfPlayer(Pid)) {
+            bSelfDead = false;
+            ClearPredictionInput();                            // ❗9：清预测输入环（防和解拉回尸体）
+        }
+        EntityHp.Add(Pid, 100);                                // 满血入账
+        OnRespawn.Broadcast(Pid, static_cast<int32>(R.spawnIndex), static_cast<int32>(R.invulnMs));
+        return;
+    }
+    if (MsgId == SightlineProtocol::MSG_S2C_MATCH_END) {       // ep07：25 号（结算面板）
+        SightlineProtocol::FMatchEndMsg M;
+        if (!SightlineProtocol::FMatchEndMsg::Parse(Payload, M)) return;
+        TArray<FSightlineScoreRow> Rows;
+        for (const auto& r : M.rows) {
+            FSightlineScoreRow rr;
+            rr.pid = static_cast<int32>(r.pid);
+            rr.kills = static_cast<int32>(r.kills);
+            rr.deaths = static_cast<int32>(r.deaths);
+            Rows.Add(rr);
+        }
+        OnMatchEnd.Broadcast(Rows);
+        return;
+    }
     if (MsgId == SightlineProtocol::MSG_S2C_FIRE_RESULT) {
         // M5：21 号三分流——射手 Hitmarker / 其余 tracer+远端动画 / 受击者红闪（D5-02v2）
         // 血量行数据也在此更新（TCP 可靠有序：事件流等价状态流，无丢包漂移）

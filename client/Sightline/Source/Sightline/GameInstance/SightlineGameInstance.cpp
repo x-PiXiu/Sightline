@@ -511,7 +511,8 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
     // 血量行的唯一数据源；漏路由则 MatchSession 的 21 分支成死代码，PIE 命中链验收实锤）
     if (MatchSession &&
         (MsgId == MSG_S2C_MATCH_START || MsgId == MSG_S2C_ENTITY_STATE || MsgId == MSG_S2C_ENTITY_LEAVE ||
-         MsgId == MSG_S2C_FIRE_RESULT))
+         MsgId == MSG_S2C_FIRE_RESULT || MsgId == MSG_S2C_KILL || MsgId == MSG_S2C_RESPAWN ||
+         MsgId == MSG_S2C_MATCH_END))
     {
         MatchSession->HandleFrame(MsgId, Payload);
         return;

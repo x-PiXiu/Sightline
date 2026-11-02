@@ -4,6 +4,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/SightlineOccluderComponent.h"
+#include "GameFramework/PlayerStart.h"
+#include "Engine/TargetPoint.h"
 #include "Character/SightlineCharacter.h"
 #include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
@@ -99,6 +101,30 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         return false;
     }
 
+    // 2.5) ep07：出生点（PlayerStart 命名合同 Spawn_{n}·三重匹配同 FindSpawnStart）
+    //      与人机巡逻点（ATargetPoint·Tag=BotPatrol 才计入——不误收无关标记点）
+    struct BakedSpawn { int32 Index; FVector Pos; float YawDeg; };
+    TArray<BakedSpawn> Spawns;
+    for (TActorIterator<APlayerStart> It(World); It; ++It) {
+        auto ParseIndex = [](const FString& Str) -> int32 {
+            if (!Str.StartsWith(TEXT("Spawn_"))) return INDEX_NONE;
+            const int32 N = FCString::Atoi(*Str.Mid(6));     // Spawn_1 → 1 → 下标 0
+            return N > 0 ? N - 1 : INDEX_NONE;
+        };
+        int32 Idx = ParseIndex(It->GetName());
+        if (Idx == INDEX_NONE) Idx = ParseIndex(It->PlayerStartTag.ToString());
+        if (Idx == INDEX_NONE) Idx = ParseIndex(It->GetActorLabel());
+        if (Idx == INDEX_NONE) continue;                 // 非合同命名：不入合同（防误收引擎默认位）
+        Spawns.Add({Idx, It->GetActorLocation(), float(It->GetActorRotation().Yaw)});
+    }
+    Spawns.Sort([](const BakedSpawn& A, const BakedSpawn& B) { return A.Index < B.Index; });
+
+    TArray<FVector> Patrols;
+    for (TActorIterator<ATargetPoint> It(World); It; ++It) {
+        if (!It->ActorHasTag(TEXT("BotPatrol"))) continue;
+        Patrols.Add(It->GetActorLocation());
+    }
+
     // 2) entityHitbox = 角色胶囊真身（CDO 读取——烘焙期拿默认值，服务器不猜）
     float HitRadius = 40.f, HitHalfH = 90.f;
     if (const ASightlineCharacter* CharCDO = GetDefault<ASightlineCharacter>()) {
@@ -125,6 +151,21 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
                                 i + 1 < Centers.Num() ? TEXT(",") : TEXT(""));
     }
     Json += TEXT("  ],\n");
+    // ep07：spawnPoints（序号升序——服务器 spawnPoints[i] ↔ 客户端 Spawn_{i+1} 同源合同）
+    Json += TEXT("  \"spawnPoints\": [\n");
+    for (int32 i = 0; i < Spawns.Num(); ++i) {
+        Json += FString::Printf(TEXT("    { \"pos\": [%.2f, %.2f, %.2f], \"yawDeg\": %.2f }%s\n"),
+                                Spawns[i].Pos.X, Spawns[i].Pos.Y, Spawns[i].Pos.Z, Spawns[i].YawDeg,
+                                i + 1 < Spawns.Num() ? TEXT(",") : TEXT(""));
+    }
+    Json += TEXT("  ],\n");
+    Json += TEXT("  \"patrolPoints\": [\n");
+    for (int32 i = 0; i < Patrols.Num(); ++i) {
+        Json += FString::Printf(TEXT("    { \"pos\": [%.2f, %.2f, %.2f] }%s\n"),
+                                Patrols[i].X, Patrols[i].Y, Patrols[i].Z,
+                                i + 1 < Patrols.Num() ? TEXT(",") : TEXT(""));
+    }
+    Json += TEXT("  ],\n");
     Json += FString::Printf(TEXT("  \"entityHitbox\": { \"radius\": %.2f, \"halfHeight\": %.2f }\n"), HitRadius, HitHalfH);
     Json += TEXT("}\n");
 
@@ -144,8 +185,8 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         OutSummary = TEXT("写盘失败：") + Path;
         return false;
     }
-    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d → %s（entityHitbox r=%.1f h=%.1f）%s"),
-                                 MarkersFound, Centers.Num(), *Path, HitRadius, HitHalfH,
+    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d 出生点=%d 巡逻点=%d → %s（entityHitbox r=%.1f h=%.1f）%s"),
+                                 MarkersFound, Centers.Num(), Spawns.Num(), Patrols.Num(), *Path, HitRadius, HitHalfH,
                                  Skipped > 0
                                      ? *FString::Printf(TEXT(" ⚠跳过%d（实例包围盒无效——空Actor只挂标记件？给Mesh或勾bOverrideBounds）"), Skipped)
                                      : TEXT(""));

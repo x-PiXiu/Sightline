@@ -6,6 +6,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerStart.h"
 #include "GameInstance/SightlineGameInstance.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
@@ -115,6 +116,8 @@ void ASightlineCharacter::BeginPlay() {
         if (MatchSession.IsValid()) {
             MatchSession->OnSelfCorrected.AddDynamic(this, &ASightlineCharacter::OnSelfCorrected);
             MatchSession->OnFireResult.AddDynamic(this, &ASightlineCharacter::OnFireResult);   // M5：三分流（本地角色处理全房间开火结果）
+            MatchSession->OnKill.AddDynamic(this, &ASightlineCharacter::OnKill);               // ep07：死亡/播报
+            MatchSession->OnRespawn.AddDynamic(this, &ASightlineCharacter::OnRespawn);         // ep07：落位/插值重置
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
@@ -197,7 +200,7 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
             LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣时上弦——
                                                      // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
                                                      // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
-        const bool bTrigger = bMatchLive && bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
+        const bool bTrigger = bMatchLive && !MatchSession->IsSelfDead() && bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
         // ep06 表现层：弹药/换弹 HUD 行（key=3，GI 的 ping 行=1、和解行=2；本地弹匣预测态直读，
         // 与服务器扣弹镜像同步——换弹钟倒数即"换弹时间"上屏）
         if (GEngine)
@@ -335,6 +338,19 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     }
 }
 
+void ASightlineCharacter::ResetRemoteOnRespawn(int32 SpawnIndex) {
+    // ❗10：远端重生——插值窗重置（SnapCount=0→下一快照直摆落位）+幽灵历史环清空（死前轨迹不跨越重生）
+    SnapCount = 0;
+    SnapA = FSnapshot{}; SnapB = FSnapshot{};
+    RemoteVelocity = FVector::ZeroVector;
+    SmoothedRemoteVel = FVector::ZeroVector;
+    AuthCount = 0; AuthHead = 0;
+    if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
+        SetActorLocation(Start->GetActorLocation());
+        SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));
+    }
+}
+
 FVector ASightlineCharacter::SampleAuthorityAt(double TimeSec) const {
     if (AuthCount == 0) return GetActorLocation();
     const auto At = [this](int32 I) -> const FAuthoritySample& { return AuthorityHist[(AuthHead - AuthCount + I + kAuthorityCap * 2) % kAuthorityCap]; };
@@ -428,6 +444,7 @@ void ASightlineCharacter::TryFire() {
     // 对局门（2026-10-29 用户报：登录页点击出枪声）：未进对局武器系统休眠——客户端镜像服务器
     // 四道门的第一道（在局）；登录页/大厅/断链时点击不再出枪声/蒙太奇/扣弹
     if (!MatchSession.IsValid() || !MatchSession->IsInMatch()) return;
+    if (MatchSession->IsSelfDead()) return;            // ep07：死亡期开火静默（客户端镜像服务器门0）
     const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
     if (NowMs < NextFireAllowedMs) return;           // 本地节流（表现层预测先行一拍）
     if (LocalMag <= 0) {
@@ -451,6 +468,34 @@ void ASightlineCharacter::TryFire() {
     if (FireMontage && LocalMag > 0) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
+}
+
+// ===== ep07 死亡/重生（23/24 号；自己=表现+输入禁用，他人=蒙太奇+插值重置）=====
+void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
+    ASightlineCharacter* VictimPawn = nullptr;
+    if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance()))
+        if (const USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
+            VictimPawn = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Kill.VictimPid));
+    if (VictimPawn) VictimPawn->PlayAnimMontage(DeathMontage);   // 自己=本类（他人=远端同类）——同一入口
+    if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
+        bFireHeld = false;                                       // 死亡期开火电平断（TryFire 门另加 bSelfDead）
+        if (DeathMontage) PlayAnimMontage(DeathMontage);         // 自己也播（覆盖表现）
+    }
+}
+
+void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs) {
+    if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Pid)) {
+        // 自己：清预测输入环（❗9——防和解拉回尸体）+ 落位重生点（Spawn_{n+1} 同源）+ 无敌闪
+        MatchSession->ClearPredictionInput();   // ❗9：清预测输入环（防和解拉回尸体）
+        if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
+            SetActorLocation(Start->GetActorLocation());
+            SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));
+        }
+    } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
+        if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
+            if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid)))
+                Remote->ResetRemoteOnRespawn(SpawnIndex);        // ❗10：远端插值重置+幽灵环清空
+    }
 }
 
 void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {

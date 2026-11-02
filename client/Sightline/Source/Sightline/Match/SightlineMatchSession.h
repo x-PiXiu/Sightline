@@ -40,6 +40,30 @@ struct FSightlineFireResult {
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFireResult, const FSightlineFireResult&, Result);
 
+// ===== ep07 死亡/重生/结算（v4.4）=====
+/** 23 号击杀事件（击杀播报+比分源+自己死亡态置位） */
+USTRUCT(BlueprintType)
+struct FSightlineKill {
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) int32 VictimPid = 0;
+    UPROPERTY(BlueprintReadOnly) int32 KillerPid = 0;
+    UPROPERTY(BlueprintReadOnly) int32 RespawnDelayMs = 0;
+    UPROPERTY(BlueprintReadOnly) int32 VictimHp = 0;
+};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKill, const FSightlineKill&, Kill);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnRespawn, int32, Pid, int32, SpawnIndex,
+                                               int32, InvulnMs);
+/** 25 号结算行 */
+USTRUCT(BlueprintType)
+struct FSightlineScoreRow {
+    GENERATED_BODY()
+    UPROPERTY(BlueprintReadOnly) int32 pid = 0;
+    UPROPERTY(BlueprintReadOnly) int32 kills = 0;
+    UPROPERTY(BlueprintReadOnly) int32 deaths = 0;
+};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchEnd, const TArray<FSightlineScoreRow>&, Rows);
+
 UCLASS()
 class SIGHTLINE_API USightlineMatchSession : public UObject {
     GENERATED_BODY()
@@ -67,13 +91,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void SendFireRequest();
 
-    // —— 收帧入口（GameInstance.OnFrameReceived 路由 15/17/18）——
+    // —— 收帧入口（GameInstance.OnFrameReceived 路由 15/17/18/21 + ep07 23/24/25）——
     void HandleFrame(uint16 MsgId, const TArray<uint8>& Payload);
+    bool IsSelfDead() const { return bSelfDead; }
+    void ClearPredictionInput();                      // ep07：重生落位前清预测底账（❗9）   // ep07: 死亡期输入/开火禁用（Character 查询）
 
     UPROPERTY(BlueprintAssignable) FOnMatchStarted OnMatchStarted;
     UPROPERTY(BlueprintAssignable) FOnMatchEntityLeft OnEntityLeft;
     UPROPERTY(BlueprintAssignable) FOnSelfCorrected OnSelfCorrected;   // M3b：本地 Pawn 订阅（和解落地）
     UPROPERTY(BlueprintAssignable) FOnFireResult OnFireResult;         // M5：21 号三分流（Hitmarker/红闪/tracer/音效/血量行）
+    UPROPERTY(BlueprintAssignable) FOnKill OnKill;                     // ep07：23 号（击杀播报+比分源）
+    UPROPERTY(BlueprintAssignable) FOnRespawn OnRespawn;               // ep07：24 号（落位+无敌窗）
+    UPROPERTY(BlueprintAssignable) FOnMatchEnd OnMatchEnd;             // ep07：25 号（结算面板）
 
     // —— M3c Debug HUD 观测面（GI 每帧取用；AddOnScreenDebugMessage 扩展，D4-08）——
     int32  GetReconcileCount() const { return ReconcileCount; }   // 和解次数（≥ε 触发）
@@ -116,6 +145,7 @@ private:
     TObjectPtr<USightlineEntityRegistry> Registry;
     int32 SelfPlayerId = 0;                            // 登录回执分配，Registry 以此标 bSelf
     bool bInMatch = false;                             // 对局激活：收到 15 置位 / 自己 18 离场或链路死亡清位——16 上报的唯一合法窗口
+    bool bSelfDead = false;                            // ep07：自己死亡态（23 victim=自己置位 / 24 清位）
     uint32 InputSeq = 0;                               // v4：本地预测序号（19 号；M3 预测/重放的历史锚点）
     TArray<FInputSample> InputHistory;                 // M3b：1s 环形输入史（对账/重放的本地底账）
     uint32 LastAckedSeq = 0;                           // 服务器最近确认的序号（对账基准；HUD 差值用）

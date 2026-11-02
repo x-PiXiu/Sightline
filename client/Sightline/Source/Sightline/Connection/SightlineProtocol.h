@@ -34,6 +34,12 @@ namespace SightlineProtocol
         MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
         MSG_S2C_FIRE_RESULT   = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B（房内全员广播·含射手）
         MSG_C2S_RTT_REPORT    = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
+        // —— 第 7 期：死亡/重生/结算 + 人机席位（v4.4）——
+        MSG_S2C_KILL           = 23, // S→C  [4B victimPid][4B killerPid][2B respawnDelayMs]=10B——房内全员广播
+        MSG_S2C_RESPAWN        = 24, // S→C  [4B pid][1B spawnIndex][2B invulnMs]=7B——服务器选点下发序号
+        MSG_S2C_MATCH_END      = 25, // S→C  [1B 原因][1B n]{[4B pid][2B kills][2B deaths]}×n
+        MSG_C2S_BOT_ADD        = 26, // C→S  [1B 难度]——仅房主
+        MSG_C2S_BOT_REMOVE     = 27, // C→S  [4B botPid]——仅房主
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid
@@ -192,4 +198,61 @@ namespace SightlineProtocol
             return true;
         }
     };
+// ===== 第 7 期：死亡/重生/结算（v4.4）=====
+struct FKillMsg {
+    std::uint32_t victimPid = 0;
+    std::uint32_t killerPid = 0;
+    std::uint16_t respawnDelayMs = 0;
+    static constexpr int32_t Size = 10;
+    static bool Parse(const TArray<uint8_t>& P, FKillMsg& Out)
+    {
+        if (P.Num() < Size) return false;
+        Out.victimPid = ReadU32(P, 0);
+        Out.killerPid = ReadU32(P, 4);
+        Out.respawnDelayMs = static_cast<uint16>(P[8]) | (static_cast<uint16>(P[9]) << 8);
+        return true;
+    }
+};
+
+struct FRespawnMsg {
+    std::uint32_t pid = 0;
+    std::uint8_t spawnIndex = 0;       // 服务器选点序号（FindSpawnStart(Spawn_{n+1}) 同源）
+    std::uint16_t invulnMs = 0;
+    static constexpr int32_t Size = 7;
+    static bool Parse(const TArray<uint8_t>& P, FRespawnMsg& Out)
+    {
+        if (P.Num() < Size) return false;
+        Out.pid = ReadU32(P, 0);
+        Out.spawnIndex = P[4];
+        Out.invulnMs = static_cast<uint16>(P[5]) | (static_cast<uint16>(P[6]) << 8);
+        return true;
+    }
+};
+
+struct FMatchEndRow {
+    std::uint32_t pid = 0;
+    std::uint16_t kills = 0;
+    std::uint16_t deaths = 0;
+};
+
+struct FMatchEndMsg {
+    std::uint8_t reason = 0;           // 1=击杀上限 2=真人全离
+    TArray<FMatchEndRow> rows;
+    static bool Parse(const TArray<uint8_t>& P, FMatchEndMsg& Out)
+    {
+        if (P.Num() < 2) return false;
+        Out.reason = P[0];
+        const int32 N = P[1];
+        if (P.Num() < 2 + N * 8) return false;
+        for (int32 i = 0; i < N; ++i) {
+            const int32 o = 2 + i * 8;
+            FMatchEndRow r;
+            r.pid = ReadU32(P, o);
+            r.kills = static_cast<uint16>(P[o + 4]) | (static_cast<uint16>(P[o + 5]) << 8);
+            r.deaths = static_cast<uint16>(P[o + 6]) | (static_cast<uint16>(P[o + 7]) << 8);
+            Out.rows.Add(r);
+        }
+        return true;
+    }
+};
 }
