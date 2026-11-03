@@ -84,7 +84,7 @@ struct WeaponState {
     bool bHasFired = false;                              // 首发免射速门（lastFireMs=0 是合法时刻）
 };
 
-enum class FireGate { Ok, Reloading, MagEmpty, RateLimited };
+enum class FireGate { Ok, Reloading, MagEmpty, RateLimited, Dead };
 
 /** 门 ②③④（消费式：通过即更新状态）。②③=换弹状态机（触发/进行/到期补满，reloadUntil==0 卫哨防
  *  未触发先补满的边角——审计修复①）；④射速容差 95ms<D5-14。

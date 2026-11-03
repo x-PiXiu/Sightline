@@ -80,6 +80,11 @@ struct FireResultData {
     float victimX = 0.f, victimY = 0.f, victimZ = 0.f;     // 受害实体权威位（未命中=0）
     float hbRadius = 0.f, hbHalfH = 0.f;                   // 本次判定用命中体（几何合同烘焙值）
     std::uint16_t rewindMs = 0;                // ep06：本次回溯量 now−judgeAt（0=不回溯；KPI 分桶+日志动画数据源）
+    // —— miss 诊断（2026-11-03："打不中"复盘可观测性——miss 时给出最近候选的回溯采样位与垂距，
+    //     判定行直接可读"目标在哪条方位、射线偏了多少"；诊断字段不入 21 号，与 bAccepted 同纪律）——
+    std::uint32_t nearPid = 0;                 // 最近候选 pid（0=无候选——全员死亡/未激活）
+    float nearPerp = 0.f;                      // 其回溯采样位到射线的垂直距离（cm）
+    float nearX = 0.f, nearY = 0.f, nearZ = 0.f;  // 该候选的采样位（judgeAt 时刻）
 };
 
 struct ScoreRow {                          // ep07：结算行（25 号载荷源）

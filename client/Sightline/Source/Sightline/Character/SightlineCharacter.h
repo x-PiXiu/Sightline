@@ -228,6 +228,8 @@ private:
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;
+    float LastReportedYaw = 0.f;                 // 诊断镜像：最近一次 19 号上报的姿态——与弹余行的准星
+    float LastReportedPitch = 0.f;               // 姿态并排打印，"上报值 vs 准星值"恒差一眼定案
 
     // —— 远端插值：快照缓冲 + 恒速线性插值 ——
     // 两个带时间戳的快照，在 (Now - 延迟) 处线性插值。速度=位移/Δack 拍（发端时钟口径）。

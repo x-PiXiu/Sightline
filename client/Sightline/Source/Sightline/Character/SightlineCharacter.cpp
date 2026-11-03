@@ -306,6 +306,8 @@ void ASightlineCharacter::SampleLocalState() {
     // AnimInputs.Pitch 的平滑语义只属于动画层（ABP 瞄准），判定层禁止复用
     S.Pitch = GetBaseAimRotation().Pitch;
     S.bFalling = AnimInputs.bFalling;
+    LastReportedYaw = S.Yaw;                             // 诊断镜像：判定行 yaw vs 弹余行准星 yaw 的
+    LastReportedPitch = S.Pitch;                         // 恒差（2026-11-03 实锤 4.4°）靠这两条日志定案
     MatchSession->ReportLocalState(S);
 }
 
@@ -467,9 +469,10 @@ void ASightlineCharacter::TryFire() {
         if (ReloadMontage) PlayAnimMontage(ReloadMontage);
         if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
     }
-    UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 姿态 yaw=%.1f pitch=%.1f t=%.3f"),
+    UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 准星 yaw=%.1f pitch=%.1f | 上报 yaw=%.1f pitch=%.1f t=%.3f"),
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
-           FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）
+           LastReportedYaw, LastReportedPitch,
+           FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）；准星 vs 上报并排=朝向偏差定案
     // 打空帧不播开火蒙太奇：同帧已播换弹蒙太奇，后播会中断覆盖（2026-10-31 实锤：换弹动作"不播"）
     if (FireMontage && LocalMag > 0) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
     if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());

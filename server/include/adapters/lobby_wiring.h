@@ -180,14 +180,14 @@ public:
             }
             case MT::FireResult: {
                 // 诊断行（每次开火一条全参数判定链：门/眼位/方向/命中距离/余血）
-                static const char* GateName[] = {"Ok", "换弹中", "弹匣空", "射速限制"};
+                static const char* GateName[] = {"Ok", "换弹中", "弹匣空", "射速限制", "死亡/终局"};
                 const auto& F = e.fire;
                 if (!F.bAccepted) {
                     LOG_INFO("[射击拒绝] shooter=" + std::to_string(F.shooterPid) +
-                              " 原因=" + GateName[F.gate % 4]);
+                              " 原因=" + GateName[F.gate % 5]);
                     break;                                   // 被武器门拦下：不广播 21 号（静默丢 D5-03）
                 }
-                const std::string judgeLine = "[射击判定] shooter=" + std::to_string(F.shooterPid) +
+                std::string judgeLine = "[射击判定] shooter=" + std::to_string(F.shooterPid) +
                           " 眼位=(" + std::to_string(F.oX) + "," + std::to_string(F.oY) + "," + std::to_string(F.oZ) + ")" +
                           " 方向=(" + std::to_string(F.dX) + "," + std::to_string(F.dY) + "," + std::to_string(F.dZ) + ")" +
                           " hit=" + std::to_string(F.bHit) +
@@ -198,6 +198,12 @@ public:
                           " 受害位=(" + std::to_string(F.victimX) + "," + std::to_string(F.victimY) + "," + std::to_string(F.victimZ) + ")" +
                           " 命中体=(r=" + std::to_string(F.hbRadius) + " 半高=" + std::to_string(F.hbHalfH) + ")" +
                           " 回溯=" + std::to_string(F.rewindMs) + "ms";
+                // miss 诊断：最近候选（回溯采样位+垂距）——"打不中"复盘直接可读目标方位与偏差量
+                if (!F.bHit && F.nearPid != 0)
+                    judgeLine += " 最近候选=pid" + std::to_string(F.nearPid) +
+                                 " 垂距=" + std::to_string(F.nearPerp) + "cm 位=(" +
+                                 std::to_string(F.nearX) + "," + std::to_string(F.nearY) + "," +
+                                 std::to_string(F.nearZ) + ")";
                 // 人机每个约 10 发/秒：判定行降 TRACE（真人仍 INFO 整链可见；击杀 23 号恒 INFO）
                 if (lobby_.IsBot(F.shooterPid)) LOG_TRACE(judgeLine);
                 else LOG_INFO(judgeLine);

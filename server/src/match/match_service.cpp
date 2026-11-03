@@ -244,12 +244,13 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         return out;
     }
 
-    // ⓪ 存活门（ep07）：死亡者开火静默丢（客户端镜像同款）
+    // ⓪ 存活门（ep07）：死亡/终局开火拒绝（客户端镜像同款）——gate=Dead（2026-11-03 实锤：
+    // 此前复用 ConsumeWeaponGate 的返回值，死亡瞬间武器门恰为 Ok → 日志打出"[射击拒绝] 原因=Ok"自相矛盾）
     if (shooter->bDead || bEnded_) {
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate),
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(FireGate::Dead),
                                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         out.push_back(std::move(ev));
         return out;
@@ -272,6 +273,24 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         others.push_back({E.playerId, p->x, p->y, p->z});
     }
     const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
+
+    // miss 诊断（可观测性）：最近的候选（回溯采样位到射线的垂距）——判定行可读"目标在哪个方位、偏了多少"
+    std::uint32_t nearPid = 0; float nearPerp = 0.f; Vec3 nearPos{};
+    if (!v.hit) {
+        float best = 1e9f;
+        for (const auto& O : others) {
+            const Vec3 w{O.x - o.x, O.y - o.y, O.z - o.z};
+            const float t = w.x * d.x + w.y * d.y + w.z * d.z;
+            if (t < 0.f) continue;                           // 身后（射线不打背后目标）
+            const Vec3 foot{o.x + d.x * t, o.y + d.y * t, o.z + d.z * t};
+            const float perp = std::sqrt((O.x - foot.x) * (O.x - foot.x) +
+                                         (O.y - foot.y) * (O.y - foot.y) +
+                                         (O.z - foot.z) * (O.z - foot.z));
+            if (perp < best) { best = perp; nearPid = O.playerId; nearPos = {O.x, O.y, O.z}; }
+        }
+        nearPerp = best < 1e8f ? best : 0.f;
+        if (nearPid == 0) nearPerp = 0.f;
+    }
 
     // ⑥ 结算扣血（ep07：hp≤0 → 死亡状态机启用）；顺手捕获受害实体判定时刻位（诊断日志用）
     std::uint8_t victimHp = 0;
@@ -321,6 +340,12 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
                              victimX, victimY, victimZ,
                              geometry_.hitbox.radius, geometry_.hitbox.halfHeight,
                              static_cast<std::uint16_t>(nowMs - judgeAtMs)};
+    // ⑨ miss 诊断字段填充（命中时不填——受害位已足够；诊断字段不入 21 号）
+    if (!v.hit && nearPid != 0) {
+        ev.fire.nearPid = nearPid;
+        ev.fire.nearPerp = nearPerp;
+        ev.fire.nearX = nearPos.x; ev.fire.nearY = nearPos.y; ev.fire.nearZ = nearPos.z;
+    }
     out.push_back(std::move(ev));
     return out;
 }
