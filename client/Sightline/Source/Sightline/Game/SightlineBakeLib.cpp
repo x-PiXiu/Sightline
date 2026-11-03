@@ -67,6 +67,16 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         AActor* Actor = *It;
         USightlineOccluderComponent* Marker = Actor->FindComponentByClass<USightlineOccluderComponent>();
         if (!Marker) continue;
+        // 结构性防呆（2026-11-03 用户实锤：4 个 PlayerStart 全挂了标记件 → 出生点被烘成 184×128×128
+        // "箱子" → 人机出生在箱里原地站桩+子弹先中箱皮）。出生点/巡逻点进合同靠 类+命名/标签，
+        // 不需要标记件——挂了必是误解，直接忽略并喊一声（ep05 人物 BP 幽灵墙同款错误的出生点版）
+        if (Cast<APlayerStart>(Actor) || Cast<ATargetPoint>(Actor)) {
+            UE_LOG(LogTemp, Warning,
+                   TEXT("[烘焙] 已忽略 %s（%s）上的遮挡标记——出生点/巡逻点不是遮挡物：Spawn_{n} 靠类+命名、"
+                        "TargetPoint 靠 BotPatrol 标签进合同；请把该组件从 Actor 上移除"),
+                   *Actor->GetName(), *Marker->GetClass()->GetName());
+            continue;
+        }
         ++MarkersFound;
         FVector Center;
         FVector Half;
