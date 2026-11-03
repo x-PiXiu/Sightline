@@ -36,10 +36,12 @@ inline constexpr int           kEntityHistoryCap  = 32;      // ep06：权威位
 inline constexpr std::uint64_t kRespawnMs         = 3000;    // ep07：死亡→重生倒计时（服务器权威）
 inline constexpr std::uint64_t kInvulnMs          = 2000;    // ep07：重生无敌（防出生即死·行业惯例）
 inline constexpr int           kKillLimit         = 10;      // ep07：先到 10 杀结束（D7-02·ep08 进数值表）
-// 活动区半宽**回退缺省**（2026-11-04 审计 A 级收编）：正式界=MatchService::SetGeometry 从合同
-// 地板盒（足印最大遮挡盒）推导并注入 UpdateEntity 钳制——本常量仅在合同无地板盒（缺省/单测）
-// 时兜底。03:20 局实锤：出生点挪到常量界外 → 24 号传出去/钳制拽回来=重生即拉扯，规则必须随数据走。
-inline constexpr float         kPlayAreaHalfUu    = 2000.f;
+// 活动区半宽**回退缺省**（2026-11-04 审计 A 级收编 + 同日勘误）：正式界=MatchService::SetGeometry
+// 从合同地板盒（足印最大遮挡盒）推导并注入 UpdateEntity 钳制——本常量仅在合同无地板盒时兜底。
+// ⚠ 勘误：合同 size=半尺寸（map_geometry.h 语义），地板盒 size=[4000,4000,200] → 实际地板 ±4000
+// （80m×80m）；本常量曾按"4000=全宽"误读为 2000 → 97cb827 版把玩家/人机钳在地图中央 1/4，
+// 03:20 局拉扯感真凶。四个出生点全部在 ±4000 地板内（用户核实只有一个地板）。
+inline constexpr float         kPlayAreaHalfUu    = 4000.f;
 inline constexpr float         kNavCellCm         = 50.f;    // ep07：导航栅格粒度（80×80@4000² 地图）
 inline constexpr float         kNavStepCm         = 45.f;    // ep07：可跨越台阶高（低于此的盒不挡路）
 inline constexpr float         kNavBodyTopCm      = 176.f;   // ep07：身体高度带顶（88×2——挡路判定用）

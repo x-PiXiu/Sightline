@@ -36,9 +36,19 @@ struct NavGrid {
  *  地板盒（顶面在脚下）天然排除——不做任何特判。纯函数：同输入同栅格。 */
 inline NavGrid BuildNavGrid(const OccluderTable& occ) {
     NavGrid g;
-    const float mapHalf = 2100.f;
+    // 地图半宽从合同地板盒（足印最大）推导 +100 建格余量（2026-11-04 勘误：size=半尺寸，
+    // 地板 hx=4000 → 实际地图 ±4000；旧值 2100 按"4000=全宽"误读——栅格只盖中央 1/4，
+    // 远端出生点（2127,-570 等）寻路/栅格 LOS 全部退化）。无地板盒（缺省）回退 2100。
+    // 半宽=max(回退缺省, 地板盒推导)——只放大不缩小：无地板盒的合同（或纯掩体小几何）不得把
+    // 栅格缩到比缺省活动区还小（否则界外坐标钳到边缘格=blocked 涂抹假阳性，2026-11-04 测试实锤）
+    float mapHalf = kPlayAreaHalfUu + 100.f;
+    float bestArea = -1.f;
+    for (const auto& b : occ.boxes) {
+        const float area = b.hx * b.hy;
+        if (area > bestArea) { bestArea = area; mapHalf = std::max(mapHalf, std::max(b.hx, b.hy) + 100.f); }
+    }
     g.originX = -mapHalf; g.originY = -mapHalf;
-    g.w = g.h = static_cast<int>(2 * mapHalf / kNavCellCm);   // 84×84
+    g.w = g.h = static_cast<int>(2 * mapHalf / kNavCellCm);
     g.blocked.assign(static_cast<std::size_t>(g.w) * g.h, 0);
     const float inflate = kNavInflateCm;
     for (const auto& b : occ.boxes) {

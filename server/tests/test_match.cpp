@@ -368,22 +368,22 @@ int main() {
         std::uint64_t now = 1000;
         std::uint32_t sq = 0;
         pam.UpdateEntity(32, 0.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);          // 首报（界内原点）
-        for (int i = 0; i < 21; ++i) {                                            // 诚实步行 21×100uu → 越东界
+        for (int i = 0; i < 41; ++i) {                                            // 诚实步行 41×100uu → 越东界（回退界 ±4000）
             now += 33;
             pam.UpdateEntity(32, float(100 * (i + 1)), 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);
         }
         auto ev1 = pam.Tick(now);
-        CHECK(ev1.size() == 1 && ev1[0].entities[0].x == 2000.f);                 // ★权威位钳在活动区界上
+        CHECK(ev1.size() == 1 && ev1[0].entities[0].x == 4000.f);                 // ★权威位钳在活动区界上
         now += 33;
-        pam.UpdateEntity(32, 2100.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);       // 继续向外顶
+        pam.UpdateEntity(32, 4100.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);       // 继续向外顶
         auto ev2 = pam.Tick(now);
-        CHECK(ev2.size() == 1 && ev2[0].entities[0].x == 2000.f);                 // 顶墙停驻（回拉由客户端尾款平滑接走）
-        for (int i = 0; i < 25; ++i) {                                            // 转向南界步行 25×100uu
+        CHECK(ev2.size() == 1 && ev2[0].entities[0].x == 4000.f);                 // 顶墙停驻（回拉由客户端尾款平滑接走）
+        for (int i = 0; i < 45; ++i) {                                            // 转向南界步行 45×100uu
             now += 33;
-            pam.UpdateEntity(32, 2100.f, float(-100 * (i + 1)), 92.f, 0.f, 0.f, 0x00, ++sq, now);
+            pam.UpdateEntity(32, 4100.f, float(-100 * (i + 1)), 92.f, 0.f, 0.f, 0x00, ++sq, now);
         }
         auto ev3 = pam.Tick(now);
-        CHECK(ev3.size() == 1 && ev3[0].entities[0].x == 2000.f && ev3[0].entities[0].y == -2000.f);  // 双轴各自钳
+        CHECK(ev3.size() == 1 && ev3[0].entities[0].x == 4000.f && ev3[0].entities[0].y == -4000.f);  // 双轴各自钳
         {  // 界内诚实移动不受影响（新实体——避免从界外瞬回被超速钳制拦截的合理行为干扰断言）
             MatchService pbm;
             std::vector<RosterEntry> rs{{33, "b", 0}};
@@ -806,12 +806,13 @@ int main() {
     }
     stage("ep07 人机出界钳制：ClampMoveTarget 界外钳回/界内不动 + TakeCover 撤退顶界实测（Bot2 (3177,−3918) 实锤回归）");
     {
-        auto out = adapters::ClampMoveTarget({5000.f, -6000.f});
-        CHECK(out.x == 2000.f && out.y == -2000.f);            // 界外 → 活动区角（域常量 kPlayAreaHalfUu）
-        auto in = adapters::ClampMoveTarget({300.f, -300.f});
+        const auto nav0 = BuildNavGrid(OccluderTable{});       // 无地板盒 → 回退栅格 ±4100
+        auto out = adapters::ClampMoveTarget(nav0, {5000.f, -6000.f});
+        CHECK(out.x == 4100.f && out.y == -4100.f);            // 界外 → 栅格角（地板+100 建格余量）
+        auto in = adapters::ClampMoveTarget(nav0, {300.f, -300.f});
         CHECK(in.x == 300.f && in.y == -300.f);                // 界内 → 原样
-        auto edge = adapters::ClampMoveTarget({-9999.f, 42.f});
-        CHECK(edge.x == -2000.f && edge.y == 42.f);            // 单轴越界只钳该轴
+        auto edge = adapters::ClampMoveTarget(nav0, {-9999.f, 42.f});
+        CHECK(edge.x == -4100.f && edge.y == 42.f);            // 单轴越界只钳该轴
     }
     {
         LobbyService lob2;
@@ -823,7 +824,7 @@ int main() {
         const auto bot2 = static_cast<std::uint32_t>(botPid2);
         const auto host2 = static_cast<std::uint32_t>(lob2.PlayerIdByFd(901));
         MapGeometry g;
-        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{1900, 0, 92, 180}};   // 人机贴东界出生
+        g.spawnPoints = {SpawnPoint{1700, 0, 92, 0}, SpawnPoint{3900, 0, 92, 180}};   // 人机贴东缘出生（感知半径内可见玩家）
         MatchService bm2;
         bm2.SetGeometry(g);
         adapters::BotDriver drv2;
@@ -835,19 +836,19 @@ int main() {
         std::uint32_t pseq = 1;
         for (int i = 0; i < 3; ++i) {                          // 3 发×25 → 人机 hp=25（<30 触发 TakeCover）
             now += 200;
-            bm2.UpdateEntity(host2, 10, 0, 92, 0, 0, 0, ++pseq, now);
+            bm2.UpdateEntity(host2, 1710, 0, 92, 0, 0, 0, ++pseq, now);
             (void)bm2.Fire(host2, now);
             (void)drv2.Tick(now, bm2, lob2);
         }
         const auto* bb = bm2.EntityById(bot2);
         CHECK(bb && bb->weapon.hp == 25.f);                    // 残血：撤退前提成立
-        for (int i = 0; i < 90; ++i) {                         // 3s：背敌撤退 400cm/s 顶向栅格界
+        for (int i = 0; i < 200; ++i) {                        // ~6.6s：背敌撤退 400cm/s 顶向栅格界（±4100）
             now += 33;
             (void)drv2.Tick(now, bm2, lob2);
         }
         bb = bm2.EntityById(bot2);
-        CHECK(bb && bb->x <= 2000.01f);                        // ★不越过活动区（域层也钳·修复前会到 ~2300+）
-        CHECK(bb && bb->x > 1900.f);                           // 且确实向界外撤过（钳在界上）
+        CHECK(bb && bb->x <= 4000.01f);                        // ★不越过活动区（域层钳·意图层已被钳到栅格界 4100）
+        CHECK(bb && bb->y == 0.f);                             // 沿轴撤退无漂移
     }
     stage("ep07 合同自检：出生点被掩体压住可检出（栅格同语义）/净空放行");
     {

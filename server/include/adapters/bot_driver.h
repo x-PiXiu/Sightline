@@ -26,9 +26,13 @@ namespace adapters {
  *  Search 的 lastKnown 在界外）——统一在适配器钳回活动区（kPlayAreaHalfUu=域常量单源）。
  *  分工：本函数只管"FSM 意图目标不越图"（寻路输入卫生）；权威位边界执法在
  *  MatchService::UpdateEntity（域规则·对全体实体含真人生效）——两层不互替。 */
-inline sightline::match::Vec2 ClampMoveTarget(sightline::match::Vec2 p) {
-    const float half = sightline::match::kPlayAreaHalfUu;
-    return {std::clamp(p.x, -half, half), std::clamp(p.y, -half, half)};
+inline sightline::match::Vec2 ClampMoveTarget(const sightline::match::NavGrid& g,
+                                              sightline::match::Vec2 p) {
+    // 钳到栅格界（=地板+建格余量，随地图推导）——FSM 意图目标不越过可寻路范围；
+    // 权威位边界执法在域层 UpdateEntity（活动区，对全体实体生效）——两层不互替。
+    const float maxX = g.originX + static_cast<float>(g.w) * g.cellCm;
+    const float maxY = g.originY + static_cast<float>(g.h) * g.cellCm;
+    return {std::clamp(p.x, g.originX, maxX), std::clamp(p.y, g.originY, maxY)};
 }
 
 class BotDriver {
@@ -228,7 +232,7 @@ private:
         sightline::match::BotIntent intent =
             sightline::match::Decide(w, b.st, b.mem, nowMs, t);   // 非常量：moveTarget 出界钳制就地改写
         if (intent.hasMove) {
-            intent.moveTarget = ClampMoveTarget(intent.moveTarget);   // 意图目标钳制（见函数注释；权威边界在域层 UpdateEntity）
+            intent.moveTarget = ClampMoveTarget(nav_, intent.moveTarget);   // 意图目标钳制（见函数注释；权威边界在域层 UpdateEntity）
             const bool direct = sightline::match::GridLOS(
                 nav_, nav_.CellIx(b.x), nav_.CellIy(b.y), nav_.CellIx(intent.moveTarget.x),
                 nav_.CellIy(intent.moveTarget.y));
