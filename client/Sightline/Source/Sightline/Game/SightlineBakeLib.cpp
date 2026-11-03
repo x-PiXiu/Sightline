@@ -60,6 +60,7 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
     TArray<FVector> Centers;
     TArray<FVector> Halves;
     TArray<float>   Yaws;
+    TArray<FString> MarkerNames;                         // 盒→Actor 名（净空告警点名——用户关卡里"不认识的箱子"靠它定位）
     int32 MarkersFound = 0;
     int32 Skipped = 0;
     for (TActorIterator<AActor> It(World); It; ++It) {
@@ -95,6 +96,7 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         Centers.Add(Center);
         Halves.Add(Half);
         Yaws.Add(YawDeg);
+        MarkerNames.Add(Actor->GetName());
     }
     if (MarkersFound == 0) {
         OutSummary = TEXT("目标世界里没有标记件实例——BP 资产加了组件≠关卡有实例（拖进当前关卡）；PIE 会话里新摆的墙要先重进 PIE");
@@ -198,8 +200,9 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
                 if (!(Top > StepCm) || !(Bot < BodyTopCm)) continue;   // 身体高度带外（地板等）：不挡
                 const float Ex = Halves[i].X + Inflate, Ey = Halves[i].Y + Inflate;
                 if (FMath::Abs(S.Pos.X - Centers[i].X) <= Ex && FMath::Abs(S.Pos.Y - Centers[i].Y) <= Ey) {
-                    SpawnBlocked += FString::Printf(TEXT(" [Spawn_%d@(%d,%d) 压在盒#%d]"),
-                                                    S.Index + 1, int32(S.Pos.X), int32(S.Pos.Y), i);
+                    SpawnBlocked += FString::Printf(TEXT(" [Spawn_%d@(%d,%d) 压在盒#%d=%s]"),
+                                                    S.Index + 1, int32(S.Pos.X), int32(S.Pos.Y), i,
+                                                    i < MarkerNames.Num() ? *MarkerNames[i] : TEXT("?"));
                     break;
                 }
             }
