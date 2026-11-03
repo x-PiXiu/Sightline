@@ -183,24 +183,18 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
         E.invulnUntilMs = nowMs + kInvulnMs;             // 出生保护（D7-03）
         E.rebasePending = true;                          // 重生握手（❗9）
         E.histCount = 0; E.histHead = 0;                 // 历史环清空——死前轨迹不得跨越重生（❗8）
-        std::size_t best = 0; float bestD = -1.f;
-        for (std::size_t i = 0; i < geometry_.spawnPoints.size(); ++i) {
-            const auto& sp = geometry_.spawnPoints[i];
-            float dMin = 1e9f;
-            for (const Entity& O : entities_) {
-                if (O.playerId == E.playerId || O.bDead || !O.bHasReport) continue;
-                const float dx = sp.x - O.x, dy = sp.y - O.y;
-                dMin = std::min(dMin, dx * dx + dy * dy);
-            }
-            if (dMin > bestD) { bestD = dMin; best = i; }
-        }
+        // 选点=合同出生点均匀随机（2026-11-04 用户令：重生就在已有出生点位随机选一个，不做
+        // "随机位置"也不做 D7-03 离敌最远——后者可预期（可蹲点）且出生点摊开后跳变 2~4km；
+        // 2s 无敌兜底出生保护）。落位仍钳入活动区（界外出生点数据由启动告警/烘焙红字拦）。
         if (!geometry_.spawnPoints.empty()) {            // 有合同点：服务器权威落位（人机首报同源）
-            const auto& sp = geometry_.spawnPoints[best];
+            std::uniform_int_distribution<std::size_t> pick(0, geometry_.spawnPoints.size() - 1);
+            const std::size_t picked = pick(rng_);       // 随机选中序（spawnIx/24 号回传语义不变）
+            const auto& sp = geometry_.spawnPoints[picked];
             E.x = std::clamp(sp.x, playMinX_, playMaxX_); // 界外出生点钳入活动区（同 StartMatch——
             E.y = std::clamp(sp.y, playMinY_, playMaxY_); //  24 号带钳后坐标=客户端传送不再被拽回）
             E.z = sp.z;
             E.yaw = sp.yawDeg;
-            E.spawnIx = static_cast<std::uint8_t>(best);
+            E.spawnIx = static_cast<std::uint8_t>(picked);  // 选中序随 24 号回传（比分/回放语义）
         } else {                                          // 无合同点：原位复活（ep05 兼容路径）
             E.x = E.spawnX = E.lx; E.y = E.spawnY = E.ly; E.z = E.spawnZ = E.lz;
         }

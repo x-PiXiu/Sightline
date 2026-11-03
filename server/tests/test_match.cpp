@@ -511,9 +511,11 @@ int main() {
         const auto* rb = rk.EntityById(61);
         CHECK(rb && !rb->bDead && rb->rebasePending);
         const float sx = rb->x, sy = rb->y;
-        CHECK(sx == -400.f && sy == 0.f);                          // 落位=离敌最远合同点
+        // 落位∈合同出生点（2026-11-04 用户令：选点改均匀随机——测试只验合同约束不验策略）
+        CHECK((sx == 0.f && sy == 0.f) || (sx == 400.f && sy == 0.f) || (sx == -400.f && sy == 0.f));
         now += 33;
-        rk.UpdateEntity(61, 400, 0, 92, 180, 0, 0, 10, now);       // 重生后在途旧报（尸体位 @400,0）→ 拒绝
+        // 在途旧报位置远离全部合同点（选点已改均匀随机——旧报恰好落在新锚上会被握手放行）
+        rk.UpdateEntity(61, 2000, 2000, 92, 180, 0, 0, 10, now);   // 重生后在途旧报 → 拒绝
         const auto* rj = rk.EntityById(61);
         CHECK(rj && rj->rebasePending);                            // 仍在握手期
         CHECK(rj->lx == sx && rj->ly == sy);                       // ★增量基准保持 spawn（修复前被 :104 污染回尸体位）
@@ -523,44 +525,54 @@ int main() {
         CHECK(rp && !rp->rebasePending);
         CHECK(rp->x == sx + 40.f && rp->y == sy && rp->z == 92.f); // ★权威位逐分量=上报位（修复前 300~600uu 过冲+追爬）
     }
-    stage("ep07 无敌诊断：重生 2s 保护内完美瞄准=miss+最近候选[无敌]；保护过期=命中（2026-11-04 零反馈实锤）");
+    stage("ep07 无敌诊断：重生 2s 保护内完美瞄准=miss+最近候选[无敌]；保护过期=命中（选点随机下射手恒居西）");
     {
         MatchService iv;
         MapGeometry g;
-        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{200, 0, 92, 180}};
+        g.spawnPoints = {SpawnPoint{-300.f, 0.f, 92.f, 0.f}, SpawnPoint{500.f, 0.f, 92.f, 180.f}};
         iv.SetGeometry(g);
         std::vector<RosterEntry> rs{{70, "h", 0}, {71, "v", 1}};
         iv.StartMatch(4, rs);
-        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 1, 1000);
-        iv.UpdateEntity(71, 200, 0, 92, 180, 0, 0, 1, 1000);
+        iv.UpdateEntity(70, -290.f, 0.f, 92.f, 0.f, 0.f, 0, 1, 1000);   // 射手锚旁激活
+        iv.UpdateEntity(71, 500.f, 0.f, 92.f, 180.f, 0.f, 0.f, 1, 1000);// 靶位激活
         std::uint64_t now = 1000;
+        std::uint32_t hseq = 1;
+        for (int i = 0; i < 4; ++i) {                          // 射手撤到 −700：两个候选重生点都在正前方
+            now += 33;
+            iv.UpdateEntity(70, float(-290 - 100 * (i + 1)), 0.f, 92.f, 0.f, 0.f, 0x00, ++hseq, now);
+        }
+        now += 33;
+        iv.UpdateEntity(70, -690.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++hseq, now);
         bool killed = false;
-        for (int i = 0; i < 4; ++i) {                          // 4 发×25 → 击杀
+        for (int i = 0; i < 4; ++i) {                          // 4 发×25 → 击杀（yaw0：射线过靶心旁 8cm）
             now += 200;
-            iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, static_cast<std::uint32_t>(2 + i), now);
+            iv.UpdateEntity(70, -690.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++hseq, now);
             auto ev = iv.Fire(70, now + 10);
             for (const auto& e : ev)
                 if (e.type == MatchEvent::Type::Kill) killed = true;
         }
         CHECK(killed);
         now += 4000;
-        auto rev = iv.Tick(now);                               // 到期重生：离敌最远=(200,0)（原地）
-        CHECK(find(rev, MatchEvent::Type::Respawn) != nullptr);
+        auto rev = iv.Tick(now);                               // 到期重生：均匀随机二选一
+        const auto* rv = find(rev, MatchEvent::Type::Respawn);
+        CHECK(rv != nullptr);
+        const float rx = rv->respawnX, ryv = rv->respawnY;     // 以实际落位为准
+        CHECK((rx == -300.f && ryv == 0.f) || (rx == 500.f && ryv == 0.f));
         now += 100;
-        iv.UpdateEntity(71, 200, 0, 92, 180, 0, 0, 9, now);    // 重生后首报（激活+入历史环）
+        iv.UpdateEntity(71, rx, ryv, 92.f, 180.f, 0.f, 0.f, 9, now);   // 重生后首报（激活+入历史环）
         now += 100;                                            // 无敌窗内（respawn+200 < +2000）
-        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 20, now);
-        auto miss = iv.Fire(70, now + 10);                     // 完美瞄准：射线正穿 (200,0,92)
+        iv.UpdateEntity(70, -690.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++hseq, now);
+        auto miss = iv.Fire(70, now + 10);                     // 完美瞄准：yaw0 射线正穿重生点旁 8cm
         CHECK(miss.size() == 1 && !miss[0].fire.bHit);         // 判定语义不变：无敌不可命中
         CHECK(miss[0].fireDiag.nearPid == 71);                 // ★诊断可见：最近候选=无敌目标
         CHECK(miss[0].fireDiag.nearInvuln);                    // ★[无敌] 旗置位（原=整只剔除零反馈）
         CHECK(miss[0].fireDiag.nearPerp < 70.f);               // 垂距≈63.5（含眼高 63cm 差，点到射线）
         now += 2200;                                           // 越过无敌窗
-        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 21, now);
+        iv.UpdateEntity(70, -690.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++hseq, now);
         auto hit = iv.Fire(70, now + 10);
         CHECK(hit.size() == 1 && hit[0].fire.bHit && hit[0].fire.victimPid == 71);   // 保护过期→命中
         now += 200;
-        iv.UpdateEntity(70, 10, 0, 92, 45, 0, 0, 22, now);     // 无敌过期后朝 45° 打偏
+        iv.UpdateEntity(70, -690.f, 0.f, 92.f, -60.f, 0.f, 0.f, ++hseq, now);  // 偏 60° 打偏
         auto miss2 = iv.Fire(70, now + 10);
         CHECK(miss2.size() == 1 && !miss2[0].fire.bHit);
         CHECK(miss2[0].fireDiag.nearPid == 71 && !miss2[0].fireDiag.nearInvuln);   // 同款 miss 不带旗

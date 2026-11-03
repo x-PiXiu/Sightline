@@ -9,6 +9,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <random>
 #include <vector>
 
 #include "match/fire_judge.h"   // 实体层纯决策（WeaponState/几何合同/求交）——依赖向内
@@ -166,6 +167,9 @@ public:
 
 private:
     std::vector<Entity> entities_;         // 在局实体（名册序；StartMatch 建，RemovePlayer 删）
+    // 重生选点 RNG（2026-11-04 用户令：合同出生点均匀随机，替代 D7-03 离敌最远——可预期性差+
+    // 摊开后跳变尺度大；2s 无敌兜底出生保护）。种子一次，跨局复用不影响均匀性。
+    std::mt19937 rng_{std::random_device{}()};
     std::uint32_t roomId_ = 0;
     bool bActive_ = false;
     MapGeometry geometry_;                 // 几何合同（构建期烘焙注入；缺省=空遮挡+默认胶囊 40/90）
