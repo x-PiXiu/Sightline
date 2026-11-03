@@ -135,13 +135,15 @@ public:
                          " killer=" + std::to_string(e.killKiller));
                 break;
             }
-            case MT::Respawn: {                    // ep07：24 号重生（spawnIndex 下发——Spawn_{n+1} 同源落位）
+            case MT::Respawn: {                    // v4.5：24 号（权威落位坐标下发——客户端不再自查表传送）
                 const std::string p = sightline::wire::RespawnMsg{
-                    e.respawnPid, e.spawnIndex, e.invulnMs}.Encode();
+                    e.respawnPid, e.spawnIndex, e.invulnMs,
+                    e.respawnX, e.respawnY, e.respawnZ, e.respawnYawDeg}.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     send(fd, protocol::MSG_S2C_RESPAWN, p);
                 LOG_INFO("[出站] RESPAWN pid=" + std::to_string(e.respawnPid) +
-                         " spawnIx=" + std::to_string(e.spawnIndex));
+                         " spawnIx=" + std::to_string(e.spawnIndex) +
+                         " @(" + std::to_string(e.respawnX) + "," + std::to_string(e.respawnY) + ")");
                 break;
             }
             case MT::Ended: {                      // ep07：25 号结算（比分行）

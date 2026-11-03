@@ -346,17 +346,14 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     }
 }
 
-void ASightlineCharacter::ResetRemoteOnRespawn(int32 SpawnIndex) {
+void ASightlineCharacter::ResetRemoteOnRespawn(FVector SpawnPos) {
     // ❗10：远端重生——插值窗重置（SnapCount=0→下一快照直摆落位）+幽灵历史环清空（死前轨迹不跨越重生）
     SnapCount = 0;
     SnapA = FSnapshot{}; SnapB = FSnapshot{};
     RemoteVelocity = FVector::ZeroVector;
     SmoothedRemoteVel = FVector::ZeroVector;
     AuthCount = 0; AuthHead = 0;
-    if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
-        SetActorLocation(Start->GetActorLocation());
-        SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));
-    }
+    SetActorLocation(SpawnPos, false, nullptr, ETeleportType::TeleportPhysics);  // v4.5：权威落位
 }
 
 FVector ASightlineCharacter::SampleAuthorityAt(double TimeSec) const {
@@ -498,7 +495,7 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
     }
 }
 
-void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs) {
+void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs, FVector SpawnPos) {
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Pid)) {
         // 自己：清预测输入环（❗9——防和解拉回尸体）+ 解除死亡定身 + 落位重生点（Spawn_{n+1} 同源）+ 无敌闪
         MatchSession->ClearPredictionInput();   // ❗9：清预测输入环（防和解拉回尸体）
@@ -506,14 +503,14 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs)
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
         LocalMag = kClientMag;                                   // 服务器重生满匣（Tick 里 magUsed=0）——
         LocalReloadUntilMs = 0;                                  // 客户端镜像同步重置（死后 28/30 残留=双端漂移源）
-        if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
-            SetActorLocation(Start->GetActorLocation());
-            SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));
-        }
+        // v4.5：传送坐标=24 号下发的服务器权威落位（与锚定握手锚点同源——不再自查表：
+        //  FindSpawnStart 关卡实时位置漂移会让传送点≠锚，rebase 拒放行→和解拉扯+和解暴增）
+        SetActorLocation(SpawnPos, false, nullptr, ETeleportType::TeleportPhysics);
+        SetActorRotation(FRotator(0.f, 0.f, 0.f));
     } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
             if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid)))
-                Remote->ResetRemoteOnRespawn(SpawnIndex);        // ❗10：远端插值重置+幽灵环清空
+                Remote->ResetRemoteOnRespawn(SpawnPos);          // ❗10：远端插值重置+幽灵环清空+权威落位
     }
 }
 

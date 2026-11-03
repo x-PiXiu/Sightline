@@ -182,7 +182,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             ClearPredictionInput();                            // ❗9：清预测输入环（防和解拉回尸体）
         }
         EntityHp.Add(Pid, 100);                                // 满血入账
-        OnRespawn.Broadcast(Pid, static_cast<int32>(R.spawnIndex), static_cast<int32>(R.invulnMs));
+        OnRespawn.Broadcast(Pid, static_cast<int32>(R.spawnIndex), static_cast<int32>(R.invulnMs), R.Pos);
         return;
     }
     if (MsgId == SightlineProtocol::MSG_S2C_MATCH_END) {       // ep07：25 号（结算面板）

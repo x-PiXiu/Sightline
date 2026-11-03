@@ -106,8 +106,9 @@ struct MatchEvent {
     std::uint32_t killVictim = 0, killKiller = 0;      // Kill（23 号）
     std::uint16_t respawnDelayMs = 0;                  // Kill（倒计时下发·ep08 进数值表零改动）
     std::uint32_t respawnPid = 0;                      // Respawn（24 号）
-    std::uint8_t spawnIndex = 0;                       // Respawn（落点序·客户端 Spawn_{n+1} 同源）
+    std::uint8_t spawnIndex = 0;                       // Respawn（落点序·比分/回放语义）
     std::uint16_t invulnMs = 0;                        // Respawn（无敌窗）
+    float respawnX = 0.f, respawnY = 0.f, respawnZ = 0.f, respawnYawDeg = 0.f;  // v4.5：权威落位坐标（客户端传送同源）
     std::uint8_t endReason = 0;                        // Ended（1=击杀上限 2=真人全离）
     std::vector<ScoreRow> scores;                      // Ended（结算比分）
 };

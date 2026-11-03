@@ -52,8 +52,8 @@ struct FSightlineKill {
     UPROPERTY(BlueprintReadOnly) int32 VictimHp = 0;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKill, const FSightlineKill&, Kill);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnRespawn, int32, Pid, int32, SpawnIndex,
-                                               int32, InvulnMs);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnRespawn, int32, Pid, int32, SpawnIndex,
+                                               int32, InvulnMs, FVector, SpawnPos);
 /** 25 号结算行 */
 USTRUCT(BlueprintType)
 struct FSightlineScoreRow {

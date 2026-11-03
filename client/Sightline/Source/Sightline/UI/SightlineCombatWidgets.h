@@ -26,7 +26,7 @@ protected:
     virtual void NativeDestruct() override;
 
     UFUNCTION() void HandleFireResult(const FSightlineFireResult& Result);
-    UFUNCTION() void HandleRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs);
+    UFUNCTION() void HandleRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs, FVector SpawnPos);
 
     UPROPERTY(meta = (BindWidgetOptional))
     UProgressBar* HealthBar = nullptr;

@@ -185,6 +185,7 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
         r.respawnPid = E.playerId;
         r.spawnIndex = E.spawnIx;
         r.invulnMs = static_cast<std::uint16_t>(kInvulnMs);
+        r.respawnX = E.x; r.respawnY = E.y; r.respawnZ = E.z; r.respawnYawDeg = E.yaw;  // v4.5：权威落位坐标随 24 号下发
         out.push_back(std::move(r));
     }
     // —— ep07：结束判定（真人全部离开由 AbortMatch 直达——此处只管击杀上限）——

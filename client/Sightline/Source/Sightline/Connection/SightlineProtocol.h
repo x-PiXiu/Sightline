@@ -216,15 +216,21 @@ struct FKillMsg {
 
 struct FRespawnMsg {
     std::uint32_t pid = 0;
-    std::uint8_t spawnIndex = 0;       // 服务器选点序号（FindSpawnStart(Spawn_{n+1}) 同源）
+    std::uint8_t spawnIndex = 0;       // 服务器选点序号（比分/回放语义保留）
     std::uint16_t invulnMs = 0;
-    static constexpr int32_t Size = 7;
+    FVector Pos = FVector::ZeroVector; // v4.5：服务器权威落位坐标（客户端传送用它，不再自查表——
+                                       //  FindSpawnStart 关卡实时位置与烘焙合同漂移→锚定握手拒放行→
+                                       //  和解拉扯+和解暴增，2026-11-03 实锤）
+    float YawDeg = 0.f;
+    static constexpr int32_t Size = 23;
     static bool Parse(const TArray<uint8_t>& P, FRespawnMsg& Out)
     {
         if (P.Num() < Size) return false;
         Out.pid = ReadU32(P, 0);
         Out.spawnIndex = P[4];
         Out.invulnMs = static_cast<uint16>(P[5]) | (static_cast<uint16>(P[6]) << 8);
+        Out.Pos = FVector(ReadF32(P, 7), ReadF32(P, 11), ReadF32(P, 15));
+        Out.YawDeg = ReadF32(P, 19);
         return true;
     }
 };

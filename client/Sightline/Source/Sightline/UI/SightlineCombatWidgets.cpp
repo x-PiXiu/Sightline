@@ -40,7 +40,7 @@ void UCombatHudWidgetBase::HandleFireResult(const FSightlineFireResult& Result)
     SetHp(Result.VictimHp, 100);
 }
 
-void UCombatHudWidgetBase::HandleRespawn(int32 Pid, int32 /*SpawnIndex*/, int32 /*InvulnMs*/)
+void UCombatHudWidgetBase::HandleRespawn(int32 Pid, int32 /*SpawnIndex*/, int32 /*InvulnMs*/, FVector /*SpawnPos*/)
 {
     if (Session.IsValid() && Session->IsSelfPlayer(Pid)) SetHp(100, 100);
 }

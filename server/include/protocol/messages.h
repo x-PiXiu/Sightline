@@ -180,17 +180,43 @@ struct KillMsg {                                   // 23：[4B victim][4B killer
     }
 };
 
-struct RespawnMsg {                                // 24：[4B pid][1B spawnIndex][2B invulnMs]=7B
+struct RespawnMsg {                                // v4.5：[4B pid][1B spawnIndex][2B invulnMs][4B x][4B y][4B z][4B yaw]=23B
     std::uint32_t pid = 0;
-    std::uint8_t spawnIndex = 0;                   // 服务器选点序号（客户端 Spawn_{n+1} 同源落位）
+    std::uint8_t spawnIndex = 0;                   // 服务器选点序号（Spawn_{n+1} 同源·比分/回放语义保留）
     std::uint16_t invulnMs = 0;
+    float x = 0.f, y = 0.f, z = 0.f, yawDeg = 0.f; // v4.5：服务器权威落位坐标（客户端不再自查表传送——
+                                                   //  FindSpawnStart 关卡实时位置与烘焙合同漂移→锚定握手
+                                                   //  拒放行→和解拉扯+和解暴增，2026-11-03 用户实锤）
+    static constexpr std::size_t kSize = 23;
     std::string Encode() const {
-        std::string s(7, '\0');
-        for (int i = 0; i < 4; ++i) s[i] = static_cast<char>((pid >> (8 * i)) & 0xFF);
+        std::string s(kSize, '\0');
+        const auto wrU32 = [&s](int o, std::uint32_t v) {
+            for (int i = 0; i < 4; ++i) s[o + i] = static_cast<char>((v >> (8 * i)) & 0xFF);
+        };
+        const auto wrF = [&s, &wrU32](int o, float f) {
+            std::uint32_t bits; std::memcpy(&bits, &f, sizeof(float));
+            wrU32(o, bits);
+        };
+        wrU32(0, pid);
         s[4] = static_cast<char>(spawnIndex);
         s[5] = static_cast<char>(invulnMs & 0xFF);
         s[6] = static_cast<char>((invulnMs >> 8) & 0xFF);
+        wrF(7, x); wrF(11, y); wrF(15, z); wrF(19, yawDeg);
         return s;
+    }
+    static std::optional<RespawnMsg> Parse(std::span<const std::uint8_t> b) {
+        if (b.size() != kSize) return std::nullopt;
+        RespawnMsg m;
+        const auto rdU32 = [&b](int o) {
+            return static_cast<std::uint32_t>(b[o]) | (static_cast<std::uint32_t>(b[o + 1]) << 8) |
+                   (static_cast<std::uint32_t>(b[o + 2]) << 16) | (static_cast<std::uint32_t>(b[o + 3]) << 24);
+        };
+        const auto rdF = [&b](int o) { float f; std::memcpy(&f, b.data() + o, sizeof(float)); return f; };
+        m.pid = rdU32(0);
+        m.spawnIndex = b[4];
+        m.invulnMs = static_cast<std::uint16_t>(b[5]) | (static_cast<std::uint16_t>(b[6]) << 8);
+        m.x = rdF(7); m.y = rdF(11); m.z = rdF(15); m.yawDeg = rdF(19);
+        return m;
     }
 };
 
