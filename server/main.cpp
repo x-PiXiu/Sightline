@@ -191,7 +191,7 @@ int main() {
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
     adapters::BotDriver botDriver;                        // ep07：人机驱动（主线程单线程·零锁）
-    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver};
+    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟：与 Tick/人机/RTT 同源
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 

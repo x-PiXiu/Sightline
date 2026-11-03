@@ -5,6 +5,7 @@
 #pragma once
 #include <chrono>
 #include <cstring>
+#include <functional>
 
 #include "adapters/lobby_wiring.h"   // MessageDispatcher / FrameWriter / ConnTable
 #include "lobby/lobby.h"
@@ -18,10 +19,17 @@ namespace adapters {
 
 class MatchWiring {
 public:
+    // 时钟注入（ADR-1 单钟·2026-11-04 双钟复盘）：适配器不得自带时钟——main 以 nowMs 注入，与
+    // Tick/人机驱动/RTT 完全同源。此前 19/20 号处理器内联 steady_clock，而 main/Tick 用 system_clock，
+    // 两个时钟数值差 N 小时 → ①玩家击杀 respawnAtMs(steady) 对 Tick(system) 恒"已过期"=同毫秒
+    // KILL+RESPAWN（受害者瞬移复活=客户端"人机拉扯"）②玩家开火 judgeAt(steady) 采样人机历史
+    // (system 打戳) 恒钳最老条目=永远打在 ~1 秒前的人机身上（垂距 300~750cm=400cm/s×1s）。
+    // 默认回退 system_clock（与 main.nowMs 同款）防裸构造漏注入。
     MatchWiring(MessageDispatcher& disp, sightline::match::MatchService& match,
                 sightline::lobby::LobbyService& lobby, FrameWriter& writer,
-                BotDriver* bot = nullptr)
-        : disp_(disp), match_(match), lobby_(lobby), writer_(writer), bot_(bot) {}
+                BotDriver* bot = nullptr,
+                std::function<std::uint64_t()> now = nullptr)
+        : disp_(disp), match_(match), lobby_(lobby), writer_(writer), bot_(bot), now_(std::move(now)) {}
 
     void Register() {
         // 19：位置上报 v2（v4 R10——对局期内替代 16）——Parse 集中校验（messages.h 唯一长度守门）
@@ -36,9 +44,7 @@ public:
                             " fd=" + std::to_string(fd));
                 return;
             }
-            const auto nowMs = static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch()).count());
+            const auto nowMs = Now_();                       // 注入钟（ADR-1 单钟）——历史环打戳与 Tick/回溯同源
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                            // 未登录/不在房：上报无效
             match_.UpdateEntity(static_cast<uint32_t>(pid),
@@ -90,10 +96,7 @@ public:
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                             // 未登录：无效
             LOG_INFO("[开火·请求] shooter=" + std::to_string(pid) + " fd=" + std::to_string(fd));
-            const auto nowMs = static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch()).count());
-            writer_.deliverMatch(match_.Fire(static_cast<std::uint32_t>(pid), nowMs));
+            writer_.deliverMatch(match_.Fire(static_cast<std::uint32_t>(pid), Now_()));   // 注入钟（ADR-1 单钟）
         }, true);
 
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
@@ -121,7 +124,7 @@ public:
             lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
             writer_.deliverMatch(match_.StartMatch(roomId, entries));
             // 人机首报读用例分配结果（Entity::spawnIx）——不传本地 entries：值传递副本里 spawnIndex 全 0
-            if (bot_) bot_->OnMatchStart(roomId, match_.Geometry(), match_, NowMs());
+            if (bot_) bot_->OnMatchStart(roomId, match_.Geometry(), match_, Now_());
         });
         // 26/27：人机席位指令（仅房主——D2-11 同款校验线）
         disp_.on(protocol::MSG_C2S_BOT_ADD, "添加人机",
@@ -183,10 +186,12 @@ public:
     void HandleDisconnect(int fd) { HandleMemberGone(fd); }
 
 private:
-    static std::uint64_t NowMs() {
+    // 注入钟（ADR-1 单钟）：main 以 nowMs（system_clock 墙钟）注入；空=回退 system_clock 同款
+    std::uint64_t Now_() const {
+        if (now_) return now_();
         return static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+                std::chrono::system_clock::now().time_since_epoch()).count());
     }
     // fd → PlayerId 翻译 → 对局离场（不在局则空转）
     void HandleMemberGone(int fd) {
@@ -200,6 +205,7 @@ private:
     sightline::lobby::LobbyService& lobby_;
     FrameWriter& writer_;
     BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）；声明序=构造初始化序（-Wreorder）
+    std::function<std::uint64_t()> now_;   // 注入钟（ADR-1 单钟·2026-11-04 双钟复盘）——空=回退 system
 };
 
 } // namespace adapters
