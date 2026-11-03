@@ -8,9 +8,8 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
+#include "Match/SightlineMatchSession.h"   // FSightlineFireResult/Kill/ScoreRow：UFUNCTION 形参要完整类型（头文件自足，不赖 unity 拼接顺序）
 #include "SightlineCombatWidgets.generated.h"
-
-class USightlineMatchSession;
 
 /** 血条（对局 HUD 扩展——自己血量；数据=OnFireResult.VictimHp + OnRespawn 满血） */
 UCLASS(Abstract)
@@ -58,10 +57,9 @@ protected:
 
 private:
     void PushLine(const FString& Text);
+    FString NameOf(int32 Pid) const;              // 击杀时刻现查 Registry（构造期建表=空表，见 .cpp）
     TWeakObjectPtr<USightlineMatchSession> Session;
     int32 SelfPid = 0;
-    /** pid→名字（播报可读：Registry 名册或 MatchStart 名册——BindSession 时抓） */
-    TMap<int32, FString> NameByPid;
 };
 
 /** 结算面板（OnMatchEnd 25 号触发显示；房主可再来一局） */

@@ -128,9 +128,15 @@ public:
             const std::span<const std::uint8_t> bytes(
                 reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
             const auto msg = sightline::wire::BotAddMsg::Parse(bytes);
-            if (!msg) return;
+            if (!msg) {
+                LOG_WARNING("[人机] 添加拒绝（载荷长度非法 len=" + std::to_string(payload.size()) + "）fd=" + std::to_string(fd));
+                return;
+            }
             uint32_t roomId = 0;
-            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) return;
+            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) {
+                LOG_WARNING("[人机] 添加拒绝（不在房间/非房主）fd=" + std::to_string(fd));
+                return;
+            }
             const int pid = lobby_.AddBot(roomId);
             if (pid < 0) {
                 LOG_WARNING("[人机] 添加失败（房间满/对局中）房=" + std::to_string(roomId));
@@ -145,10 +151,19 @@ public:
             const std::span<const std::uint8_t> bytes(
                 reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
             const auto msg = sightline::wire::BotRemoveMsg::Parse(bytes);
-            if (!msg) return;
+            if (!msg) {
+                LOG_WARNING("[人机] 移除拒绝（载荷长度非法 len=" + std::to_string(payload.size()) + "）fd=" + std::to_string(fd));
+                return;
+            }
             uint32_t roomId = 0;
-            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) return;
-            if (!lobby_.IsBot(msg->botPid)) return;
+            if (!lobby_.RoomIdByFd(fd, roomId) || !lobby_.IsHost(fd)) {
+                LOG_WARNING("[人机] 移除拒绝（不在房间/非房主）fd=" + std::to_string(fd));
+                return;
+            }
+            if (!lobby_.IsBot(msg->botPid)) {
+                LOG_WARNING("[人机] 移除拒绝（pid=" + std::to_string(msg->botPid) + " 不是人机）");
+                return;
+            }
             writer_.deliver(lobby_.RemoveBot(msg->botPid));
             if (bot_) bot_->RemoveBot(msg->botPid);
             LOG_INFO("[人机] 已移除 pid=" + std::to_string(msg->botPid));

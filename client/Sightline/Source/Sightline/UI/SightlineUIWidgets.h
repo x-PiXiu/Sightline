@@ -142,6 +142,9 @@ protected:
     void OnStartMatchClicked();                     // 开始对局（意图只发包；服务器校验房主）
 
     UFUNCTION()
+    void OnAddBotClicked();                        // ep07：添加人机（26 号意图只发包；服务器校验房主+4 人上限）
+
+    UFUNCTION()
     void HandleRoomStateChanged(int32 RoomId, const FString& HostName, const TArray<FString>& Members);
 
     UPROPERTY(meta = (BindWidget))
@@ -156,6 +159,8 @@ protected:
     /** 开始对局按钮（BindWidgetOptional——WBP 摆了才生效；可见性由 C++ 按房主驱动，P5） */
     UPROPERTY(meta = (BindWidgetOptional))
     UButton* StartMatchButton = nullptr;
+    UPROPERTY(meta = (BindWidgetOptional))
+    UButton* AddBotButton = nullptr;              // ep07：添加人机（可选——WBP 摆了才有）
 
     UPROPERTY(meta = (BindWidgetOptional))
     UBorder* SlotBox_1 = nullptr;

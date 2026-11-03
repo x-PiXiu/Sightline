@@ -176,18 +176,23 @@ void URoomWidgetBase::InitMatch(USightlineMatchSession* InMatch) {
 void URoomWidgetBase::NativeConstruct() {
     Super::NativeConstruct();
     UE_LOG(LogTemp, Warning,
-           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s | StartMatchButton=%s | 槽位模式=%s"),
+           TEXT("[诊断] Room 构造：根类=%s | MemberListText=%s | RoomTitleText=%s | LeaveButton=%s | StartMatchButton=%s | AddBotButton=%s | 槽位模式=%s"),
            *GetClass()->GetName(),
            MemberListText ? TEXT("已绑定") : TEXT("未绑定!"),
            RoomTitleText ? TEXT("已绑定") : TEXT("未绑定!"),
            LeaveButton ? TEXT("已绑定") : TEXT("未绑定!"),
            StartMatchButton ? TEXT("已绑定") : TEXT("未绑定!"),
+           AddBotButton ? TEXT("已绑定") : TEXT("未绑定!"),
            SlotText_1 ? TEXT("ON") : TEXT("OFF（文本名单兜底）"));
     if (MemberListText) MemberListText->SetAutoWrapText(true);   // 成员名单自动换行
     if (LeaveButton) LeaveButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnLeaveClicked);
     if (StartMatchButton) {
         StartMatchButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnStartMatchClicked);
         StartMatchButton->SetVisibility(ESlateVisibility::Collapsed);   // 默认折叠，房主身份到了再显
+    }
+    if (AddBotButton) {
+        AddBotButton->OnClicked.AddDynamic(this, &URoomWidgetBase::OnAddBotClicked);
+        AddBotButton->SetVisibility(ESlateVisibility::Collapsed);       // 同上：房主可见（ep07）
     }
     if (Session.IsValid()) {
         Session->OnRoomStateChanged.AddDynamic(this, &URoomWidgetBase::HandleRoomStateChanged);
@@ -283,6 +288,11 @@ void URoomWidgetBase::HandleRoomStateChanged(int32 RoomId, const FString& HostNa
         StartMatchButton->SetVisibility(HostName == MyName
             ? ESlateVisibility::Visible
             : ESlateVisibility::Collapsed);
+    // 添加人机按钮（ep07）：同款房主驱动——人机席位=房主特权（服务器 AddBot 二次校验）
+    if (AddBotButton)
+        AddBotButton->SetVisibility(HostName == MyName
+            ? ESlateVisibility::Visible
+            : ESlateVisibility::Collapsed);
 }
 
 void URoomWidgetBase::OnLeaveClicked() {
@@ -291,6 +301,14 @@ void URoomWidgetBase::OnLeaveClicked() {
 
 void URoomWidgetBase::OnStartMatchClicked() {
     if (MatchSession.IsValid()) MatchSession->StartMatch();       // 意图只发包（v3 契约 14，空 payload）
+}
+
+void URoomWidgetBase::OnAddBotClicked() {
+    // ep07 人机席位：26 号意图只发包（难度 1=中 默认档）；上限/房主/对局中三道校验全在服务器
+    if (MatchSession.IsValid()) {
+        MatchSession->SendBotAdd(1);
+        UE_LOG(LogTemp, Log, TEXT("[人机] 已发送添加人机请求（难度=中）"));
+    }
 }
 
 // ============ 调试面板（M5 损伤滑块）============

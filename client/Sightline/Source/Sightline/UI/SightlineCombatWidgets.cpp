@@ -66,11 +66,7 @@ void UKillFeedWidgetBase::BindSession(USightlineMatchSession* InSession)
 void UKillFeedWidgetBase::NativeConstruct()
 {
     Super::NativeConstruct();
-    // 名字表：Registry 名册（人机/真人统一——服务器名册即真相）
-    if (Session.IsValid())
-        if (const auto* Reg = Session->GetRegistry())
-            for (const FSightlineEntityState& E : Reg->All())
-                NameByPid.Add(E.PlayerId, E.Name);
+    // 名字不在这里建表：AddToViewport 同步触发本函数，早于 BindSession——此刻 Session 必为空
 }
 
 void UKillFeedWidgetBase::NativeDestruct()
@@ -81,11 +77,17 @@ void UKillFeedWidgetBase::NativeDestruct()
 
 void UKillFeedWidgetBase::HandleKill(const FSightlineKill& Kill)
 {
-    const int32 VictimPid = Kill.VictimPid;
-    const int32 KillerPid = Kill.KillerPid;
-    const FString KillerName = NameByPid.Contains(KillerPid) ? NameByPid[KillerPid] : TEXT("?");
-    const FString VictimName = NameByPid.Contains(VictimPid) ? NameByPid[VictimPid] : TEXT("?");
-    PushLine(FString::Printf(TEXT("%s 击杀了 %s"), *KillerName, *VictimName));
+    PushLine(FString::Printf(TEXT("%s 击杀了 %s"), *NameOf(Kill.KillerPid), *NameOf(Kill.VictimPid)));
+}
+
+FString UKillFeedWidgetBase::NameOf(int32 Pid) const
+{
+    // 击杀时刻现查 Registry（人机/真人统一——服务器名册即真相；结算面板同款）
+    if (Session.IsValid())
+        if (const auto* Reg = Session->GetRegistry())
+            for (const FSightlineEntityState& E : Reg->All())
+                if (E.PlayerId == Pid) return E.Name;
+    return FString::FromInt(Pid);
 }
 
 void UKillFeedWidgetBase::PushLine(const FString& Text)

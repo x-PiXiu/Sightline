@@ -174,6 +174,12 @@ protected:
     TSubclassOf<UUserWidget> HurtFlashClass;     // 红闪（WBP_HurtFlash）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
     TSubclassOf<UUserWidget> HitmarkerClass;     // Hitmarker（WBP_Hitmarker·对象池管理）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> CombatHudClass;      // 血条（根类 UCombatHudWidgetBase·WBP_CombatHud）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> KillFeedClass;       // 击杀播报（根类 UKillFeedWidgetBase·WBP_KillFeed）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> ResultClass;         // 结算面板（根类 UResultWidgetBase·WBP_Result）
 
     // —— M5 枪口火光（D5-16v2：NS 为参数驱动——每发写 User.Trigger 上升沿 + User.Direction；
     //     组件由 BP 挂在 WeaponRifle 的 Muzzle 插槽下，C++ BeginPlay 按类自动发现；
@@ -213,6 +219,9 @@ private:
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
     UPROPERTY() TObjectPtr<UUserWidget> CrosshairWidget = nullptr;
     UPROPERTY() TObjectPtr<UUserWidget> HurtFlashWidget = nullptr;
+    UPROPERTY() TObjectPtr<UUserWidget> CombatHudWidget = nullptr;   // ep07：血条
+    UPROPERTY() TObjectPtr<UUserWidget> KillFeedWidget = nullptr;    // ep07：击杀播报
+    UPROPERTY() TObjectPtr<UUserWidget> ResultWidget = nullptr;      // ep07：结算面板
     FTimerHandle HitmarkerTimer;
     TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;

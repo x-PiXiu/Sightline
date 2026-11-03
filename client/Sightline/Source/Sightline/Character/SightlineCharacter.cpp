@@ -27,6 +27,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Game/SightlineObjectPoolSubsystem.h"
 #include "UI/SightlineUIWidgets.h"
+#include "UI/SightlineCombatWidgets.h"
 
 namespace {
     constexpr const TCHAR* kMappingContextPath = TEXT("/Game/Code/Input/IMC_Default.IMC_Default");
@@ -602,6 +603,36 @@ void ASightlineCharacter::CreateMatchUI() {
     UE_LOG(LogTemp, Log, TEXT("[对局UI] 准星=%s 红闪=%s"),
            CrosshairWidget ? TEXT("OK") : TEXT("未配置"),
            HurtFlashWidget ? TEXT("OK") : TEXT("未配置"));
+
+    // —— ep07 战斗 UI 三件（血条/击杀播报/结算——Bind 委托；结算默认 Collapsed 自管理）——
+    if (CombatHudClass) {
+        CombatHudWidget = CreateWidget<UUserWidget>(GetWorld(), CombatHudClass);
+        if (CombatHudWidget) {
+            CombatHudWidget->AddToViewport(43);
+            if (auto* Combat = Cast<UCombatHudWidgetBase>(CombatHudWidget))
+                Combat->BindSession(MatchSession.Get());               // 单参：SelfPid 由基类从会话自取
+        }
+    }
+    if (KillFeedClass) {
+        KillFeedWidget = CreateWidget<UUserWidget>(GetWorld(), KillFeedClass);
+        if (KillFeedWidget) {
+            KillFeedWidget->AddToViewport(44);
+            if (auto* Feed = Cast<UKillFeedWidgetBase>(KillFeedWidget))
+                Feed->BindSession(MatchSession.Get());
+        }
+    }
+    if (ResultClass) {
+        ResultWidget = CreateWidget<UUserWidget>(GetWorld(), ResultClass);
+        if (ResultWidget) {
+            ResultWidget->AddToViewport(45);
+            if (auto* Result = Cast<UResultWidgetBase>(ResultWidget))
+                Result->BindSession(MatchSession.Get(), MatchSession.IsValid() ? MatchSession->GetSelfPlayerId() : 0);
+        }
+    }
+    UE_LOG(LogTemp, Log, TEXT("[对局UI] 血条=%s 播报=%s 结算=%s（ep07 战斗 UI）"),
+           CombatHudClass ? TEXT("OK") : TEXT("未配置"),
+           KillFeedClass ? TEXT("OK") : TEXT("未配置"),
+           ResultClass ? TEXT("OK") : TEXT("未配置"));
     // ep06 首枪预热（挂这里而非 OnMatchStartedHandler——本项目常规时序=15 号先到、切图后角色
     // 才出生，新角色 BeginPlay 走 IsInMatch→CreateMatchUI 分支、OnMatchStartedHandler 不会被绑
     // （2026-10-31 日志实锤：预热从未执行）。两条时序收敛于此，每角色实例只跑一次）
