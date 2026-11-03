@@ -184,30 +184,31 @@ public:
                 // 诊断行（每次开火一条全参数判定链：门/眼位/方向/命中距离/余血）
                 static const char* GateName[] = {"Ok", "换弹中", "弹匣空", "射速限制", "死亡/终局"};
                 const auto& F = e.fire;
+                const auto& D = e.fireDiag;   // 判定链诊断快照（2026-11-04 拆分——判定行专用）
                 if (!F.bAccepted) {
                     LOG_INFO("[射击拒绝] shooter=" + std::to_string(F.shooterPid) +
                               " 原因=" + GateName[F.gate % 5]);
                     break;                                   // 被武器门拦下：不广播 21 号（静默丢 D5-03）
                 }
                 std::string judgeLine = "[射击判定] shooter=" + std::to_string(F.shooterPid) +
-                          " 眼位=(" + std::to_string(F.oX) + "," + std::to_string(F.oY) + "," + std::to_string(F.oZ) + ")" +
-                          " 方向=(" + std::to_string(F.dX) + "," + std::to_string(F.dY) + "," + std::to_string(F.dZ) + ")" +
+                          " 眼位=(" + std::to_string(D.oX) + "," + std::to_string(D.oY) + "," + std::to_string(D.oZ) + ")" +
+                          " 方向=(" + std::to_string(D.dX) + "," + std::to_string(D.dY) + "," + std::to_string(D.dZ) + ")" +
                           " hit=" + std::to_string(F.bHit) +
                           " victim=" + std::to_string(F.victimPid) +
-                          " dist=" + std::to_string(F.dist) +
+                          " dist=" + std::to_string(D.dist) +
                           " hp=" + std::to_string(F.victimHp) +
-                          " 射手位=(" + std::to_string(F.shooterX) + "," + std::to_string(F.shooterY) + "," + std::to_string(F.shooterZ) + ")" +
-                          " 受害位=(" + std::to_string(F.victimX) + "," + std::to_string(F.victimY) + "," + std::to_string(F.victimZ) + ")" +
-                          " 命中体=(r=" + std::to_string(F.hbRadius) + " 半高=" + std::to_string(F.hbHalfH) + ")" +
-                          " 回溯=" + std::to_string(F.rewindMs) + "ms";
+                          " 射手位=(" + std::to_string(D.shooterX) + "," + std::to_string(D.shooterY) + "," + std::to_string(D.shooterZ) + ")" +
+                          " 受害位=(" + std::to_string(D.victimX) + "," + std::to_string(D.victimY) + "," + std::to_string(D.victimZ) + ")" +
+                          " 命中体=(r=" + std::to_string(D.hbRadius) + " 半高=" + std::to_string(D.hbHalfH) + ")" +
+                          " 回溯=" + std::to_string(D.rewindMs) + "ms";
                 // miss 诊断：最近候选（回溯采样位+垂距）——"打不中"复盘直接可读目标方位与偏差量；
                 // [无敌] 旗=该目标仅因重生 2s 保护未被判定（2026-11-04 实锤：完美瞄准 0.2° 打无敌=零反馈）
-                if (!F.bHit && F.nearPid != 0)
-                    judgeLine += " 最近候选=pid" + std::to_string(F.nearPid) +
-                                 " 垂距=" + std::to_string(F.nearPerp) + "cm 位=(" +
-                                 std::to_string(F.nearX) + "," + std::to_string(F.nearY) + "," +
-                                 std::to_string(F.nearZ) + ")" +
-                                 (F.nearInvuln ? " [无敌——重生保护内·命中无效]" : "");
+                if (!F.bHit && D.nearPid != 0)
+                    judgeLine += " 最近候选=pid" + std::to_string(D.nearPid) +
+                                 " 垂距=" + std::to_string(D.nearPerp) + "cm 位=(" +
+                                 std::to_string(D.nearX) + "," + std::to_string(D.nearY) + "," +
+                                 std::to_string(D.nearZ) + ")" +
+                                 (D.nearInvuln ? " [无敌——重生保护内·命中无效]" : "");
                 // 人机每个约 10 发/秒：判定行降 TRACE（真人仍 INFO 整链可见；击杀 23 号恒 INFO）
                 if (lobby_.IsBot(F.shooterPid)) LOG_TRACE(judgeLine);
                 else LOG_INFO(judgeLine);

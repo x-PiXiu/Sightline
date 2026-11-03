@@ -60,33 +60,32 @@ struct EntitySnapshot {
     std::uint32_t ackedSeq = 0;        // v4：17 号每实体 25B→29B（契约破例 D4-01）
 };
 
-/** 对局领域事件（纯数据；FrameWriter 翻译成 15/17/18/21 帧）
- *  M5：FireResult = 21 号载荷源（全房间广播含射手自己——一条消息三方共用：Hitmarker/tracer/红闪）
- *  诊断字段（bAccepted/gate/o/d/dist）不入 21 号——仅供适配层日志（每次开火一条判定链全参数行） */
+/** 21 号载荷源 + 领域裁定（2026-11-04 审计 C 级收编：域事件只载裁定与 wire 字段，
+ *  判定链诊断一律进 FireDiagnostics——域事件回归"纯裁定"职责） */
 struct FireResultData {
     std::uint32_t shooterPid = 0;
     bool bHit = false;
-    bool bAccepted = true;                     // false=被武器门拦下（②③④ 静默丢——诊断日志用）
-    std::uint8_t gate = 0;                     // FireGate 枚举值（0=Ok 1=换弹 2=弹匣 3=射速）
+    bool bAccepted = true;                     // false=被武器门拦下（②③④ 静默丢 D5-03——驱动器丢事件过滤）
+    std::uint8_t gate = 0;                     // FireGate 枚举值（0=Ok 1=换弹 2=弹匣 3=射速 4=死亡/终局）
     std::uint32_t victimPid = 0;
     float hitX = 0.f, hitY = 0.f, hitZ = 0.f;  // 未命中=射线终点（墙面或 Lmax 端点，tracer 停墙）
     std::uint8_t victimHp = 0;                 // 命中后余血（ep07 接血条/死亡判定，契约一次定稿）
+};
+
+/** 判定链诊断快照（2026-10-28 用户令"判定链全参数可读" + 2026-11-03 miss 最近候选 +
+ *  2026-11-04 [无敌]旗——审计 C 级收编：从域事件拆出，适配层判定行专用，**永不入 21 号 wire**） */
+struct FireDiagnostics {
     float oX = 0.f, oY = 0.f, oZ = 0.f;        // 射线起点（眼位）
     float dX = 0.f, dY = 0.f, dZ = 0.f;        // 射线方向（单位向量）
     float dist = 0.f;                          // 命中距离（未命中=Lmax）
-    // —— 判定时刻几何快照（2026-10-28 用户令：判定链日志可见双方位姿与命中体——TPP 准星
-    // 与服务器判定射线的视差肉眼化，出生点远距 miss 的几何归因就靠这三组数）——
     float shooterX = 0.f, shooterY = 0.f, shooterZ = 0.f;  // 射手实体权威位（19 上报推算值）
     float victimX = 0.f, victimY = 0.f, victimZ = 0.f;     // 受害实体权威位（未命中=0）
     float hbRadius = 0.f, hbHalfH = 0.f;                   // 本次判定用命中体（几何合同烘焙值）
-    std::uint16_t rewindMs = 0;                // ep06：本次回溯量 now−judgeAt（0=不回溯；KPI 分桶+日志动画数据源）
-    // —— miss 诊断（2026-11-03："打不中"复盘可观测性——miss 时给出最近候选的回溯采样位与垂距，
-    //     判定行直接可读"目标在哪条方位、射线偏了多少"；诊断字段不入 21 号，与 bAccepted 同纪律）——
-    std::uint32_t nearPid = 0;                 // 最近候选 pid（0=无候选——全员死亡/未激活）
+    std::uint16_t rewindMs = 0;                // ep06：本次回溯量 now−judgeAt（0=不回溯）
+    std::uint32_t nearPid = 0;                 // miss 最近候选 pid（0=无候选——全员死亡/未激活）
     float nearPerp = 0.f;                      // 其回溯采样位到射线的垂直距离（cm）
     float nearX = 0.f, nearY = 0.f, nearZ = 0.f;  // 该候选的采样位（judgeAt 时刻）
-    bool nearInvuln = false;                   // 该候选仅因重生无敌被挡（2026-11-04"指着身体打不中"实锤：
-                                               //  无敌目标原被整只剔出候选列=零反馈；现计入最近候选并打旗）
+    bool nearInvuln = false;                   // 该候选仅因重生无敌被挡（2026-11-04"指着身体打不中"实锤）
 };
 
 struct ScoreRow {                          // ep07：结算行（25 号载荷源）
@@ -103,7 +102,8 @@ struct MatchEvent {
     std::vector<RosterEntry> roster;      // MatchStart：全员名册
     std::uint32_t leavePlayerId = 0;      // EntityLeave
     std::vector<EntitySnapshot> entities; // Snapshot：在局实体全量（按接收者滤自己）
-    FireResultData fire;                  // FireResult
+    FireResultData fire;                  // FireResult：领域裁定 + 21 号载荷源
+    FireDiagnostics fireDiag;             // 判定链诊断快照（适配层判定行专用·永不入 wire·2026-11-04 拆分）
     // —— ep07 ——
     std::uint32_t killVictim = 0, killKiller = 0;      // Kill（23 号）
     std::uint16_t respawnDelayMs = 0;                  // Kill（倒计时下发·ep08 进数值表零改动）
