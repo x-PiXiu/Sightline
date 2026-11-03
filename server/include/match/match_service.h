@@ -85,6 +85,8 @@ struct FireResultData {
     std::uint32_t nearPid = 0;                 // 最近候选 pid（0=无候选——全员死亡/未激活）
     float nearPerp = 0.f;                      // 其回溯采样位到射线的垂直距离（cm）
     float nearX = 0.f, nearY = 0.f, nearZ = 0.f;  // 该候选的采样位（judgeAt 时刻）
+    bool nearInvuln = false;                   // 该候选仅因重生无敌被挡（2026-11-04"指着身体打不中"实锤：
+                                               //  无敌目标原被整只剔出候选列=零反馈；现计入最近候选并打旗）
 };
 
 struct ScoreRow {                          // ep07：结算行（25 号载荷源）

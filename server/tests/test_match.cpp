@@ -466,6 +466,48 @@ int main() {
         CHECK(rp && !rp->rebasePending);
         CHECK(rp->x == sx + 40.f && rp->y == sy && rp->z == 92.f); // ★权威位逐分量=上报位（修复前 300~600uu 过冲+追爬）
     }
+    stage("ep07 无敌诊断：重生 2s 保护内完美瞄准=miss+最近候选[无敌]；保护过期=命中（2026-11-04 零反馈实锤）");
+    {
+        MatchService iv;
+        MapGeometry g;
+        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{200, 0, 92, 180}};
+        iv.SetGeometry(g);
+        std::vector<RosterEntry> rs{{70, "h", 0}, {71, "v", 1}};
+        iv.StartMatch(4, rs);
+        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 1, 1000);
+        iv.UpdateEntity(71, 200, 0, 92, 180, 0, 0, 1, 1000);
+        std::uint64_t now = 1000;
+        bool killed = false;
+        for (int i = 0; i < 4; ++i) {                          // 4 发×25 → 击杀
+            now += 200;
+            iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, static_cast<std::uint32_t>(2 + i), now);
+            auto ev = iv.Fire(70, now + 10);
+            for (const auto& e : ev)
+                if (e.type == MatchEvent::Type::Kill) killed = true;
+        }
+        CHECK(killed);
+        now += 4000;
+        auto rev = iv.Tick(now);                               // 到期重生：离敌最远=(200,0)（原地）
+        CHECK(find(rev, MatchEvent::Type::Respawn) != nullptr);
+        now += 100;
+        iv.UpdateEntity(71, 200, 0, 92, 180, 0, 0, 9, now);    // 重生后首报（激活+入历史环）
+        now += 100;                                            // 无敌窗内（respawn+200 < +2000）
+        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 20, now);
+        auto miss = iv.Fire(70, now + 10);                     // 完美瞄准：射线正穿 (200,0,92)
+        CHECK(miss.size() == 1 && !miss[0].fire.bHit);         // 判定语义不变：无敌不可命中
+        CHECK(miss[0].fire.nearPid == 71);                     // ★诊断可见：最近候选=无敌目标
+        CHECK(miss[0].fire.nearInvuln);                        // ★[无敌] 旗置位（原=整只剔除零反馈）
+        CHECK(miss[0].fire.nearPerp < 70.f);                   // 垂距≈63.5（含眼高 63cm 差，点到射线）
+        now += 2200;                                           // 越过无敌窗
+        iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 21, now);
+        auto hit = iv.Fire(70, now + 10);
+        CHECK(hit.size() == 1 && hit[0].fire.bHit && hit[0].fire.victimPid == 71);   // 保护过期→命中
+        now += 200;
+        iv.UpdateEntity(70, 10, 0, 92, 45, 0, 0, 22, now);     // 无敌过期后朝 45° 打偏
+        auto miss2 = iv.Fire(70, now + 10);
+        CHECK(miss2.size() == 1 && !miss2[0].fire.bHit);
+        CHECK(miss2[0].fire.nearPid == 71 && !miss2[0].fire.nearInvuln);   // 同款 miss 不带旗
+    }
     stage("ep07 终局：10 杀 Ended（原因 1·比分两行）/终局静默/AbortMatch");
     {
         MatchService em;
@@ -692,6 +734,52 @@ int main() {
             CHECK(h901 && h901->bHasReport);
             CHECK(h901->x == 460.f && h901->y == -490.f);      // 权威位=上报位（首报即真值）
         }
+    }
+    stage("ep07 人机出界钳制：ClampMoveTarget 界外钳回/界内不动 + TakeCover 撤退顶界实测（Bot2 (3177,−3918) 实锤回归）");
+    {
+        const auto nav = BuildNavGrid(OccluderTable{});
+        auto out = adapters::ClampMoveTarget(nav, {5000.f, -6000.f});
+        CHECK(out.x == 2100.f && out.y == -2100.f);            // 界外 → 栅格角
+        auto in = adapters::ClampMoveTarget(nav, {300.f, -300.f});
+        CHECK(in.x == 300.f && in.y == -300.f);                // 界内 → 原样
+        auto edge = adapters::ClampMoveTarget(nav, {-9999.f, 42.f});
+        CHECK(edge.x == -2100.f && edge.y == 42.f);            // 单轴越界只钳该轴
+    }
+    {
+        LobbyService lob2;
+        (void)lob2.Login(901, "host");
+        (void)lob2.CreateRoom(901, "edge");
+        std::uint32_t rid2 = 0;
+        CHECK(lob2.RoomIdByFd(901, rid2));
+        const int botPid2 = lob2.AddBot(rid2);
+        const auto bot2 = static_cast<std::uint32_t>(botPid2);
+        const auto host2 = static_cast<std::uint32_t>(lob2.PlayerIdByFd(901));
+        MapGeometry g;
+        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{1900, 0, 92, 180}};   // 人机贴东界出生
+        MatchService bm2;
+        bm2.SetGeometry(g);
+        adapters::BotDriver drv2;
+        drv2.OnBotAdded(rid2, bot2, "Bot", 1);
+        std::vector<RosterEntry> entries{{host2, "host", 0}, {bot2, "Bot", 0}};
+        bm2.StartMatch(rid2, entries);
+        drv2.OnMatchStart(rid2, bm2.Geometry(), bm2, 1000);
+        std::uint64_t now = 1000;
+        std::uint32_t pseq = 1;
+        for (int i = 0; i < 3; ++i) {                          // 3 发×25 → 人机 hp=25（<30 触发 TakeCover）
+            now += 200;
+            bm2.UpdateEntity(host2, 10, 0, 92, 0, 0, 0, ++pseq, now);
+            (void)bm2.Fire(host2, now);
+            (void)drv2.Tick(now, bm2, lob2);
+        }
+        const auto* bb = bm2.EntityById(bot2);
+        CHECK(bb && bb->weapon.hp == 25.f);                    // 残血：撤退前提成立
+        for (int i = 0; i < 90; ++i) {                         // 3s：背敌撤退 400cm/s 顶向栅格界
+            now += 33;
+            (void)drv2.Tick(now, bm2, lob2);
+        }
+        bb = bm2.EntityById(bot2);
+        CHECK(bb && bb->x <= 2100.01f);                        // ★不越过栅格界（修复前会到 ~2300+）
+        CHECK(bb && bb->x > 1900.f);                           // 且确实向界外撤过（钳在界上）
     }
     stage("ep07 合同自检：出生点被掩体压住可检出（栅格同语义）/净空放行");
     {

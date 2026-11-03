@@ -5,6 +5,7 @@
 // 并发模型：主线程单线程驱动（main 33ms tick 统一调 Tick）——与业务串行铁律一致，零锁。
 // 自愈（❗12）：Tick 内自检——房间被解散（真人数归零）→ AbortMatch + 人机清场。
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -19,6 +20,17 @@
 #include "match/perception.h"
 
 namespace adapters {
+
+/** 移动目标出界钳制（2026-11-04 用户局实锤 Bot2 撤退到 (3177,−3918)——走出烘焙地板上千米）：
+ *  FSM 四态的 moveTarget 都可能落在栅格外（TakeCover 撤退方向无界 / Engage 追击出界敌 /
+ *  Search 的 lastKnown 在界外）——统一在适配器钳回栅格界（含 BuildNavGrid 的 ±100 建格余量）。
+ *  判定与超速钳制仍归 MatchService::UpdateEntity 同真人入口，这里只管"目标不越图"。 */
+inline sightline::match::Vec2 ClampMoveTarget(const sightline::match::NavGrid& g,
+                                              sightline::match::Vec2 p) {
+    const float maxX = g.originX + static_cast<float>(g.w) * g.cellCm;
+    const float maxY = g.originY + static_cast<float>(g.h) * g.cellCm;
+    return {std::clamp(p.x, g.originX, maxX), std::clamp(p.y, g.originY, maxY)};
+}
 
 class BotDriver {
 public:
@@ -213,11 +225,12 @@ private:
         if (b.mem.hasLastKnown) w.lastKnown = sightline::match::Vec3{b.mem.lastKnown.x, b.mem.lastKnown.y, 0.f};
         // 巡逻目标=驱动器航点表（此前读的是从未填充的每人机空表 → patrolTarget 落默认 (0,0)：人机全奔场心扎堆）
         if (!waypoints_.empty()) w.patrolTarget = waypoints_[b.wp % waypoints_.size()];
-        const sightline::match::BotIntent intent =
-            sightline::match::Decide(w, b.st, b.mem, nowMs, t);
 
         // ── 行动·移动（栅格寻路兜底：LOS 直行 / 否则 A* 路径逐段走）──
+        sightline::match::BotIntent intent =
+            sightline::match::Decide(w, b.st, b.mem, nowMs, t);   // 非常量：moveTarget 出界钳制就地改写
         if (intent.hasMove) {
+            intent.moveTarget = ClampMoveTarget(nav_, intent.moveTarget);   // 出界钳制（见函数注释）
             const bool direct = sightline::match::GridLOS(
                 nav_, nav_.CellIx(b.x), nav_.CellIy(b.y), nav_.CellIx(intent.moveTarget.x),
                 nav_.CellIy(intent.moveTarget.y));

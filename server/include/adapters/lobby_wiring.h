@@ -200,12 +200,14 @@ public:
                           " 受害位=(" + std::to_string(F.victimX) + "," + std::to_string(F.victimY) + "," + std::to_string(F.victimZ) + ")" +
                           " 命中体=(r=" + std::to_string(F.hbRadius) + " 半高=" + std::to_string(F.hbHalfH) + ")" +
                           " 回溯=" + std::to_string(F.rewindMs) + "ms";
-                // miss 诊断：最近候选（回溯采样位+垂距）——"打不中"复盘直接可读目标方位与偏差量
+                // miss 诊断：最近候选（回溯采样位+垂距）——"打不中"复盘直接可读目标方位与偏差量；
+                // [无敌] 旗=该目标仅因重生 2s 保护未被判定（2026-11-04 实锤：完美瞄准 0.2° 打无敌=零反馈）
                 if (!F.bHit && F.nearPid != 0)
                     judgeLine += " 最近候选=pid" + std::to_string(F.nearPid) +
                                  " 垂距=" + std::to_string(F.nearPerp) + "cm 位=(" +
                                  std::to_string(F.nearX) + "," + std::to_string(F.nearY) + "," +
-                                 std::to_string(F.nearZ) + ")";
+                                 std::to_string(F.nearZ) + ")" +
+                                 (F.nearInvuln ? " [无敌——重生保护内·命中无效]" : "");
                 // 人机每个约 10 发/秒：判定行降 TRACE（真人仍 INFO 整链可见；击杀 23 号恒 INFO）
                 if (lobby_.IsBot(F.shooterPid)) LOG_TRACE(judgeLine);
                 else LOG_INFO(judgeLine);

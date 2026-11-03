@@ -277,34 +277,45 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     const Vec3 o = RayOriginFromEntity(shooter->x, shooter->y, shooter->z, shooter->yaw);
     const Vec3 d = DirectionFromYawPitch(shooter->yaw, shooter->pitch);
     std::vector<EntityPose> others;
+    std::vector<EntityPose> invulnOnly;   // 仅因无敌被挡（2026-11-04：判定语义不变，诊断不再无声）
     others.reserve(entities_.size());
     for (const Entity& E : entities_) {
         if (E.playerId == shooterPid || !E.bHasReport) continue;
         if (E.bDead) continue;                                   // ep07：死者不入候选（❗4）
         if (judgeAtMs < E.bornAtMs) continue;                    // ep07：重生前的旧影子打不中（❗8）
-        if (nowMs < E.invulnUntilMs) continue;                   // ep07：无敌期不被命中（出生保护）
         const auto p = SampleHistoryAt(E.history, E.histCount, E.histHead, judgeAtMs);
         if (!p) continue;
+        if (nowMs < E.invulnUntilMs) {
+            invulnOnly.push_back({E.playerId, p->x, p->y, p->z});   // 无敌期：不可命中，但计入最近候选
+            continue;
+        }
         others.push_back({E.playerId, p->x, p->y, p->z});
     }
     const FireVerdict v = CastRay(o, d, geometry_.occluders, others, geometry_.hitbox);
 
-    // miss 诊断（可观测性）：最近的候选（回溯采样位到射线的垂距）——判定行可读"目标在哪个方位、偏了多少"
-    std::uint32_t nearPid = 0; float nearPerp = 0.f; Vec3 nearPos{};
+    // miss 诊断（可观测性）：最近的候选（回溯采样位到射线的垂距）——判定行可读"目标在哪个方位、偏了多少"。
+    // 无敌目标（invulnOnly）一并参选：完美瞄准打在重生保护上不再是"无声 miss"（判定行带 [无敌] 旗）
+    std::uint32_t nearPid = 0; float nearPerp = 0.f; Vec3 nearPos{}; bool nearInvuln = false;
     if (!v.hit) {
         float best = 1e9f;
-        for (const auto& O : others) {
-            const Vec3 w{O.x - o.x, O.y - o.y, O.z - o.z};
-            const float t = w.x * d.x + w.y * d.y + w.z * d.z;
-            if (t < 0.f) continue;                           // 身后（射线不打背后目标）
-            const Vec3 foot{o.x + d.x * t, o.y + d.y * t, o.z + d.z * t};
-            const float perp = std::sqrt((O.x - foot.x) * (O.x - foot.x) +
-                                         (O.y - foot.y) * (O.y - foot.y) +
-                                         (O.z - foot.z) * (O.z - foot.z));
-            if (perp < best) { best = perp; nearPid = O.playerId; nearPos = {O.x, O.y, O.z}; }
-        }
+        const auto scan = [&](const std::vector<EntityPose>& list, bool bInv) {
+            for (const auto& O : list) {
+                const Vec3 w{O.x - o.x, O.y - o.y, O.z - o.z};
+                const float t = w.x * d.x + w.y * d.y + w.z * d.z;
+                if (t < 0.f) continue;                           // 身后（射线不打背后目标）
+                const Vec3 foot{o.x + d.x * t, o.y + d.y * t, o.z + d.z * t};
+                const float perp = std::sqrt((O.x - foot.x) * (O.x - foot.x) +
+                                             (O.y - foot.y) * (O.y - foot.y) +
+                                             (O.z - foot.z) * (O.z - foot.z));
+                if (perp < best) {
+                    best = perp; nearPid = O.playerId; nearPos = {O.x, O.y, O.z}; nearInvuln = bInv;
+                }
+            }
+        };
+        scan(others, false);
+        scan(invulnOnly, true);
         nearPerp = best < 1e8f ? best : 0.f;
-        if (nearPid == 0) nearPerp = 0.f;
+        if (nearPid == 0) { nearPerp = 0.f; nearInvuln = false; }
     }
 
     // ⑥ 结算扣血（ep07：hp≤0 → 死亡状态机启用）；顺手捕获受害实体判定时刻位（诊断日志用）
@@ -355,11 +366,12 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
                              victimX, victimY, victimZ,
                              geometry_.hitbox.radius, geometry_.hitbox.halfHeight,
                              static_cast<std::uint16_t>(nowMs - judgeAtMs)};
-    // ⑨ miss 诊断字段填充（命中时不填——受害位已足够；诊断字段不入 21 号）
+    // ⑨ miss 诊断字段填充（命中时不填——受害位已足够；诊断字段不入 21 号同 bAccepted 纪律）
     if (!v.hit && nearPid != 0) {
         ev.fire.nearPid = nearPid;
         ev.fire.nearPerp = nearPerp;
         ev.fire.nearX = nearPos.x; ev.fire.nearY = nearPos.y; ev.fire.nearZ = nearPos.z;
+        ev.fire.nearInvuln = nearInvuln;
     }
     out.push_back(std::move(ev));
     return out;
