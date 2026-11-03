@@ -496,6 +496,8 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs)
         MatchSession->ClearPredictionInput();   // ❗9：清预测输入环（防和解拉回尸体）
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
+        LocalMag = kClientMag;                                   // 服务器重生满匣（Tick 里 magUsed=0）——
+        LocalReloadUntilMs = 0;                                  // 客户端镜像同步重置（死后 28/30 残留=双端漂移源）
         if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
             SetActorLocation(Start->GetActorLocation());
             SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));
