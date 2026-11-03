@@ -480,14 +480,22 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
     if (VictimPawn) VictimPawn->PlayAnimMontage(DeathMontage);   // 自己=本类（他人=远端同类）——同一入口
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
         bFireHeld = false;                                       // 死亡期开火电平断（TryFire 门另加 bSelfDead）
+        // 死亡期定身（镜像服务器死亡冻结❗13）：服务器冻结尸体位、不认死亡期上报——客户端若照走，
+        // 和解会把人一次次拉回尸体位（2026-11-03 联调"拉扯感"的客户端一半）；重生落位前解除
+        if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) {
+            MoveComp->StopMovementImmediately();
+            MoveComp->DisableMovement();
+        }
         if (DeathMontage) PlayAnimMontage(DeathMontage);         // 自己也播（覆盖表现）
     }
 }
 
 void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs) {
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Pid)) {
-        // 自己：清预测输入环（❗9——防和解拉回尸体）+ 落位重生点（Spawn_{n+1} 同源）+ 无敌闪
+        // 自己：清预测输入环（❗9——防和解拉回尸体）+ 解除死亡定身 + 落位重生点（Spawn_{n+1} 同源）+ 无敌闪
         MatchSession->ClearPredictionInput();   // ❗9：清预测输入环（防和解拉回尸体）
+        if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+            MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
         if (APlayerStart* Start = USightlinePawnSpawner::FindSpawnStart(GetWorld(), SpawnIndex)) {
             SetActorLocation(Start->GetActorLocation());
             SetActorRotation(FRotator(0.f, Start->GetActorRotation().Yaw, 0.f));

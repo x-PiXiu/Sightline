@@ -52,7 +52,8 @@ target_link_libraries(test_lobby PRIVATE sightline_lobby)
 add_test(NAME test_lobby COMMAND test_lobby)
 
 add_executable(test_match tests/test_match.cpp)
-target_link_libraries(test_match PRIVATE sightline_match sightline_lobby)
+# sightline_core：人机驱动适配器（adapters/bot_driver.h）的日志依赖——驱动器同局回归测试要真身入场
+target_link_libraries(test_match PRIVATE sightline_match sightline_lobby sightline_core)
 add_test(NAME test_match COMMAND test_match)
 
 add_executable(smoke_base tests/smoke_base.cpp)

@@ -7,6 +7,7 @@
 #include "match/bot_brain.h"
 #include "match/fire_judge.h"
 #include "adapters/map_geometry.h"
+#include "adapters/bot_driver.h"
 #include "lobby/lobby.h"
 
 #include <cmath>
@@ -514,6 +515,109 @@ int main() {
         w.self.hp = 20.f;
         auto i3 = Decide(w, st, m, 1300 + 3100, t);
         CHECK(st == BotState::TakeCover && i3.hasMove);
+    }
+
+    // ── 2026-11-03 联调回归：同一服务进程连开多局（用户现场"开枪无回包"根因=终局字段跨局泄漏）──
+    // 旧测试每段 new 一个 MatchService，从没测过"上一局结束后同实例再开局"——bug 就藏在这道缝里
+    stage("ep07 跨局复位①：AbortMatch 后同实例再开局——首报激活/开火必有判定/不得开局即结算");
+    {
+        MatchService xm;
+        xm.SetGeometry(MapGeometry{});
+        std::vector<RosterEntry> rs{{60, "h", 0}, {61, "b", 0}};
+        xm.StartMatch(3, rs);
+        xm.UpdateEntity(60, 442, -474, 90, 133, 0, 0, 1, 1000);
+        xm.AbortMatch();                                       // 房间解散自愈路径（❗12）
+        xm.StartMatch(4, rs);                                  // 同一服务进程的下一局
+        CHECK(find(xm.Tick(2000), MatchEvent::Type::Ended) == nullptr);   // 新局不得一开局就结算
+        xm.UpdateEntity(60, 442, -474, 90, 133, 0, 0, 1, 2000);           // 真实出生点（非原点）
+        const auto* e60 = xm.EntityById(60);
+        CHECK(e60 && e60->bHasReport);                         // 首报必须激活实体
+        CHECK(find(xm.Fire(60, 2100), MatchEvent::Type::FireResult) != nullptr);   // 开火必有判定
+        CHECK(find(xm.Tick(2200), MatchEvent::Type::Snapshot) != nullptr);         // 新局持续出快照
+    }
+    stage("ep07 跨局复位②：击杀上限终局+快照停发后同实例再开局（用户现场形态：无结算行·开枪无回包）");
+    {
+        MatchService km;
+        km.SetGeometry(MapGeometry{});
+        std::vector<RosterEntry> rs{{70, "a", 0}, {71, "b", 0}};
+        km.StartMatch(5, rs);
+        std::uint64_t now = 1000;
+        std::uint32_t sa = 1, sb = 1;
+        for (int round = 0; round < 12 && !km.IsEnded(); ++round) {
+            now += 5000;
+            km.Tick(now);                                      // 到期重生
+            now += 2100;                                       // 无敌期过
+            km.UpdateEntity(70, 0, 0, 90, 0, 0, 0, ++sa, now);
+            km.UpdateEntity(71, 200, 0, 90, 180, 0, 0, ++sb, now);
+            for (int i = 0; i < 4; ++i) {
+                now += 150;
+                km.UpdateEntity(70, 0, 0, 90, 0, 0, 0, ++sa, now);
+                km.Fire(70, now);
+            }
+        }
+        CHECK(km.IsEnded());
+        km.Tick(now + 10);                                     // 产出 Ended（停发时刻上弦）
+        km.Tick(now + 2500);                                   // 结算背景 2s 用毕 → 快照停发
+        km.StartMatch(6, rs);                                  // 同一服务进程的下一局
+        now += 5000;
+        CHECK(find(km.Tick(now), MatchEvent::Type::Snapshot) != nullptr);   // 新局不得首拍即停用
+        km.UpdateEntity(70, 442, -474, 90, 133, 0, 0, 1, now);
+        const auto* e70 = km.EntityById(70);
+        CHECK(e70 && e70->bHasReport && !km.IsEnded());
+        CHECK(find(km.Fire(70, now + 100), MatchEvent::Type::FireResult) != nullptr);
+    }
+    stage("ep07 人机驱动：出生点取用例分配（不叠真人）/航点真巡逻/开火与击杀事件回传");
+    {
+        LobbyService lob;
+        (void)lob.Login(801, "host");
+        (void)lob.CreateRoom(801, "botroom");
+        std::uint32_t rid = 0;
+        CHECK(lob.RoomIdByFd(801, rid));
+        const int botPid = lob.AddBot(rid);
+        CHECK(botPid > 0);
+        const auto bot = static_cast<std::uint32_t>(botPid);
+        const auto host = static_cast<std::uint32_t>(lob.PlayerIdByFd(801));
+        MapGeometry g;
+        g.spawnPoints = {SpawnPoint{442, -474, 90, 133}, SpawnPoint{820, -820, 90, -47}};
+        g.patrolPoints = {Vec3{1050, -820, 90}, Vec3{200, -1200, 90}, Vec3{1200, -200, 90}};
+        MatchService bm;
+        bm.SetGeometry(g);
+        adapters::BotDriver drv;
+        drv.OnBotAdded(rid, bot, "Bot", 1);
+        // 生产形态：适配层按房间名册组 entries（spawnIndex 全 0——名册序由用例 StartMatch 分配）
+        std::vector<RosterEntry> entries{{host, "host", 0}, {bot, "Bot", 0}};
+        bm.StartMatch(rid, entries);
+        drv.OnMatchStart(rid, bm.Geometry(), bm, 1000);
+        const auto* be = bm.EntityById(bot);
+        CHECK(be && be->bHasReport);
+        CHECK(be->x == 820.f && be->y == -820.f);              // 名册序 1 → spawnPoints[1]：不叠房主出生点
+        bool reached = false;                                  // 真人未上报=不可见 → 人机只巡逻
+        std::uint64_t now = 1000;
+        for (int i = 0; i < 300 && !reached; ++i) {            // ≤10s（400cm/s·最远航点 <8m）
+            (void)drv.Tick(now += 33, bm, lob);
+            for (const auto& p : g.patrolPoints)
+                if (std::hypot(be->x - p.x, be->y - p.y) < 80.f) reached = true;
+        }
+        CHECK(reached);                                        // 真去航点（不是默认目标场心 (0,0)）
+        // 真人现身人机身侧 3m → 人机开火/击杀事件必须从 Tick 返回（主循环经同一输出端口广播）
+        const float hx = be->x + 300.f, hy = be->y;
+        std::uint32_t hseq = 0;
+        bool sawShot = false, sawRejected = false, sawKill = false;
+        for (int i = 0; i < 180 && !sawKill; ++i) {            // ≤6s
+            now += 33;
+            bm.UpdateEntity(host, hx, hy, 90, 180, 0, 0, ++hseq, now);
+            for (const auto& e : drv.Tick(now, bm, lob)) {
+                if (e.type == MatchEvent::Type::FireResult && e.fire.shooterPid == bot) {
+                    sawShot = true;
+                    if (!e.fire.bAccepted) sawRejected = true;
+                }
+                if (e.type == MatchEvent::Type::Kill && e.killKiller == bot && e.killVictim == host)
+                    sawKill = true;
+            }
+            (void)bm.Tick(now);
+        }
+        CHECK(sawShot && !sawRejected);                        // 开火回传；被武器门拦的不回传（不刷日志）
+        CHECK(sawKill);                                        // 击杀回传（受害客户端靠 23 号知道自己死了）
     }
 
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";

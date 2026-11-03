@@ -187,7 +187,7 @@ public:
                               " 原因=" + GateName[F.gate % 4]);
                     break;                                   // 被武器门拦下：不广播 21 号（静默丢 D5-03）
                 }
-                LOG_INFO("[射击判定] shooter=" + std::to_string(F.shooterPid) +
+                const std::string judgeLine = "[射击判定] shooter=" + std::to_string(F.shooterPid) +
                           " 眼位=(" + std::to_string(F.oX) + "," + std::to_string(F.oY) + "," + std::to_string(F.oZ) + ")" +
                           " 方向=(" + std::to_string(F.dX) + "," + std::to_string(F.dY) + "," + std::to_string(F.dZ) + ")" +
                           " hit=" + std::to_string(F.bHit) +
@@ -197,7 +197,10 @@ public:
                           " 射手位=(" + std::to_string(F.shooterX) + "," + std::to_string(F.shooterY) + "," + std::to_string(F.shooterZ) + ")" +
                           " 受害位=(" + std::to_string(F.victimX) + "," + std::to_string(F.victimY) + "," + std::to_string(F.victimZ) + ")" +
                           " 命中体=(r=" + std::to_string(F.hbRadius) + " 半高=" + std::to_string(F.hbHalfH) + ")" +
-                          " 回溯=" + std::to_string(F.rewindMs) + "ms");
+                          " 回溯=" + std::to_string(F.rewindMs) + "ms";
+                // 人机每个约 10 发/秒：判定行降 TRACE（真人仍 INFO 整链可见；击杀 23 号恒 INFO）
+                if (lobby_.IsBot(F.shooterPid)) LOG_TRACE(judgeLine);
+                else LOG_INFO(judgeLine);
                 // v4.2：21 号房内全员广播（**含射手自己**——射手要出 Hitmarker；其余画 tracer；
                 // 受击者红闪）——一条消息三方共用（D5-02v2；翻译唯一落点纪律同 15/17/18）
                 const sightline::wire::FireResultMsg m{

@@ -138,6 +138,7 @@ public:
     const std::vector<Entity>& Entities() const { return entities_; }
     const MapGeometry& Geometry() const { return geometry_; }
     bool IsEnded() const { return bEnded_; }
+    std::uint32_t RoomId() const { return roomId_; }   // 常驻单局所属房间（人机驱动自愈只中止本房对局）
     const Entity* EntityById(std::uint32_t pid) const;
 
     // —— M5：开火裁决（D5 系列；几何合同=构建期烘焙注入，拒绝运行时上报）——

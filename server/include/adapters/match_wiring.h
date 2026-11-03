@@ -115,12 +115,13 @@ public:
                 LOG_INFO("[开始对局] 拒绝：fd=" + std::to_string(fd) + " 非房主");
                 return;
             }
-            std::vector<sightline::match::RosterEntry> entries;   // 名册序 = 出生点序（含 ep07 人机席位·排尾）
+            std::vector<sightline::match::RosterEntry> entries;   // 名册（含 ep07 人机席位·排尾）；出生点序=名册序由用例 StartMatch 分配
             for (const auto& m : lobby_.RoomRoster(roomId))
                 entries.push_back({m.playerId, m.name, 0});
             lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
             writer_.deliverMatch(match_.StartMatch(roomId, entries));
-            if (bot_) bot_->OnMatchStart(roomId, entries, match_.Geometry(), match_, NowMs());
+            // 人机首报读用例分配结果（Entity::spawnIx）——不传本地 entries：值传递副本里 spawnIndex 全 0
+            if (bot_) bot_->OnMatchStart(roomId, match_.Geometry(), match_, NowMs());
         });
         // 26/27：人机席位指令（仅房主——D2-11 同款校验线）
         disp_.on(protocol::MSG_C2S_BOT_ADD, "添加人机",
@@ -191,10 +192,10 @@ private:
     }
 
     MessageDispatcher& disp_;
-    BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）
     sightline::match::MatchService& match_;
     sightline::lobby::LobbyService& lobby_;
     FrameWriter& writer_;
+    BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）；声明序=构造初始化序（-Wreorder）
 };
 
 } // namespace adapters

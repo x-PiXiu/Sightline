@@ -16,6 +16,12 @@ namespace {
 std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vector<RosterEntry> roster) {
     roomId_ = roomId;
     bActive_ = true;
+    // 局级状态开局全量复位（2026-11-03 联调根因）：服务进程常驻、MatchService 跨局复用——上一局的
+    // 终局三件套（击杀上限/AbortMatch 置位）若漏复位，新局首拍即被 Tick 判"已结束"停用，且 UpdateEntity
+    // 终局门静默丢全部上报 → 实体永不激活 → Fire 静默返回（现场症状=开枪零回包）
+    bEnded_ = false;
+    endReason_ = 0;
+    snapshotStopAtMs = 0;
     entities_.clear();
     for (std::size_t i = 0; i < roster.size(); ++i) {
         roster[i].spawnIndex = static_cast<std::uint8_t>(i);   // 出生点 = 名册序（v3 契约规则 7）

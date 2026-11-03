@@ -226,7 +226,8 @@ int main() {
             }
         }
         writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
-        botDriver.Tick(nowMs(), match, lobby);               // ep07：人机 感知→决策→行动（同真人入口）
+        // ep07：人机 感知→决策→行动（同真人入口）——其开火产出的 21/23 事件走同一输出端口广播
+        writer.deliverMatch(botDriver.Tick(nowMs(), match, lobby));
         auto matchEvents = match.Tick(nowMs());              // ep07：快照+死亡倒计时+重生+结束判定
         for (const auto& e : matchEvents)
             if (e.type == sightline::match::MatchEvent::Type::Ended)

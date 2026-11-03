@@ -48,39 +48,18 @@ public:
         return false;
     }
 
-    /** 开局（14 号处理后调用）：建导航栅格 + 人机立即首报出生点（防 (0,0,0) 幻影·❗2） */
-    void OnMatchStart(std::uint32_t roomId, const std::vector<sightline::match::RosterEntry>& roster,
-                      const sightline::match::MapGeometry& geo, sightline::match::MatchService& match,
-                      std::uint64_t nowMs) {
+    /** 开局（14 号处理后调用）：建导航栅格 + 人机立即首报出生点（防 (0,0,0) 幻影·❗2）。
+     *  出生点序读用例在 StartMatch 分配的 Entity::spawnIx（名册序=出生点序的唯一真相源）——适配层
+     *  不重推规则：2026-11-03 联调实锤，14 号处理器的名册是值传递副本（spawnIndex 全 0），按它取点
+     *  = 所有人机叠在房主出生点（客户端胶囊互挤+零距互射） */
+    void OnMatchStart(std::uint32_t roomId, const sightline::match::MapGeometry& geo,
+                      sightline::match::MatchService& match, std::uint64_t nowMs) {
         auto it = byRoom_.find(roomId);
         if (it == byRoom_.end()) return;
         nav_ = sightline::match::BuildNavGrid(geo.occluders);
         navBuilt_ = true;
-        // 巡逻航点：合同 patrolPoints 优先，缺省退化为出生点轮转
-        for (const auto& r : roster) {
-            for (auto& b : it->second) {
-                if (b.pid != r.playerId) continue;
-                b.homeSpawnIx = r.spawnIndex;
-                b.st = sightline::match::BotState::Patrol;
-                b.mem = sightline::match::BotMemory{};
-                b.path.reset();
-                b.wp = 0;
-                b.seq = 0;
-                b.lastTickMs = nowMs;
-                b.hp = sightline::match::kMaxHp;
-                // 立即首报：出生点 = 名册序 → geometry.spawnPoints[序]（同源 Spawn_{n+1}）
-                float sx = 0.f, sy = 0.f, sz = 90.f, syaw = 0.f;
-                if (!geo.spawnPoints.empty()) {
-                    const auto& sp = geo.spawnPoints[std::min<std::size_t>(r.spawnIndex, geo.spawnPoints.size() - 1)];
-                    sx = sp.x; sy = sp.y; sz = sp.z; syaw = sp.yawDeg;
-                }
-                match.UpdateEntity(b.pid, sx, sy, sz, syaw, 0.f, 0, ++b.seq, nowMs);
-                b.x = sx; b.y = sy; b.z = sz; b.yaw = syaw;
-                LOG_INFO("[人机] 首报出生点 pid=" + std::to_string(b.pid) + " @(" +
-                         std::to_string(sx) + "," + std::to_string(sy) + ")");
-            }
-        }
-        // 航点表：patrolPoints 优先，否则 spawnPoints 世界位轮转，再否则场心环
+        // 航点表（每局重建——不跨局累加）：合同 patrolPoints 优先，否则 spawnPoints 世界位轮转，再否则场心环
+        waypoints_.clear();
         if (!geo.patrolPoints.empty()) {
             for (const auto& p : geo.patrolPoints) waypoints_.push_back({p.x, p.y});
         } else if (!geo.spawnPoints.empty()) {
@@ -88,7 +67,33 @@ public:
         } else {
             waypoints_ = {{300.f, -300.f}, {-300.f, 300.f}, {300.f, 300.f}, {-300.f, -300.f}};
         }
-        for (auto& b : it->second) b.wp = b.pid % waypoints_.size();
+        if (!geo.spawnPoints.empty() && match.Entities().size() > geo.spawnPoints.size())
+            LOG_WARNING("[人机] 出生点不足：本局 " + std::to_string(match.Entities().size()) +
+                        " 人 > 地图出生点 " + std::to_string(geo.spawnPoints.size()) +
+                        " 个——超出者叠在末位出生点（关卡补 PlayerStart Spawn_N 后重烘焙）");
+        for (auto& b : it->second) {
+            const sightline::match::Entity* E = match.EntityById(b.pid);
+            if (!E) continue;                                // 不在本局名册：不首报
+            b.homeSpawnIx = E->spawnIx;
+            b.st = sightline::match::BotState::Patrol;
+            b.mem = sightline::match::BotMemory{};
+            b.path.reset();
+            b.pathI = 0;
+            b.wp = b.pid % waypoints_.size();                // 航点错开（相邻 pid 走不同航点）
+            b.seq = 0;
+            b.lastTickMs = nowMs;
+            b.hp = sightline::match::kMaxHp;
+            b.wasDead = false;                               // 上一局死亡沿不跨局
+            float sx = 0.f, sy = 0.f, sz = 90.f, syaw = 0.f;
+            if (!geo.spawnPoints.empty()) {
+                const auto& sp = geo.spawnPoints[std::min<std::size_t>(E->spawnIx, geo.spawnPoints.size() - 1)];
+                sx = sp.x; sy = sp.y; sz = sp.z; syaw = sp.yawDeg;
+            }
+            match.UpdateEntity(b.pid, sx, sy, sz, syaw, 0.f, 0, ++b.seq, nowMs);
+            b.x = sx; b.y = sy; b.z = sz; b.yaw = syaw;
+            LOG_INFO("[人机] 首报出生点 pid=" + std::to_string(b.pid) + " 序=" +
+                     std::to_string(E->spawnIx) + " @(" + std::to_string(sx) + "," + std::to_string(sy) + ")");
+        }
     }
 
     /** 结束/中止：FSM 与记忆重置（席位保留——"再来一局"直接可用） */
@@ -104,24 +109,32 @@ public:
 
     void ClearRoom(std::uint32_t roomId) { byRoom_.erase(roomId); }
 
-    /** 主循环 33ms tick（唯一驱动点·主线程）：自愈检查 + 逐人机 感知→决策→行动 */
-    void Tick(std::uint64_t nowMs, sightline::match::MatchService& match,
-              sightline::lobby::LobbyService& lobby) {
-        // 自愈（❗12）：房间已解散（最后真人离开）→ 终止对局 + 清场（ lobby 已自行解散房间）
+    /** 主循环 33ms tick（唯一驱动点·主线程）：自愈检查 + 逐人机 感知→决策→行动。
+     *  返回人机开火产出的领域事件（21 判定 / 23 击杀）——"同真人入口"不止同进还要同出：真人的 Fire
+     *  事件经 FrameWriter 广播，人机的也必须走同一输出端口（2026-11-03 联调：此前返回值被丢——
+     *  人机打人只扣血不广播，受害客户端不知道自己已死 → 服务器冻结尸体位、客户端照走 → 和解回拉） */
+    std::vector<sightline::match::MatchEvent> Tick(std::uint64_t nowMs, sightline::match::MatchService& match,
+                                                   sightline::lobby::LobbyService& lobby) {
+        std::vector<sightline::match::MatchEvent> out;
+        // 自愈（❗12）：房间已解散（最后真人离开）→ 清场；仅当常驻的单局正属本房时才中止对局——
+        // 别的房间（大厅里加过人机又解散）不得误杀进行中的对局
         for (auto it = byRoom_.begin(); it != byRoom_.end();) {
             if (!lobby.HasRoom(it->first)) {
-                match.AbortMatch();
-                LOG_INFO("[人机] 房间已解散 → AbortMatch + 清场 房=" + std::to_string(it->first));
+                const bool ownsMatch = (match.RoomId() == it->first);
+                if (ownsMatch) match.AbortMatch();
+                LOG_INFO("[人机] 房间已解散 → " + std::string(ownsMatch ? "AbortMatch + " : "") +
+                         "清场 房=" + std::to_string(it->first));
                 it = byRoom_.erase(it);
             } else {
                 ++it;
             }
         }
-        if (!navBuilt_) return;
+        if (!navBuilt_) return out;
         for (auto& [roomId, list] : byRoom_) {
             if (match.IsEnded()) break;                      // 终局：本帧人机全部静默（快照保留期）
-            for (auto& b : list) TickOne(b, nowMs, match);
+            for (auto& b : list) TickOne(b, nowMs, match, out);
         }
+        return out;
     }
 
 private:
@@ -131,8 +144,7 @@ private:
         std::uint8_t diff = 1;
         sightline::match::BotState st = sightline::match::BotState::Patrol;
         sightline::match::BotMemory mem;
-        std::vector<sightline::match::Vec2> waypoints;
-        std::size_t wp = 0;
+        std::size_t wp = 0;                                  // 航点游标（航点表=驱动器级 waypoints_·每局重建）
         std::optional<std::vector<sightline::match::Vec3>> path;
         std::size_t pathI = 0;
         std::uint64_t lastRepathMs = 0;
@@ -154,7 +166,8 @@ private:
         return t;
     }
 
-    void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchService& match) {
+    void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchService& match,
+                 std::vector<sightline::match::MatchEvent>& out) {
         const sightline::match::Entity* E = match.EntityById(b.pid);
         if (!E || !E->bHasReport) { b.lastTickMs = nowMs; return; }   // 未在局/未激活：静默
         const float dtMs = b.lastTickMs ? std::min<float>(float(nowMs - b.lastTickMs), 100.f) : 33.f;
@@ -194,7 +207,8 @@ private:
                   nowMs < E->weapon.reloadUntilMs};
         w.visible = visible;
         if (b.mem.hasLastKnown) w.lastKnown = sightline::match::Vec3{b.mem.lastKnown.x, b.mem.lastKnown.y, 0.f};
-        if (!b.waypoints.empty()) w.patrolTarget = b.waypoints[b.wp % b.waypoints.size()];
+        // 巡逻目标=驱动器航点表（此前读的是从未填充的每人机空表 → patrolTarget 落默认 (0,0)：人机全奔场心扎堆）
+        if (!waypoints_.empty()) w.patrolTarget = waypoints_[b.wp % waypoints_.size()];
         const sightline::match::BotIntent intent =
             sightline::match::Decide(w, b.st, b.mem, nowMs, t);
 
@@ -224,8 +238,8 @@ private:
                 }
             }
             // 航点推进（巡逻环）
-            if (!b.waypoints.empty()) {
-                const auto& wp = b.waypoints[b.wp % b.waypoints.size()];
+            if (!waypoints_.empty()) {
+                const auto& wp = waypoints_[b.wp % waypoints_.size()];
                 const float dx = b.x - wp.x, dy = b.y - wp.y;
                 if (dx * dx + dy * dy < 60.f * 60.f) ++b.wp;
             }
@@ -236,8 +250,15 @@ private:
         const float want = intent.aimYawDeg - b.yaw;
         b.yaw += std::clamp(sightline::match::detail::NormDeg(want), -maxTurn, maxTurn);
 
-        // ── 行动·开火（同真人入口：Fire 内四道门说了算）──
-        if (intent.bFire) match.Fire(b.pid, nowMs);
+        // ── 行动·开火（同真人入口：Fire 内四道门说了算；产出事件回传主循环走同一输出端口）──
+        if (intent.bFire) {
+            for (auto& ev : match.Fire(b.pid, nowMs)) {
+                // 被武器门拦下的射击（射速/换弹）：真人路径同样不广播（D5-03 静默丢）——人机 30Hz 决策
+                // 每拍都请求，拒绝事件回传只会刷"[射击拒绝]"日志，就地丢弃
+                if (ev.type == sightline::match::MatchEvent::Type::FireResult && !ev.fire.bAccepted) continue;
+                out.push_back(std::move(ev));
+            }
+        }
 
         // ── 上报（同 19 号入口：权威推算+钳制+历史环一条不落）──
         match.UpdateEntity(b.pid, b.x, b.y, b.z, b.yaw, 0.f, 0, ++b.seq, nowMs);
