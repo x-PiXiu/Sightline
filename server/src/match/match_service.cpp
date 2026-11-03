@@ -11,6 +11,10 @@ namespace {
     // 按到达间隔钳制会误伤诚实移动、刷爆客户端和解。
     constexpr float kMaxSpeedUuPerSec = 1000.f;   // uu/s（UE 厘米制；行走 450 / 冲刺 ~700，留裕量）
     constexpr float kMaxInputGapSec   = 0.1f;     // 100ms：帧率跌到 10fps 的单帧位移也放行
+    // 下落专用界（2026-11-04 坠楼段拉扯复盘）：诚实 CMC 重力 980 长坠可达 3000+uu/s，原 3D 合模长
+    // 把"奔跑+下落"合成一个预算 → 长坠期 dz 逐拍被钳 → 权威位落后 → 和解持续回拉。只放宽 dz<0，
+    // 上升维持原界（跳跃 420 远低于界，防飞天）；水平界不变（传送黑客打不动权威位）。
+    constexpr float kMaxFallSpeedUuPerSec = 4000.f;
 }
 
 std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vector<RosterEntry> roster) {
@@ -101,7 +105,10 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             if (dx0 * dx0 + dy0 * dy0 < 100.f * 100.f) {   // 出生点附近首条 → 重定基准放行
                 E.rebasePending = false;
             } else {
-                E.lx = x; E.ly = y; E.lz = z;              // 在途旧报（死亡位置）→ 忽略
+                // 在途旧报（死亡位置）→ 只拒不改基准（2026-11-04 拉扯第五轮复盘）：此处曾顺手推
+                // lx/ly/lz，把重生落位刚重置的 spawn 基准污染回尸体位——放行首拍 dx=上报−尸体位
+                // 是全程距离 → 被 300uu 钳制 → 权威位过冲出生点 → 17 号逐拍带误差硬拉。
+                // 开局路径不受影响（首报走 bHasReport=false 采纳分支不读 lx），所以只有"重生后"病。
                 return;
             }
         }
@@ -123,10 +130,17 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
                 timeBound = kMaxSpeedUuPerSec *
                             std::min(static_cast<float>(recvMs - E.lastRecvMs) / 1000.f, 0.6f);
             const float bound = std::max(seqBound, timeBound);
-            const float len2 = dx * dx + dy * dy + dz * dz;
-            if (len2 > bound * bound) {                      // 超界钳回界上：保方向弃模长（传送黑客打不动权威位）
-                const float k = bound / std::sqrt(len2);
-                dx *= k; dy *= k; dz *= k;
+            // 水平/垂直分开钳：水平维持原界；垂直下落放宽到终端速度量级（见 kMaxFallSpeedUuPerSec 注）
+            const float boundV = (dz < 0.f)
+                ? std::max(bound, kMaxFallSpeedUuPerSec * kMaxInputGapSec * gapScale)
+                : bound;
+            const float lenH2 = dx * dx + dy * dy;
+            if (lenH2 > bound * bound) {                     // 超界钳回界上：保方向弃模长（传送黑客打不动权威位）
+                const float k = bound / std::sqrt(lenH2);
+                dx *= k; dy *= k;
+            }
+            if (std::fabs(dz) > boundV) {
+                dz = (dz > 0.f) ? boundV : -boundV;
             }
             E.x += dx; E.y += dy; E.z += dz;                 // 权威=上次权威+钳制增量（诚实路径与上报恒等）
         }

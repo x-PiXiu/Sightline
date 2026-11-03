@@ -1,6 +1,6 @@
 // test_match.cpp —— M3 对局链路纯单测：MatchService 用例 + D3-15 编排过桥（LobbyService 组合）
 // 不起网络：喂查询/请求，断言事件与名册（整洁架构体检第 3 条）
-// 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp -o /tmp/test_match && /tmp/test_match
+// 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_match && /tmp/test_match
 #include "match/match_service.h"
 #include "match/nav_grid.h"
 #include "match/perception.h"
@@ -342,6 +342,23 @@ int main() {
         auto ev3 = cm.Tick(1000);
         CHECK(ev3.size() == 1 && std::fabs(ev3[0].entities[0].x - 900.f) < 0.01f);// 800+100=界上
     }
+    // 垂直分钳（2026-11-04 坠楼段复盘）：下落（dz<0）放宽到 kMaxFallSpeedUuPerSec×gapScale=400×gapScale
+    // ——诚实重力长坠不再逐拍被钳（和解不再持续回拉）；上升维持原界（防飞天）；水平界不变
+    {
+        MatchService vm;
+        std::vector<RosterEntry> rs{{31, "a", 0}};
+        vm.StartMatch(1, rs);
+        vm.UpdateEntity(31, 0.f, 0.f, 2000.f, 0.f, 0.f, 0x01, 1, 1000);           // 首报：高空
+        vm.UpdateEntity(31, 0.f, 0.f, 1650.f, 0.f, 0.f, 0x01, 2, 1033);           // 下落 350uu ≤ 400 界 → 放行
+        auto ev1 = vm.Tick(1000);
+        CHECK(ev1.size() == 1 && ev1[0].entities[0].z == 1650.f);                 // 诚实下落原样入权威
+        vm.UpdateEntity(31, 0.f, 0.f, 1850.f, 0.f, 0.f, 0x01, 3, 1066);           // 上升 200uu > bound 100 → 钳 100
+        auto ev2 = vm.Tick(1000);
+        CHECK(ev2.size() == 1 && ev2[0].entities[0].z == 1750.f);                 // 防飞天仍在
+        vm.UpdateEntity(31, 0.f, 0.f, 1150.f, 0.f, 0.f, 0x01, 4, 1099);           // 下落 600uu > 400 界 → 钳 400
+        auto ev3 = vm.Tick(1000);
+        CHECK(ev3.size() == 1 && ev3[0].entities[0].z == 1350.f);                 // 终端速度界生效
+    }
 
     // —— ep07 死亡/重生/结算/导航/感知/人机脑 ——
     stage("ep07 死亡状态机：4 枪击杀/Kill 事件/死亡门/死者不入候选/重生满血/无敌/历史清/握手");
@@ -407,6 +424,47 @@ int main() {
         dm.UpdateEntity(41, 200, 0, 90, 180, 0, 0, 3, now);
         auto d41b = dm.EntityById(41);
         CHECK(d41b && !d41b->rebasePending);
+    }
+    stage("ep07 重生握手回归：在途旧报只拒不改基准 → 放行首拍权威位=上报位（拉扯第五轮·无过冲）");
+    {
+        MatchService rk;
+        MapGeometry g;
+        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{400, 0, 92, 180}, SpawnPoint{-400, 0, 92, 0}};
+        rk.SetGeometry(g);
+        std::vector<RosterEntry> rs{{60, "h", 0}, {61, "v", 1}};
+        rk.StartMatch(3, rs);
+        rk.UpdateEntity(60, 10, 0, 92, 0, 0, 0, 1, 1000);          // 60 锚点旁激活（狙击位）
+        rk.UpdateEntity(61, 400, 0, 92, 180, 0, 0, 1, 1000);       // 61 锚点旁激活（靶位）
+        std::uint64_t now = 1000;
+        bool killed = false;
+        for (int i = 0; i < 4; ++i) {                              // 4 发×25 伤 → 击杀
+            now += 200;
+            rk.UpdateEntity(60, 10, 0, 92, 0, 0, 0, static_cast<std::uint32_t>(2 + i), now);
+            auto ev = rk.Fire(60, now + 10);
+            for (const auto& e : ev)
+                if (e.type == MatchEvent::Type::Kill) killed = true;
+        }
+        CHECK(killed);
+        now += 100;
+        rk.UpdateEntity(61, 400, 0, 92, 180, 0, 0, 9, now);        // 死亡期上报：bDead 早退（既有行为）
+        now += 4000;
+        auto rev = rk.Tick(now);                                   // 到期重生 → 离敌最远 = spawnPoints[2]
+        const auto* rr = find(rev, MatchEvent::Type::Respawn);
+        CHECK(rr != nullptr && rr->respawnPid == 61);
+        const auto* rb = rk.EntityById(61);
+        CHECK(rb && !rb->bDead && rb->rebasePending);
+        const float sx = rb->x, sy = rb->y;
+        CHECK(sx == -400.f && sy == 0.f);                          // 落位=离敌最远合同点
+        now += 33;
+        rk.UpdateEntity(61, 400, 0, 92, 180, 0, 0, 10, now);       // 重生后在途旧报（尸体位 @400,0）→ 拒绝
+        const auto* rj = rk.EntityById(61);
+        CHECK(rj && rj->rebasePending);                            // 仍在握手期
+        CHECK(rj->lx == sx && rj->ly == sy);                       // ★增量基准保持 spawn（修复前被 :104 污染回尸体位）
+        now += 33;
+        rk.UpdateEntity(61, sx + 40.f, sy, 92, 0, 0, 0, 11, now);  // 传送后首条：锚点旁 40cm → 放行
+        const auto* rp = rk.EntityById(61);
+        CHECK(rp && !rp->rebasePending);
+        CHECK(rp->x == sx + 40.f && rp->y == sy && rp->z == 92.f); // ★权威位逐分量=上报位（修复前 300~600uu 过冲+追爬）
     }
     stage("ep07 终局：10 杀 Ended（原因 1·比分两行）/终局静默/AbortMatch");
     {
