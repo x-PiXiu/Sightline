@@ -175,7 +175,7 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
     TSubclassOf<UUserWidget> HitmarkerClass;     // Hitmarker（WBP_Hitmarker·对象池管理）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
-    TSubclassOf<UUserWidget> CombatHudClass;      // 血条（根类 UCombatHudWidgetBase·WBP_CombatHud）
+    TSubclassOf<UUserWidget> CombatHudClass;      // 对局 HUD（血条=首个控件·后续弹药/枪械名同面板扩·根类 UCombatHudWidgetBase·WBP_CombatHud）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
     TSubclassOf<UUserWidget> KillFeedClass;       // 击杀播报（根类 UKillFeedWidgetBase·WBP_KillFeed）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")

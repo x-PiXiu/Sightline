@@ -637,7 +637,7 @@ void ASightlineCharacter::CreateMatchUI() {
                 Result->BindSession(MatchSession.Get(), MatchSession.IsValid() ? MatchSession->GetSelfPlayerId() : 0);
         }
     }
-    UE_LOG(LogTemp, Log, TEXT("[对局UI] 血条=%s 播报=%s 结算=%s（ep07 战斗 UI）"),
+    UE_LOG(LogTemp, Log, TEXT("[对局UI] 对局HUD=%s 播报=%s 结算=%s（ep07 战斗 UI）"),
            CombatHudClass ? TEXT("OK") : TEXT("未配置"),
            KillFeedClass ? TEXT("OK") : TEXT("未配置"),
            ResultClass ? TEXT("OK") : TEXT("未配置"));

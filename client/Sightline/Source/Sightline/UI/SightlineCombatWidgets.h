@@ -1,5 +1,5 @@
 // SightlineCombatWidgets.h —— ep07 对局战斗 UI 基类（BindWidget 按名抓取——WBP 放皮，逻辑在 C++）
-// 三块：血条（扩展现有对局 HUD 行）/ 击杀播报（3 行循环）/ 结算面板（胜负+比分+再来一局）
+// 三块：对局 HUD（WBP_CombatHud·血条是首个控件，弹药/枪械名后续扩展同一面板）/ 击杀播报（3 行循环）/ 结算面板（胜负+比分+再来一局）
 // 数据源全走 MatchSession 委托：OnFireResult.VictimHp（血条）/ OnKill（播报）/ OnMatchEnd（结算）
 // 工艺=UI/SightlineUIWidgets.h 同款（BindWidget 名字合同；Optional 缺了不崩）
 #pragma once
@@ -11,7 +11,9 @@
 #include "Match/SightlineMatchSession.h"   // FSightlineFireResult/Kill/ScoreRow：UFUNCTION 形参要完整类型（头文件自足，不赖 unity 拼接顺序）
 #include "SightlineCombatWidgets.generated.h"
 
-/** 血条（对局 HUD 扩展——自己血量；数据=OnFireResult.VictimHp + OnRespawn 满血） */
+/** 对局 HUD 基类（血条=首个控件；弹药/枪械名/技能等后续控件同面板扩展——新控件随意命名
+ *  + 在此加 BindWidgetOptional 字段即可，不与已有合同名冲突）。
+ *  血条数据=OnFireResult.VictimHp（受击掉血）+ OnRespawn（满血）；文本格式「75 / 100」单控件 */
 UCLASS(Abstract)
 class SIGHTLINE_API UCombatHudWidgetBase : public UUserWidget {
     GENERATED_BODY()

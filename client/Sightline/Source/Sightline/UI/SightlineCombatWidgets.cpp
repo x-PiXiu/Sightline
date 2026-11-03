@@ -49,7 +49,7 @@ void UCombatHudWidgetBase::SetHp(int32 Hp, int32 MaxHp)
 {
     const float Ratio = MaxHp > 0 ? static_cast<float>(Hp) / MaxHp : 0.f;
     if (HealthBar) HealthBar->SetPercent(Ratio);
-    if (HealthText) HealthText->SetText(FText::AsNumber(Hp));
+    if (HealthText) HealthText->SetText(FText::FromString(FString::Printf(TEXT("%d / %d"), Hp, MaxHp)));
 }
 
 // ───────── 击杀播报 ─────────
