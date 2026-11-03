@@ -58,6 +58,21 @@ inline NavGrid BuildNavGrid(const OccluderTable& occ) {
     return g;
 }
 
+/** 出生点可用性自检（2026-11-03 联调实锤）：出生点被掩体（含命中体 34cm 膨胀带）压住 →
+ *  出生格 blocked → GridLOS 首格即 false + FindPath 起点九宫格全堵 → 人机原地不动；
+ *  且人机站在箱体内，CanSee/子弹都先穿箱皮 → 永远看不见、永远打不中。
+ *  返回被压出生点下标列表（与 BuildNavGrid 同一套栅格语义：出生格 blocked=不可站立）。
+ *  服务器启动告警 + 编辑器烘焙红字两侧使用——数据问题在数据入口拦，不进运行时猜。 */
+inline std::vector<std::size_t> BlockedSpawnPoints(const MapGeometry& geo) {
+    std::vector<std::size_t> out;
+    if (geo.spawnPoints.empty()) return out;
+    const NavGrid g = BuildNavGrid(geo.occluders);
+    for (std::size_t i = 0; i < geo.spawnPoints.size(); ++i)
+        if (g.Blocked(g.CellIx(geo.spawnPoints[i].x), g.CellIy(geo.spawnPoints[i].y)))
+            out.push_back(i);
+    return out;
+}
+
 /** 栅格 LOS（走格判定：Bresenham 直线过 blocked 格=不可视/不可直行） */
 inline bool GridLOS(const NavGrid& g, int x0, int y0, int x1, int y1) {
     int dx = std::abs(x1 - x0), dy = std::abs(y1 - y0);

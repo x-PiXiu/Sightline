@@ -171,6 +171,14 @@ int main() {
                      " 球=" + std::to_string(geometry->occluders.spheres.size()) +
                      " 命中体 r=" + std::to_string(geometry->hitbox.radius) +
                      " h=" + std::to_string(geometry->hitbox.halfHeight));
+            // 出生点净空自检（2026-11-03 联调实锤：4 箱全压出生点 → 人机原地不动+子弹先中箱皮）
+            for (const std::size_t ix : sightline::match::BlockedSpawnPoints(*geometry)) {
+                const auto& sp = geometry->spawnPoints[ix];
+                LOG_WARNING("[几何合同] 出生点 " + std::to_string(ix + 1) + " @(" +
+                            std::to_string(sp.x) + "," + std::to_string(sp.y) +
+                            ") 被掩体压住（含命中体 34cm 膨胀带）——人机会原地不动、子弹先中箱皮打不中它；"
+                            "请在关卡把该掩体挪开（箱缘离出生点 ≥70cm）后重新烘焙");
+            }
         } else if (std::ifstream f(path); f.good()) {
             LOG_ERROR("[几何合同] " + path + " 存在但非法（schema 校验失败）——装配错误，拒绝启动");
             return 1;                                    // fail-fast：装配错误不留活口（D5-08v2）

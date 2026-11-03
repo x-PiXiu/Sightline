@@ -619,6 +619,21 @@ int main() {
         CHECK(sawShot && !sawRejected);                        // 开火回传；被武器门拦的不回传（不刷日志）
         CHECK(sawKill);                                        // 击杀回传（受害客户端靠 23 号知道自己死了）
     }
+    stage("ep07 合同自检：出生点被掩体压住可检出（栅格同语义）/净空放行");
+    {
+        // 用户现场形态（2026-11-03）：184×128×128 箱压在出生点旁 56cm——出生格 blocked
+        MapGeometry g;
+        g.occluders.boxes.push_back(OccluderBox{56, 0, 92, 92, 64, 64, 0});
+        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}};
+        CHECK(BlockedSpawnPoints(g).size() == 1);              // 压住 → 检出
+        g.spawnPoints.push_back(SpawnPoint{400, -400, 91.5f, 0});
+        const auto v = BlockedSpawnPoints(g);
+        CHECK(v.size() == 1 && v[0] == 0);                     // 净空点放行；下标对位
+        g.occluders.boxes.push_back(OccluderBox{1507, -777, 49, 25, 206.25f, 212.5f, 0});   // 长墙
+        CHECK(BlockedSpawnPoints(g).size() == 1);              // 远墙不影响
+        g.occluders.boxes.clear();
+        CHECK(BlockedSpawnPoints(g).empty());                  // 撤箱全放行
+    }
 
     std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";
     return 0;

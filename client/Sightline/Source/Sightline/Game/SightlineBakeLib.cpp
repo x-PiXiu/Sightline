@@ -185,10 +185,36 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         OutSummary = TEXT("写盘失败：") + Path;
         return false;
     }
-    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d 出生点=%d 巡逻点=%d → %s（entityHitbox r=%.1f h=%.1f）%s"),
+    // 5) 出生点净空自检（ep07：箱体+命中体膨胀带 34cm 压住出生格 → 人机原地不动、子弹先中箱皮
+    //    打不中它；与服务器 nav_grid.h 同一套语义：身体高度带过滤 + 34cm 膨胀。摆错烘焙当场红字，
+    //    不用等服务器启动告警）。客户端不 include 服务器头——判定式按 kNav* 常量镜像手写。
+    FString SpawnBlocked;
+    {
+        constexpr float Inflate = 34.f;                  // kNavInflateCm 镜像
+        constexpr float StepCm = 45.f, BodyTopCm = 176.f; // kNavStepCm / kNavBodyTopCm 镜像
+        for (const BakedSpawn& S : Spawns) {
+            for (int32 i = 0; i < Centers.Num(); ++i) {
+                const float Bot = Centers[i].Z - Halves[i].Z, Top = Centers[i].Z + Halves[i].Z;
+                if (!(Top > StepCm) || !(Bot < BodyTopCm)) continue;   // 身体高度带外（地板等）：不挡
+                const float Ex = Halves[i].X + Inflate, Ey = Halves[i].Y + Inflate;
+                if (FMath::Abs(S.Pos.X - Centers[i].X) <= Ex && FMath::Abs(S.Pos.Y - Centers[i].Y) <= Ey) {
+                    SpawnBlocked += FString::Printf(TEXT(" [Spawn_%d@(%d,%d) 压在盒#%d]"),
+                                                    S.Index + 1, int32(S.Pos.X), int32(S.Pos.Y), i);
+                    break;
+                }
+            }
+        }
+    }
+
+    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d 出生点=%d 巡逻点=%d → %s（entityHitbox r=%.1f h=%.1f）%s%s"),
                                  MarkersFound, Centers.Num(), Spawns.Num(), Patrols.Num(), *Path, HitRadius, HitHalfH,
                                  Skipped > 0
                                      ? *FString::Printf(TEXT(" ⚠跳过%d（实例包围盒无效——空Actor只挂标记件？给Mesh或勾bOverrideBounds）"), Skipped)
-                                     : TEXT(""));
+                                     : TEXT(""),
+                                 *SpawnBlocked);
+    if (!SpawnBlocked.IsEmpty())
+        UE_LOG(LogTemp, Warning,
+               TEXT("[烘焙] ⚠ 出生点净空自检不通过：%s——被掩体（含 34cm 膨胀带）压住的出生点会让人机原地不动、子弹先中箱皮；把掩体挪开（箱缘离出生点 ≥70cm）后重新烘焙"),
+               *SpawnBlocked);
     return true;
 }
