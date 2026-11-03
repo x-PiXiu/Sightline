@@ -299,7 +299,12 @@ void ASightlineCharacter::SampleLocalState() {
     FSightlineLocalState S;
     S.Pos = GetActorLocation();
     S.Yaw = GetControlRotation().Yaw;
-    S.Pitch = AnimInputs.Pitch;
+    // 2026-11-03 实锤（判定行 vs 弹余行同发配对：准星 pitch=-5.4 / 服务器判定 pitch=-0.35）：
+    // 上报绝不能用 AnimInputs.Pitch——它在 Tick 被 FInterpTo(→RemotePitchTarget=17 号回声的
+    // 服务器权威 pitch) 平滑，构成"上报→权威→下发→平滑→再上报"闭环负反馈，准星动得越快
+    // 滞后越大（实测 5°）。服务器判定=子弹去向，必须与准星同源（GetBaseAimRotation）；
+    // AnimInputs.Pitch 的平滑语义只属于动画层（ABP 瞄准），判定层禁止复用
+    S.Pitch = GetBaseAimRotation().Pitch;
     S.bFalling = AnimInputs.bFalling;
     MatchSession->ReportLocalState(S);
 }
