@@ -41,8 +41,11 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
         if (!geometry_.spawnPoints.empty()) {
             const auto& sp = geometry_.spawnPoints[std::min<std::size_t>(
                 E.spawnIx, geometry_.spawnPoints.size() - 1)];
-            E.x = E.spawnX = sp.x;
-            E.y = E.spawnY = sp.y;
+            // 出生点钳入活动区（2026-11-04 03:20 局实锤：界外出生点 → 24 号传出去/首拍钳回来
+            // =重生即拉扯）。spawnX 同步=钳后值——锚定门与 24 号传送坐标同源；界外本身由
+            // 适配层启动告警 + 烘焙红字拦（数据修正在数据入口）。
+            E.x = E.spawnX = std::clamp(sp.x, playMinX_, playMaxX_);
+            E.y = E.spawnY = std::clamp(sp.y, playMinY_, playMaxY_);
             E.z = E.spawnZ = sp.z;
             E.yaw = sp.yawDeg;
             E.rebasePending = true;
@@ -144,13 +147,14 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             }
             E.x += dx; E.y += dy; E.z += dz;                 // 权威=上次权威+钳制增量（诚实路径与上报恒等）
         }
-        // 活动区钳制（2026-11-04 审计 A 级收编·原 ep09 登记预支）：权威位 x/y 钳回合同地面
-        // ±kPlayAreaHalfUu——对全体实体生效（真人+人机；此前仅人机适配器钳目标=边界形同虚设）。
+        // 活动区钳制（2026-11-04 审计 A 级收编·原 ep09 登记预支）：权威位 x/y 钳回合同地面——
+        // 对全体实体生效（真人+人机；此前仅人机适配器钳目标=边界形同虚设）。
         // 落点=权威推进之后、历史环 push 之前——时间线/快照/回溯采样自动一致（与超速钳制同管线）。
         // 客户端和解尾款平滑（6f2ca89）把回拉变成滑行，边界执法此时才可行；z 不钳（坠落合法）。
-        // 真源=烘焙地板合同 4000²；ep09 多地图时改从合同地板盒推导。
-        E.x = std::clamp(E.x, -kPlayAreaHalfUu, kPlayAreaHalfUu);
-        E.y = std::clamp(E.y, -kPlayAreaHalfUu, kPlayAreaHalfUu);
+        // 界=SetGeometry 从合同地板盒推导（数据变了规则跟着走——03:20 局实锤：出生点挪到界外
+        // 而常量钉 ±2000 → 24 号传出去/钳制拽回来=重生即拉扯）。
+        E.x = std::clamp(E.x, playMinX_, playMaxX_);
+        E.y = std::clamp(E.y, playMinY_, playMaxY_);
         E.lx = x; E.ly = y; E.lz = z;                        // 增量基准永远=客户端声明轨迹
         E.lastRecvMs = recvMs;                               // 钳制时间版基准（下一次间隔）
         E.yaw = yaw; E.pitch = pitch;                        // 朝向无动力学：末次上报即权威
@@ -192,7 +196,9 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
         }
         if (!geometry_.spawnPoints.empty()) {            // 有合同点：服务器权威落位（人机首报同源）
             const auto& sp = geometry_.spawnPoints[best];
-            E.x = sp.x; E.y = sp.y; E.z = sp.z;
+            E.x = std::clamp(sp.x, playMinX_, playMaxX_); // 界外出生点钳入活动区（同 StartMatch——
+            E.y = std::clamp(sp.y, playMinY_, playMaxY_); //  24 号带钳后坐标=客户端传送不再被拽回）
+            E.z = sp.z;
             E.yaw = sp.yawDeg;
             E.spawnIx = static_cast<std::uint8_t>(best);
         } else {                                          // 无合同点：原位复活（ep05 兼容路径）
@@ -244,6 +250,17 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
 
 void MatchService::SetGeometry(const MapGeometry& geometry) {
     geometry_ = geometry;                                    // 构建期烘焙注入（D5-08v2 拒绝运行时上报）
+    // 活动区从合同推导（2026-11-04 审计 A 级升级）：地板=足印最大的遮挡盒（hx*hy 最大）——
+    // 多地图/挪出生点后规则随数据走，不再拍常量。无盒（缺省合同）回退 kPlayAreaHalfUu。
+    float bestArea = -1.f;
+    for (const auto& b : geometry_.occluders.boxes) {
+        const float area = b.hx * b.hy;
+        if (area > bestArea) {
+            bestArea = area;
+            playMinX_ = b.cx - b.hx; playMaxX_ = b.cx + b.hx;
+            playMinY_ = b.cy - b.hy; playMaxY_ = b.cy + b.hy;
+        }
+    }
 }
 
 std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {

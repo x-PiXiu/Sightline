@@ -145,6 +145,11 @@ public:
     /** ep07：只读访问（BotBrain 感知/驱动器组装视图用——域内只读，无绕过写口） */
     const std::vector<Entity>& Entities() const { return entities_; }
     const MapGeometry& Geometry() const { return geometry_; }
+    // 活动区推导界（适配层数据校验告警用——出生点在界外=烘焙数据问题）
+    float PlayMinX() const { return playMinX_; }
+    float PlayMaxX() const { return playMaxX_; }
+    float PlayMinY() const { return playMinY_; }
+    float PlayMaxY() const { return playMaxY_; }
     bool IsEnded() const { return bEnded_; }
     std::uint32_t RoomId() const { return roomId_; }   // 常驻单局所属房间（人机驱动自愈只中止本房对局）
     const Entity* EntityById(std::uint32_t pid) const;
@@ -164,6 +169,11 @@ private:
     std::uint32_t roomId_ = 0;
     bool bActive_ = false;
     MapGeometry geometry_;                 // 几何合同（构建期烘焙注入；缺省=空遮挡+默认胶囊 40/90）
+    // 活动区边界（2026-11-04 审计 A 级升级：从合同**地板盒**推导，不再拍常量——地板=足印最大的
+    // 遮挡盒（hx*hy 最大）；多地图/挪出生点后规则随数据走。出生点在界外时落位钳入+启动告警，
+    // 数据修正在烘焙端红字拦（与"掩体压出生点"同纪律：数据问题数据入口拦）。
+    float playMinX_ = -kPlayAreaHalfUu, playMaxX_ = kPlayAreaHalfUu;
+    float playMinY_ = -kPlayAreaHalfUu, playMaxY_ = kPlayAreaHalfUu;
     bool bEnded_ = false;                  // ep07：终局置位（Fire/UpdateEntity 静默丢）
     std::uint8_t endReason_ = 0;
     std::uint64_t snapshotStopAtMs = 0;    // ep07：Ended 后保留快照 2s（结算面板背景）再停

@@ -395,6 +395,27 @@ int main() {
             CHECK(ev4.size() == 1 && ev4[0].entities[0].x == 100.f && ev4[0].entities[0].y == -100.f);
         }
     }
+    // 活动区推导（2026-11-04 03:20 局数据冲突回归）：界=合同地板盒（足印最大）——出生点在界外
+    // 时锚/落位钳入（24 号带钳后坐标=客户端传送不再被拽回），越界步行钳在推导界上
+    {
+        MatchService dm3;
+        MapGeometry g;
+        g.occluders.boxes.push_back(OccluderBox{0, 0, -200.5f, 1500.f, 1500.f, 200.f, 0});   // 地板 ±1500
+        g.occluders.boxes.push_back(OccluderBox{100, 0, 50.f, 10.f, 10.f, 50.f, 0});         // 小盒不得干扰推导
+        g.spawnPoints = {SpawnPoint{1700.f, 0.f, 92.f, 0.f}};                                // 界外出生点
+        dm3.SetGeometry(g);
+        std::vector<RosterEntry> rs{{72, "a", 0}};
+        dm3.StartMatch(5, rs);
+        const auto* pe = dm3.EntityById(72);
+        CHECK(pe && pe->spawnX == 1500.f && pe->x == 1500.f);      // ★锚/落位钳入推导活动区
+        dm3.UpdateEntity(72, 1700.f, 0.f, 92.f, 0.f, 0.f, 0, 1, 1000);   // 客户端仍报界外旧位
+        CHECK(dm3.EntityById(72)->rebasePending);                  // 锚定门拒（钳后锚 1500 的 200cm 外）
+        dm3.UpdateEntity(72, 1480.f, 0.f, 92.f, 0.f, 0.f, 0, 2, 1030);   // 落钳后锚旁 → 放行
+        const auto* pa = dm3.EntityById(72);
+        CHECK(pa && !pa->rebasePending && pa->x == 1480.f);        // 权威=上报位（界内）
+        dm3.UpdateEntity(72, 1650.f, 0.f, 92.f, 0.f, 0.f, 0, 3, 1060);   // 越推导界
+        CHECK(dm3.EntityById(72)->x == 1500.f);                    // ★钳在推导界上（非常量 2000）
+    }
 
     // —— ep07 死亡/重生/结算/导航/感知/人机脑 ——
     stage("ep07 死亡状态机：4 枪击杀/Kill 事件/死亡门/死者不入候选/重生满血/无敌/历史清/握手");

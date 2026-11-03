@@ -219,12 +219,33 @@ bool USightlineBakeLib::BakeServerOccluders(UWorld* World, const FString& OutPat
         }
     }
 
-    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d 出生点=%d 巡逻点=%d → %s（entityHitbox r=%.1f h=%.1f）%s%s"),
+    // 5.5) 活动区校验（2026-11-04 03:20 局实锤：出生点摆在地板合同之外 → 服务器域钳制拽回=重生即
+    //      拉扯、人机出生即瞬移）。地板=足印最大的盒（与服务器 SetGeometry 同规则镜像）；出生点
+    //      必须落在地板盒足印内，越界红字点名——挪回地板重烘焙。
+    FString SpawnOutside;
+    {
+        float BestArea = -1.f, Fx = 0.f, Fy = 0.f, Fhx = 0.f, Fhy = 0.f;
+        for (int32 i = 0; i < Centers.Num(); ++i) {
+            const float Area = Halves[i].X * Halves[i].Y;
+            if (Area > BestArea) { BestArea = Area; Fx = Centers[i].X; Fy = Centers[i].Y; Fhx = Halves[i].X; Fhy = Halves[i].Y; }
+        }
+        if (BestArea > 0.f)
+            for (const BakedSpawn& S : Spawns)
+                if (FMath::Abs(S.Pos.X - Fx) > Fhx || FMath::Abs(S.Pos.Y - Fy) > Fhy)
+                    SpawnOutside += FString::Printf(TEXT(" [Spawn_%d@(%d,%d) 在地板外(±%.0f,±%.0f)]"),
+                                                    S.Index + 1, int32(S.Pos.X), int32(S.Pos.Y), Fhx, Fhy);
+    }
+
+    OutSummary = FString::Printf(TEXT("标记=%d 盒=%d 出生点=%d 巡逻点=%d → %s（entityHitbox r=%.1f h=%.1f）%s%s%s"),
                                  MarkersFound, Centers.Num(), Spawns.Num(), Patrols.Num(), *Path, HitRadius, HitHalfH,
                                  Skipped > 0
                                      ? *FString::Printf(TEXT(" ⚠跳过%d（实例包围盒无效——空Actor只挂标记件？给Mesh或勾bOverrideBounds）"), Skipped)
                                      : TEXT(""),
-                                 *SpawnBlocked);
+                                 *SpawnBlocked, *SpawnOutside);
+    if (!SpawnOutside.IsEmpty())
+        UE_LOG(LogTemp, Warning,
+               TEXT("[烘焙] ⚠ 出生点在地板合同之外：%s——服务器会把权威位钳回地板界（重生即拉扯/瞬移感）；把出生点挪回地板范围内后重新烘焙"),
+               *SpawnOutside);
     if (!SpawnBlocked.IsEmpty())
         UE_LOG(LogTemp, Warning,
                TEXT("[烘焙] ⚠ 出生点净空自检不通过：%s——被掩体（含 34cm 膨胀带）压住的出生点会让人机原地不动、子弹先中箱皮；把掩体挪开（箱缘离出生点 ≥70cm）后重新烘焙"),

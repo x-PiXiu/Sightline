@@ -96,11 +96,10 @@ public:
             b.lastTickMs = nowMs;
             b.hp = sightline::match::kMaxHp;
             b.wasDead = false;                               // 上一局死亡沿不跨局
-            float sx = 0.f, sy = 0.f, sz = 90.f, syaw = 0.f;
-            if (!geo.spawnPoints.empty()) {
-                const auto& sp = geo.spawnPoints[std::min<std::size_t>(E->spawnIx, geo.spawnPoints.size() - 1)];
-                sx = sp.x; sy = sp.y; sz = sp.z; syaw = sp.yawDeg;
-            }
+            // 首报位=实体权威锚（StartMatch 已做活动区钳制且 spawnX 同步——单一真相源，不再直读
+            // 合同表：合同出生点在界外时锚已被钳入，双源必漂移=2026-11-04 03:20 局数据冲突教训）
+            const float sx = E->spawnX, sy = E->spawnY, syaw = E->yaw;
+            const float sz = E->spawnZ != 0.f ? E->spawnZ : 90.f;   // 无合同兜底（旧路径 z=90）
             match.UpdateEntity(b.pid, sx, sy, sz, syaw, 0.f, 0, ++b.seq, nowMs);
             b.x = sx; b.y = sy; b.z = sz; b.yaw = syaw;
             LOG_INFO("[人机] 首报出生点 pid=" + std::to_string(b.pid) + " 序=" +

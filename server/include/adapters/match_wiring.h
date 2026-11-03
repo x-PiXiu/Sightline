@@ -123,6 +123,17 @@ public:
                 entries.push_back({m.playerId, m.name, 0});
             lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
             writer_.deliverMatch(match_.StartMatch(roomId, entries));
+            // 活动区数据校验（数据问题数据入口拦——与"掩体压出生点"同族纪律）：出生点在合同地板
+            // 之外 → 域已钳入界内（锚/24 号同源），但请挪回地板重烘焙，否则重生/开局仍在钳制边缘
+            if (const auto& g = match_.Geometry(); !g.spawnPoints.empty())
+                for (std::size_t i = 0; i < g.spawnPoints.size(); ++i) {
+                    const auto& sp = g.spawnPoints[i];
+                    if (sp.x < match_.PlayMinX() || sp.x > match_.PlayMaxX() ||
+                        sp.y < match_.PlayMinY() || sp.y > match_.PlayMaxY())
+                        LOG_WARNING("[活动区] 出生点 " + std::to_string(i) + " (" +
+                                    std::to_string(sp.x) + "," + std::to_string(sp.y) +
+                                    ") 在地板合同之外——已钳入界内；请挪回地板并重烘焙");
+                }
             // 人机首报读用例分配结果（Entity::spawnIx）——不传本地 entries：值传递副本里 spawnIndex 全 0
             if (bot_) bot_->OnMatchStart(roomId, match_.Geometry(), match_, Now_());
         });

@@ -36,9 +36,9 @@ inline constexpr int           kEntityHistoryCap  = 32;      // ep06：权威位
 inline constexpr std::uint64_t kRespawnMs         = 3000;    // ep07：死亡→重生倒计时（服务器权威）
 inline constexpr std::uint64_t kInvulnMs          = 2000;    // ep07：重生无敌（防出生即死·行业惯例）
 inline constexpr int           kKillLimit         = 10;      // ep07：先到 10 杀结束（D7-02·ep08 进数值表）
-// 活动区半宽（2026-11-04 审计 A 级收编·原 ep09 登记预支）：权威位 x/y 钳回合同地面 ±2000——
-// 对全体实体生效（真人+人机），域规则住 UpdateEntity，适配器不再代行。真源=烘焙地板合同 4000²；
-// ep09 多地图时改为从合同地板盒推导（届时本常量退役为缺省）。
+// 活动区半宽**回退缺省**（2026-11-04 审计 A 级收编）：正式界=MatchService::SetGeometry 从合同
+// 地板盒（足印最大遮挡盒）推导并注入 UpdateEntity 钳制——本常量仅在合同无地板盒（缺省/单测）
+// 时兜底。03:20 局实锤：出生点挪到常量界外 → 24 号传出去/钳制拽回来=重生即拉扯，规则必须随数据走。
 inline constexpr float         kPlayAreaHalfUu    = 2000.f;
 inline constexpr float         kNavCellCm         = 50.f;    // ep07：导航栅格粒度（80×80@4000² 地图）
 inline constexpr float         kNavStepCm         = 45.f;    // ep07：可跨越台阶高（低于此的盒不挡路）
