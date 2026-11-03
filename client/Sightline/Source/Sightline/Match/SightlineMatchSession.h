@@ -156,6 +156,10 @@ private:
     uint32 InputSeq = 0;                               // v4：本地预测序号（19 号；M3 预测/重放的历史锚点）
     TArray<FInputSample> InputHistory;                 // M3b：1s 环形输入史（对账/重放的本地底账）
     uint32 LastAckedSeq = 0;                           // 服务器最近确认的序号（对账基准；HUD 差值用）
+    uint32 ReconcileFloorSeq = 0;                      // 对账地板（重生/新局清史时刻的 InputSeq）——
+                                                       // ackedSeq 低于地板的快照=清史前生成的过期帧，跳过对账
+                                                       // （死亡期 ackedSeq 冻结、在途快照权威位=尸体位：
+                                                       //  不设地板=全量兜底把人从出生点拽回尸体位=残留拉扯根因）
     int32 ReconcileCount = 0;                          // 和解次数（≥ε 才计；断档兑底也计）
     int32 ReplayFrames = 0;                            // 最近一次回滚重放的输入帧数（断档兑底=0）
     double ErrCurrentCm = 0.0;                         // 当前对账误差（cm；ε 判定的那条）

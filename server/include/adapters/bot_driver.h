@@ -81,6 +81,7 @@ public:
             b.pathI = 0;
             b.wp = b.pid % waypoints_.size();                // 航点错开（相邻 pid 走不同航点）
             b.seq = 0;
+            b.lastFireReqMs = 0;
             b.lastTickMs = nowMs;
             b.hp = sightline::match::kMaxHp;
             b.wasDead = false;                               // 上一局死亡沿不跨局
@@ -150,6 +151,7 @@ private:
         std::uint64_t lastRepathMs = 0;
         std::uint64_t lastTickMs = 0;
         std::uint32_t seq = 0;
+        std::uint64_t lastFireReqMs = 0;                 // 上次扣扳机时刻（fireIntervalMs 节奏门控）
         std::uint8_t homeSpawnIx = 0;
         float x = 0.f, y = 0.f, z = 90.f, yaw = 0.f;
         float hp = 100.f;
@@ -158,10 +160,12 @@ private:
 
     static sightline::match::BotTuning TuneFor(std::uint8_t diff) {
         sightline::match::BotTuning t;
-        if (diff == 0) {                                     // 易：反应慢·误差大
+        if (diff == 0) {                                     // 易：反应慢·误差大·枪稀
             t.reactMs = 400.f; t.errStartDeg = 6.f; t.errEndDeg = 3.f; t.errDecayDegPerS = 1.5f;
-        } else if (diff >= 2) {                              // 难：反应快·误差小
+            t.fireIntervalMs = 600.f;
+        } else if (diff >= 2) {                              // 难：反应快·误差小·枪密
             t.reactMs = 120.f; t.errStartDeg = 2.f; t.errEndDeg = 0.5f; t.errDecayDegPerS = 5.f;
+            t.fireIntervalMs = 250.f;
         }
         return t;
     }
@@ -251,7 +255,10 @@ private:
         b.yaw += std::clamp(sightline::match::detail::NormDeg(want), -maxTurn, maxTurn);
 
         // ── 行动·开火（同真人入口：Fire 内四道门说了算；产出事件回传主循环走同一输出端口）──
-        if (intent.bFire) {
+        // 节奏门控（用户令：射击频率降低）：意图每拍都有，扣扳机按 fireIntervalMs 间隔——
+        // 中难度 400ms=2.5 发/s（原为射速门允许的 ~10 发/s 连压）
+        if (intent.bFire && nowMs - b.lastFireReqMs >= t.fireIntervalMs) {
+            b.lastFireReqMs = nowMs;
             for (auto& ev : match.Fire(b.pid, nowMs)) {
                 // 被武器门拦下的射击（射速/换弹）：真人路径同样不广播（D5-03 静默丢）——人机 30Hz 决策
                 // 每拍都请求，拒绝事件回传只会刷"[射击拒绝]"日志，就地丢弃

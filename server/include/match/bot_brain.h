@@ -25,6 +25,8 @@ struct BotTuning {
     float engageRangeCm = 900.f;    // 交战距离（超出=追近）
     float hpCoverBelow = 30.f;      // 血量低于此→撤掩体
     float moveSpeedCmS = 400.f;     // 与角色 MaxWalkSpeed 一致
+    float fireIntervalMs = 400.f;   // 开火节奏下限（2026-11-03 用户令"人机射击频率降低"：意图每拍都有，
+                                    //  扣扳机按此间隔——连发压制→点射节奏；适配器节流，不进 Decide 纯函数）
 };
 
 /** 感知输入（driver 组装·只读 DTO——MatchService 不为人机开门） */

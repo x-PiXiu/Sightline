@@ -89,6 +89,8 @@ void USightlineMatchSession::ClearPredictionInput()   // ep07（❗9）：重生
 {
     InputHistory.Reset();                              // 输入史清（和解对账无从对起→断档全量兑底=落位态）
     LastAckedSeq = InputSeq;                           // 管线深度清零（旧 ack 不再追溯）
+    ReconcileFloorSeq = InputSeq;                      // 对账地板=清史时刻（死亡期在途快照 ackedSeq 冻结在
+                                                       //  清史前 → 低于地板 → 不再参与对账——防拽回尸体位）
     ErrCurrentCm = 0.0; ErrPeakCm = 0.0;
 }
 
@@ -109,12 +111,18 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             if (Payload.Num() < Off + NameLen + 1) return;
             FUTF8ToTCHAR ToTchar(reinterpret_cast<const ANSICHAR*>(&Payload[Off]), NameLen);
             S.Name = FString(ToTchar.Get(), ToTchar.Length());
+            FString HexStr;                                    // 名字乱码定案（2026-11-03"Bot1寿陇翿"）：
+            for (int32 b = 0; b < NameLen; ++b)                // 线上探针已证服务端字节干净（426f7431），
+                HexStr += FString::Printf(TEXT("%02X "), Payload[Off + b]);   // 此行回显客户端实收字节
+            UE_LOG(LogTemp, Log, TEXT("[15号] 名册 pid=%d NameLen=%d 字节=[%s] 名=%s"),
+                   S.PlayerId, NameLen, *HexStr, *S.Name);
             Off += NameLen;
             S.SpawnIndex = Payload[Off]; ++Off;
             Roster.Add(S);
         }
         bInMatch = true;                               // 对局激活：19 上报窗口开启（v4·R10）
         InputHistory.Reset();                          // M3b：新对局=新底账（环形缓冲与 HUD 统计归零）
+        ReconcileFloorSeq = InputSeq;                  // 新局同重生纪律：上一局的 ack 快照一律过期（跨局尸位拉扯预防）
         bSelfDead = false;                             // ep07：新局死亡态复位
         ReconcileCount = 0; ReplayFrames = 0;
         ErrCurrentCm = 0.0; ErrPeakCm = 0.0; LastAckedSeq = 0;
@@ -234,6 +242,11 @@ TArray<int32> USightlineMatchSession::GetEntityIds() const {
 // 决策逻辑在 SightlineReconcile.h（纯函数，可脱引擎单测）；本函数只做副作用（委托/统计/日志）。
 // 权威位 vs 本地同 seq 预测位：< ε 无感｜≥ ε 回滚+重放｜断档 全量回滚兜底
 void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthPos) {
+    // 对账地板（2026-11-03 残留拉扯实锤）：重生/新局清史后，死亡期在途快照（权威位=尸体位·
+    // ackedSeq 冻结在清史前的 N）晚于 24 号传送到达——AckedSeq < ReconcileFloorSeq = 过期帧。
+    // 旧逻辑对它做断档全量兑底 → 人被从出生点拽回尸体位 → 双端互追 → 和解暴增+拉扯感。
+    // 过期帧整条跳过（权威位/ackedSeq 都不取——下一个 ≥地板的快照才是重生后的世界）
+    if (AckedSeq < ReconcileFloorSeq) return;
     LastAckedSeq = AckedSeq;
     LastAuthPos = AuthPos;                              // ep06：幽灵数据源（最新权威位·随快照刷新）
     bHasAuthPos = true;

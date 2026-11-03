@@ -114,6 +114,9 @@ for r in (1, 2):
     roster = parse_roster(c.expect(MATCH_START))
     me = next(x[0] for x in roster if x[1] == "probeH")
     bot = next(x[0] for x in roster if x[1].startswith("Bot"))   # Bot1/Bot2…（房间内序号命名）
+    for pid, nm, _ in roster:
+        if nm.startswith("Bot"):
+            print(f"    名册回显 name={nm!r} 字节={nm.encode('utf-8', 'replace').hex()} 长度={len(nm)}")
 
     t0 = time.time()
     seq, fired, nxt = 0, False, t0
