@@ -599,8 +599,8 @@ int main() {
                 if (std::hypot(be->x - p.x, be->y - p.y) < 80.f) reached = true;
         }
         CHECK(reached);                                        // 真去航点（不是默认目标场心 (0,0)）
-        // 真人现身人机身侧 3m → 人机开火/击杀事件必须从 Tick 返回（主循环经同一输出端口广播）
-        const float hx = be->x + 300.f, hy = be->y;
+        // 真人现身锚点旁 30cm（开局锚定握手放行范围内激活）→ 人机开火/击杀事件必须从 Tick 返回
+        const float hx = 472.f, hy = -474.f;                   // host 锚=spawnPoints[0]=(442,-474)
         std::uint32_t hseq = 0;
         bool sawShot = false, sawRejected = false, sawKill = false;
         for (int i = 0; i < 180 && !sawKill; ++i) {            // ≤6s
@@ -618,6 +618,22 @@ int main() {
         }
         CHECK(sawShot && !sawRejected);                        // 开火回传；被武器门拦的不回传（不刷日志）
         CHECK(sawKill);                                        // 击杀回传（受害客户端靠 23 号知道自己死了）
+        // 开局锚定握手（2026-11-03"开局拉出地图"修复）：有合同出生点时实体未激活前，
+        // 远离锚点的上报（切图前旧世界角色的 19 号）必须被忽略
+        {
+            MatchService am;
+            am.SetGeometry(g);
+            std::vector<RosterEntry> rs{{901, "h", 0}, {902, "b", 1}};
+            am.StartMatch(rid, rs);
+            am.UpdateEntity(901, 1500, 300, 90, 0, 0, 0, 1, 1000);   // 远离锚点 (442,-474) 的"旧包"
+            CHECK(am.EntityById(901) && !am.EntityById(901)->bHasReport);   // 被握手过滤：未激活
+            const auto* emptySnap = find(am.Tick(1100), MatchEvent::Type::Snapshot);
+            CHECK(emptySnap != nullptr && emptySnap->entities.empty());   // 未激活不入快照（快照为空）
+            am.UpdateEntity(901, 460, -490, 90, 0, 0, 0, 2, 1200);   // 锚点附近首条 → 放行
+            const auto* h901 = am.EntityById(901);
+            CHECK(h901 && h901->bHasReport);
+            CHECK(h901->x == 460.f && h901->y == -490.f);      // 权威位=上报位（首报即真值）
+        }
     }
     stage("ep07 合同自检：出生点被掩体压住可检出（栅格同语义）/净空放行");
     {

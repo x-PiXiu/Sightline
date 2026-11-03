@@ -242,7 +242,9 @@ int LobbyService::AddBot(uint32_t roomId) {
     if (room.memberFds.size() + botCount >= kMaxRoomMembers) return -1;   // 4 人上限（人机占席）
     if (RoomInMatch(roomId)) return -1;                                // 对局中不加人
     const uint32_t pid = nextPlayerId_++;                              // fd=-1：无连接（天然收不到 S2C）
-    bots_.push_back({pid, "Bot", roomId});
+    // 命名带房间内序号（2026-11-03 用户令：三人机都叫"Bot"→ 播报"Bot 击杀了 Bot"分不清谁是谁）
+    const std::string name = "Bot" + std::to_string(botCount + 1);
+    bots_.push_back({pid, name, roomId});
     return static_cast<int>(pid);
 }
 

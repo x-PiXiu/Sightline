@@ -143,7 +143,11 @@ public:
                 LOG_WARNING("[人机] 添加失败（房间满/对局中）房=" + std::to_string(roomId));
                 return;
             }
-            if (bot_) bot_->OnBotAdded(roomId, static_cast<uint32_t>(pid), "Bot", msg->difficulty);
+            // 人机真名从名册取（Bot1/Bot2…——AddBot 带房间内序号）——driver 登记名与名册一致
+            std::string botName = "Bot";
+            for (const auto& m : lobby_.RoomRoster(roomId))
+                if (m.playerId == static_cast<std::uint32_t>(pid)) { botName = m.name; break; }
+            if (bot_) bot_->OnBotAdded(roomId, static_cast<std::uint32_t>(pid), botName, msg->difficulty);
             writer_.deliver(lobby_.RoomStateAndList(roomId));
             LOG_INFO("[人机] 已添加 房=" + std::to_string(roomId) + " pid=" + std::to_string(pid));
         });

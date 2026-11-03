@@ -12,8 +12,9 @@ import sys
 import time
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 18888
-STAND = (600.0, -650.0, 90.0)   # 两个候选人机出生点都能直视的空地（唯一的墙在 x≈1482..1532）
-S0 = (442.0, -474.0)            # spawnPoints[0]：房主出生点
+# STAND=房主锚点 spawnPoints[0] 旁 42cm——开局锚定握手（首条上报须落锚点 100cm 内）放行范围内
+STAND = (30.0, -30.0, 90.0)
+S0 = (0.0, 0.0)                 # spawnPoints[0]：房主出生点（当前关卡合同）
 S1 = (820.0, -820.0)            # spawnPoints[1]
 
 WELCOME, LOGIN, LOGIN_RESULT = 1, 4, 5
@@ -112,7 +113,7 @@ for r in (1, 2):
     c.send(START_MATCH)
     roster = parse_roster(c.expect(MATCH_START))
     me = next(x[0] for x in roster if x[1] == "probeH")
-    bot = next(x[0] for x in roster if x[1] == "Bot")
+    bot = next(x[0] for x in roster if x[1].startswith("Bot"))   # Bot1/Bot2…（房间内序号命名）
 
     t0 = time.time()
     seq, fired, nxt = 0, False, t0

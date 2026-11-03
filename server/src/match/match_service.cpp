@@ -28,6 +28,21 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
         Entity E;
         E.playerId = roster[i].playerId;                       // 位置先落原点——首个 19 上报覆盖
         E.spawnIx = static_cast<std::uint8_t>(i);              // ep07：重生选点回传序号（24 号）
+        // ep07 开局锚定（2026-11-03 用户实锤"开局按 W 被拉出地图"）：PIE 大厅/对局同关卡重载——
+        // 切图前旧世界 Character 的 19 号比新角色早到 1~2s，"首报即真值"会把旧角色站位（可能远离
+        // 本局出生点上千米）写成权威位；新角色瞬移出生后被判超速钳制 → 每次和解都往旧位拉。
+        // 有合同出生点时复用重生握手（rebasePending）：首条上报须落在锚点 100cm 内才激活——
+        // 旧包天然被过滤，权威位从合同出生点开始（与客户端 GameMode 名册序落位同源）；
+        // 空合同（单测/无图环境）保持旧行为：首报即真值。
+        if (!geometry_.spawnPoints.empty()) {
+            const auto& sp = geometry_.spawnPoints[std::min<std::size_t>(
+                E.spawnIx, geometry_.spawnPoints.size() - 1)];
+            E.x = E.spawnX = sp.x;
+            E.y = E.spawnY = sp.y;
+            E.z = E.spawnZ = sp.z;
+            E.yaw = sp.yawDeg;
+            E.rebasePending = true;
+        }
         entities_.push_back(E);
     }
     std::vector<MatchEvent> out;
