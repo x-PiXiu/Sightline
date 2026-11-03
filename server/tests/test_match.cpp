@@ -359,6 +359,42 @@ int main() {
         auto ev3 = vm.Tick(1000);
         CHECK(ev3.size() == 1 && ev3[0].entities[0].z == 1350.f);                 // 终端速度界生效
     }
+    // 活动区钳制（2026-11-04 审计 A 级收编）：UpdateEntity 权威位 x/y 钳 ±kPlayAreaHalfUu——
+    // 对全体实体生效（真人同样被钳；此前仅人机适配器钳目标=边界形同虚设）。z 不钳（坠落合法）。
+    {
+        MatchService pam;
+        std::vector<RosterEntry> rs{{32, "a", 0}};
+        pam.StartMatch(1, rs);
+        std::uint64_t now = 1000;
+        std::uint32_t sq = 0;
+        pam.UpdateEntity(32, 0.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);          // 首报（界内原点）
+        for (int i = 0; i < 21; ++i) {                                            // 诚实步行 21×100uu → 越东界
+            now += 33;
+            pam.UpdateEntity(32, float(100 * (i + 1)), 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);
+        }
+        auto ev1 = pam.Tick(now);
+        CHECK(ev1.size() == 1 && ev1[0].entities[0].x == 2000.f);                 // ★权威位钳在活动区界上
+        now += 33;
+        pam.UpdateEntity(32, 2100.f, 0.f, 92.f, 0.f, 0.f, 0x00, ++sq, now);       // 继续向外顶
+        auto ev2 = pam.Tick(now);
+        CHECK(ev2.size() == 1 && ev2[0].entities[0].x == 2000.f);                 // 顶墙停驻（回拉由客户端尾款平滑接走）
+        for (int i = 0; i < 25; ++i) {                                            // 转向南界步行 25×100uu
+            now += 33;
+            pam.UpdateEntity(32, 2100.f, float(-100 * (i + 1)), 92.f, 0.f, 0.f, 0x00, ++sq, now);
+        }
+        auto ev3 = pam.Tick(now);
+        CHECK(ev3.size() == 1 && ev3[0].entities[0].x == 2000.f && ev3[0].entities[0].y == -2000.f);  // 双轴各自钳
+        {  // 界内诚实移动不受影响（新实体——避免从界外瞬回被超速钳制拦截的合理行为干扰断言）
+            MatchService pbm;
+            std::vector<RosterEntry> rs{{33, "b", 0}};
+            pbm.StartMatch(1, rs);
+            std::uint64_t now2 = 1000;
+            std::uint32_t sq2 = 0;
+            pbm.UpdateEntity(33, 100.f, -100.f, 92.f, 0.f, 0.f, 0x00, ++sq2, now2);
+            auto ev4 = pbm.Tick(now2);
+            CHECK(ev4.size() == 1 && ev4[0].entities[0].x == 100.f && ev4[0].entities[0].y == -100.f);
+        }
+    }
 
     // —— ep07 死亡/重生/结算/导航/感知/人机脑 ——
     stage("ep07 死亡状态机：4 枪击杀/Kill 事件/死亡门/死者不入候选/重生满血/无敌/历史清/握手");
@@ -495,9 +531,9 @@ int main() {
         iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 20, now);
         auto miss = iv.Fire(70, now + 10);                     // 完美瞄准：射线正穿 (200,0,92)
         CHECK(miss.size() == 1 && !miss[0].fire.bHit);         // 判定语义不变：无敌不可命中
-        CHECK(miss[0].fire.nearPid == 71);                     // ★诊断可见：最近候选=无敌目标
-        CHECK(miss[0].fire.nearInvuln);                        // ★[无敌] 旗置位（原=整只剔除零反馈）
-        CHECK(miss[0].fire.nearPerp < 70.f);                   // 垂距≈63.5（含眼高 63cm 差，点到射线）
+        CHECK(miss[0].fireDiag.nearPid == 71);                 // ★诊断可见：最近候选=无敌目标
+        CHECK(miss[0].fireDiag.nearInvuln);                    // ★[无敌] 旗置位（原=整只剔除零反馈）
+        CHECK(miss[0].fireDiag.nearPerp < 70.f);               // 垂距≈63.5（含眼高 63cm 差，点到射线）
         now += 2200;                                           // 越过无敌窗
         iv.UpdateEntity(70, 10, 0, 92, 0, 0, 0, 21, now);
         auto hit = iv.Fire(70, now + 10);
@@ -506,7 +542,7 @@ int main() {
         iv.UpdateEntity(70, 10, 0, 92, 45, 0, 0, 22, now);     // 无敌过期后朝 45° 打偏
         auto miss2 = iv.Fire(70, now + 10);
         CHECK(miss2.size() == 1 && !miss2[0].fire.bHit);
-        CHECK(miss2[0].fire.nearPid == 71 && !miss2[0].fire.nearInvuln);   // 同款 miss 不带旗
+        CHECK(miss2[0].fireDiag.nearPid == 71 && !miss2[0].fireDiag.nearInvuln);   // 同款 miss 不带旗
     }
     stage("ep07 终局：10 杀 Ended（原因 1·比分两行）/终局静默/AbortMatch");
     {
@@ -737,13 +773,12 @@ int main() {
     }
     stage("ep07 人机出界钳制：ClampMoveTarget 界外钳回/界内不动 + TakeCover 撤退顶界实测（Bot2 (3177,−3918) 实锤回归）");
     {
-        const auto nav = BuildNavGrid(OccluderTable{});
-        auto out = adapters::ClampMoveTarget(nav, {5000.f, -6000.f});
-        CHECK(out.x == 2100.f && out.y == -2100.f);            // 界外 → 栅格角
-        auto in = adapters::ClampMoveTarget(nav, {300.f, -300.f});
+        auto out = adapters::ClampMoveTarget({5000.f, -6000.f});
+        CHECK(out.x == 2000.f && out.y == -2000.f);            // 界外 → 活动区角（域常量 kPlayAreaHalfUu）
+        auto in = adapters::ClampMoveTarget({300.f, -300.f});
         CHECK(in.x == 300.f && in.y == -300.f);                // 界内 → 原样
-        auto edge = adapters::ClampMoveTarget(nav, {-9999.f, 42.f});
-        CHECK(edge.x == -2100.f && edge.y == 42.f);            // 单轴越界只钳该轴
+        auto edge = adapters::ClampMoveTarget({-9999.f, 42.f});
+        CHECK(edge.x == -2000.f && edge.y == 42.f);            // 单轴越界只钳该轴
     }
     {
         LobbyService lob2;
@@ -778,7 +813,7 @@ int main() {
             (void)drv2.Tick(now, bm2, lob2);
         }
         bb = bm2.EntityById(bot2);
-        CHECK(bb && bb->x <= 2100.01f);                        // ★不越过栅格界（修复前会到 ~2300+）
+        CHECK(bb && bb->x <= 2000.01f);                        // ★不越过活动区（域层也钳·修复前会到 ~2300+）
         CHECK(bb && bb->x > 1900.f);                           // 且确实向界外撤过（钳在界上）
     }
     stage("ep07 合同自检：出生点被掩体压住可检出（栅格同语义）/净空放行");

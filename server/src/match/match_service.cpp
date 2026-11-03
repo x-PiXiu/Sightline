@@ -144,6 +144,13 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             }
             E.x += dx; E.y += dy; E.z += dz;                 // 权威=上次权威+钳制增量（诚实路径与上报恒等）
         }
+        // 活动区钳制（2026-11-04 审计 A 级收编·原 ep09 登记预支）：权威位 x/y 钳回合同地面
+        // ±kPlayAreaHalfUu——对全体实体生效（真人+人机；此前仅人机适配器钳目标=边界形同虚设）。
+        // 落点=权威推进之后、历史环 push 之前——时间线/快照/回溯采样自动一致（与超速钳制同管线）。
+        // 客户端和解尾款平滑（6f2ca89）把回拉变成滑行，边界执法此时才可行；z 不钳（坠落合法）。
+        // 真源=烘焙地板合同 4000²；ep09 多地图时改从合同地板盒推导。
+        E.x = std::clamp(E.x, -kPlayAreaHalfUu, kPlayAreaHalfUu);
+        E.y = std::clamp(E.y, -kPlayAreaHalfUu, kPlayAreaHalfUu);
         E.lx = x; E.ly = y; E.lz = z;                        // 增量基准永远=客户端声明轨迹
         E.lastRecvMs = recvMs;                               // 钳制时间版基准（下一次间隔）
         E.yaw = yaw; E.pitch = pitch;                        // 朝向无动力学：末次上报即权威
@@ -253,8 +260,7 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate),
-                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate), 0, 0, 0, 0};
         out.push_back(std::move(ev));
         return out;
     }
@@ -265,8 +271,7 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(FireGate::Dead),
-                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(FireGate::Dead), 0, 0, 0, 0};
         out.push_back(std::move(ev));
         return out;
     }
@@ -359,19 +364,21 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     ev.type = MatchEvent::Type::FireResult;
     ev.roomId = roomId_;
     ev.fire = FireResultData{shooterPid, v.hit, true, static_cast<std::uint8_t>(gate),
-                             v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp,
-                             o.x, o.y, o.z, d.x, d.y, d.z,
-                             v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f,
-                             shooter->x, shooter->y, shooter->z,
-                             victimX, victimY, victimZ,
-                             geometry_.hitbox.radius, geometry_.hitbox.halfHeight,
-                             static_cast<std::uint16_t>(nowMs - judgeAtMs)};
-    // ⑨ miss 诊断字段填充（命中时不填——受害位已足够；诊断字段不入 21 号同 bAccepted 纪律）
+                             v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp};
+    // ⑧.5 判定链诊断快照（2026-11-04 审计 C 级收编：诊断出域事件——适配层判定行专用，永不入 21 号 wire）
+    ev.fireDiag = FireDiagnostics{
+        o.x, o.y, o.z, d.x, d.y, d.z,
+        v.hit ? std::sqrt((v.hitX - o.x) * (v.hitX - o.x) + (v.hitY - o.y) * (v.hitY - o.y) + (v.hitZ - o.z) * (v.hitZ - o.z)) : 0.f,
+        shooter->x, shooter->y, shooter->z,
+        victimX, victimY, victimZ,
+        geometry_.hitbox.radius, geometry_.hitbox.halfHeight,
+        static_cast<std::uint16_t>(nowMs - judgeAtMs)};
+    // ⑨ miss 诊断填充（命中时不填——受害位已足够）
     if (!v.hit && nearPid != 0) {
-        ev.fire.nearPid = nearPid;
-        ev.fire.nearPerp = nearPerp;
-        ev.fire.nearX = nearPos.x; ev.fire.nearY = nearPos.y; ev.fire.nearZ = nearPos.z;
-        ev.fire.nearInvuln = nearInvuln;
+        ev.fireDiag.nearPid = nearPid;
+        ev.fireDiag.nearPerp = nearPerp;
+        ev.fireDiag.nearX = nearPos.x; ev.fireDiag.nearY = nearPos.y; ev.fireDiag.nearZ = nearPos.z;
+        ev.fireDiag.nearInvuln = nearInvuln;
     }
     out.push_back(std::move(ev));
     return out;
