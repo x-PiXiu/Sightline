@@ -23,8 +23,9 @@ struct FSightlineLocalState {
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMatchStarted);        // 15 收到 → GI 切对局关卡
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchEntityLeft, int32, PlayerId);
-// M3b 和解动作过界（纯数据，D3-17 同款）：Error=对账误差向量；bFullSnap=true 时 Error 即绝对权威位（断档全量回滚）
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSelfCorrected, FVector, Error, bool, bFullSnap);
+// M3b 和解动作过界（纯数据，D3-17 同款）：Error=对账误差向量；bFullSnap=true 时 Error 即绝对权威位
+// （断档全量回滚）；bInstant=true=传送级分歧（Reconcile.h kInstantSnapCm）→ 施加端瞬发，否则尾款平滑
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnSelfCorrected, FVector, Error, bool, bFullSnap, bool, bInstant);
 
 /** 21 号开火结果（M5 · D5-02v2）——一条消息三方共用的过界纯数据：
  *  ShooterPid=自己 → Hitmarker；VictimPid=自己 → 红闪+血量行；其他 → tracer+远端开火动画 */

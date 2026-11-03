@@ -198,7 +198,7 @@ private:
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     void SampleLocalState();
-    UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap);
+    UFUNCTION() void OnSelfCorrected(FVector Error, bool bFullSnap, bool bInstant);
 
     // —— M5 开火（D5-14：按住=全自动节流连发；本地扣弹=表现层预测，服务器四道门兜底，D5-04 不纠偏）——
     void OnFirePressed();
@@ -215,6 +215,11 @@ private:
     void WarmupFireChain();
     void ResetRemoteOnRespawn(FVector SpawnPos);   // ep07：远端重生（插值重置+幽灵环清+落位——❗10）                      // ep06 首枪预热：对局开始后静音热一遍开火链（火光/枪声/弹孔首次加载）
     bool bFireHeld = false;
+
+    // —— 和解尾款（2026-11-04 拉扯第五轮：纠正施加从"30Hz 硬瞬移"改"小额误差逐帧平滑归还"）——
+    /** 未还完的对账误差向量：OnSelfCorrected 小额分支入账，Tick 按指数衰减归还（kCorrectionRate）；
+     *  FullSnap/瞬发/死亡定身/重生传送时清零。平滑期上报的就是混合位→服务器采纳→对账归零，无反馈环 */
+    FVector PendingCorrection = FVector::ZeroVector;
 
     // —— M5 对局 UI 实例（C++ 全自动创建；离场随 Pawn 销毁）——
     UPROPERTY() TObjectPtr<UUserWidget> CrosshairWidget = nullptr;

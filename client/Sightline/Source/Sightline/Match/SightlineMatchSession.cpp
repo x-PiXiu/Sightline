@@ -245,8 +245,10 @@ void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthP
     // 对账地板（2026-11-03 残留拉扯实锤）：重生/新局清史后，死亡期在途快照（权威位=尸体位·
     // ackedSeq 冻结在清史前的 N）晚于 24 号传送到达——AckedSeq < ReconcileFloorSeq = 过期帧。
     // 旧逻辑对它做断档全量兑底 → 人被从出生点拽回尸体位 → 双端互追 → 和解暴增+拉扯感。
-    // 过期帧整条跳过（权威位/ackedSeq 都不取——下一个 ≥地板的快照才是重生后的世界）
-    if (AckedSeq < ReconcileFloorSeq) return;
+    // 过期帧整条跳过（权威位/ackedSeq 都不取——下一个 ≥地板的快照才是重生后的世界）。
+    // 2026-11-04 收紧为 <=：清史时刻的在途末报（AckedSeq==地板）同样属"上个时代的账"——
+    // 此时历史已空，放行必然走断档 FullSnap；死账不入对账是地板的完整语义。
+    if (AckedSeq <= ReconcileFloorSeq) return;
     LastAckedSeq = AckedSeq;
     LastAuthPos = AuthPos;                              // ep06：幽灵数据源（最新权威位·随快照刷新）
     bHasAuthPos = true;
@@ -275,14 +277,15 @@ void USightlineMatchSession::ReconcileSelf(uint32 AckedSeq, const FVector& AuthP
 
     case sightline::reconcile::Decision::Action::FullSnap:
         ++ReconcileCount;
-        OnSelfCorrected.Broadcast(AuthPos, /*bFullSnap=*/true);
+        OnSelfCorrected.Broadcast(AuthPos, /*bFullSnap=*/true, /*bInstant=*/true);
         break;
 
     case sightline::reconcile::Decision::Action::ErrorTranslate:
         ++ReconcileCount;
         // 回滚 + 重放（位移空间）：渲染位 += 误差向量——纯平移运动下与"摆回权威位再逐输入重放"
-        // 数学等价且不与 CMC 相搏；穿墙/碰撞级的逐帧输入重放不在本期范围（按需后置）
-        OnSelfCorrected.Broadcast(FVector(D.errorX, D.errorY, D.errorZ), /*bFullSnap=*/false);
+        // 数学等价且不与 CMC 相搏；穿墙/碰撞级的逐帧输入重放不在本期范围（按需后置）。
+        // bInstant（拉扯第五轮）：≥150cm 传送级分歧瞬发；小额误差交 Character 尾款平滑逐帧归还
+        OnSelfCorrected.Broadcast(FVector(D.errorX, D.errorY, D.errorZ), /*bFullSnap=*/false, D.bInstant);
         break;
     }
 }

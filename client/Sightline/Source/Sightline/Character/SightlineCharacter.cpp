@@ -36,6 +36,8 @@ namespace {
     constexpr const TCHAR* kJumpActionPath     = TEXT("/Game/Code/Input/IA_Jump.IA_Jump");
     constexpr const TCHAR* kFireActionPath     = TEXT("/Game/Code/Input/IA_Fire.IA_Fire");   // M5：仓库资产→构造期加载（BP 零手填）
     constexpr const TCHAR* kCameraTogglePath   = TEXT("/Game/Code/Input/IA_Camera.IA_Camera"); // M5：视角切换（D5-15，资产未建静默跳过）
+    // 和解尾款归还速率（2026-11-04 拉扯第五轮）：指数衰减 τ=1/14≈71ms，~95% 的误差在 210ms 内还完
+    constexpr float kCorrectionRate = 14.f;
 
     constexpr float kSpeedDeadZone = 5.f;
 
@@ -193,6 +195,17 @@ void ASightlineCharacter::Look(const FInputActionValue& Value) {
 void ASightlineCharacter::Tick(float DeltaSeconds) {
     Super::Tick(DeltaSeconds);
     if (IsPlayerControlled()) {
+        // 和解尾款归还（拉扯第五轮）：小额对账误差不做 30Hz 硬瞬移，按指数衰减逐帧归还——
+        // 视觉是"被轻轻推回"而不是"被拽走"。被碰撞挡住的部分留在尾款里下帧继续；
+        // 死亡定身/重生传送时尾款已在事件处理里清零（这里再加 bSelfDead 守卫双保险）。
+        if (!PendingCorrection.IsZero() && !(MatchSession.IsValid() && MatchSession->IsSelfDead())) {
+            const float StepScale = 1.f - FMath::Exp(-kCorrectionRate * DeltaSeconds);
+            const FVector Before = GetActorLocation();
+            FHitResult SweepHit;
+            SetActorLocation(Before + PendingCorrection * StepScale, /*bSweep=*/true, &SweepHit, ETeleportType::None);
+            PendingCorrection -= (GetActorLocation() - Before);   // 实际还掉的才出账（被墙挡下的留下帧）
+            if (PendingCorrection.Size() < 0.5f) PendingCorrection = FVector::ZeroVector;
+        }
         // D5-16v2：Trigger=电平驱动（对局中+按住且有弹=真；登录/大厅/松开/空匣/换弹=假）——
         // 生成节奏由 NS 的 NM_WeaponTrigger（TriggerSpacing）负责；这里只表达"想开火"的电平
         const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
@@ -311,9 +324,24 @@ void ASightlineCharacter::SampleLocalState() {
     MatchSession->ReportLocalState(S);
 }
 
-void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullSnap) {
-    const FVector Target = bFullSnap ? Error : GetActorLocation() + Error;
-    SetActorLocation(Target, false, nullptr, ETeleportType::TeleportPhysics);
+void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullSnap, const bool bInstant) {
+    if (bFullSnap) {
+        // 断档全量回滚：服务器绝对真值，瞬发落位（预测弃置）
+        PendingCorrection = FVector::ZeroVector;
+        SetActorLocation(Error, false, nullptr, ETeleportType::TeleportPhysics);
+        if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+            MoveComp->Velocity = FVector::ZeroVector;   // 断档常伴长冻结：残留旧速度会带着人继续冲出落点
+        return;
+    }
+    if (bInstant) {
+        // 传送级分歧（errCm ≥ Reconcile.h kInstantSnapCm=150）：瞬发——大误差平滑滑过去是穿墙观感
+        PendingCorrection = FVector::ZeroVector;
+        SetActorLocation(GetActorLocation() + Error, false, nullptr, ETeleportType::TeleportPhysics);
+        return;
+    }
+    // 小额常规残余（拉扯第五轮主修）：不再一帧瞬移——全额入尾款，Tick 指数衰减逐帧归还。
+    // 自洽性：平滑期上报的就是混合位 → 服务器如实采纳 → 对账归零，不构成反馈环
+    PendingCorrection = Error;
 }
 
 void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, int32 AckedSeq) {
@@ -485,6 +513,7 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
     if (VictimPawn) VictimPawn->PlayAnimMontage(DeathMontage);   // 自己=本类（他人=远端同类）——同一入口
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
         bFireHeld = false;                                       // 死亡期开火电平断（TryFire 门另加 bSelfDead）
+        PendingCorrection = FVector::ZeroVector;                 // 尾款不与尸体定身相搏
         // 死亡期定身（镜像服务器死亡冻结❗13）：服务器冻结尸体位、不认死亡期上报——客户端若照走，
         // 和解会把人一次次拉回尸体位（2026-11-03 联调"拉扯感"的客户端一半）；重生落位前解除
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) {
@@ -505,8 +534,13 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
         LocalReloadUntilMs = 0;                                  // 客户端镜像同步重置（死后 28/30 残留=双端漂移源）
         // v4.5：传送坐标=24 号下发的服务器权威落位（与锚定握手锚点同源——不再自查表：
         //  FindSpawnStart 关卡实时位置漂移会让传送点≠锚，rebase 拒放行→和解拉扯+和解暴增）
+        PendingCorrection = FVector::ZeroVector;                 // 重生=权威落位，旧尾款作废
         SetActorLocation(SpawnPos, false, nullptr, ETeleportType::TeleportPhysics);
         SetActorRotation(FRotator(0.f, 0.f, 0.f));
+        if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+            MoveComp->Velocity = FVector::ZeroVector;            // 传送不清速度=带伤落位：死亡坠落期的残余
+                                                                 // 速度会带着人冲出重生点继续坠（2026-11-04
+                                                                 // 日志实锤：重生后 3.8s 横移 4.3km+下坠 3.4km）
     } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
             if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid)))

@@ -25,7 +25,13 @@ struct Decision {
     float errorX = 0.f, errorY = 0.f, errorZ = 0.f;  // ErrorTranslate: 误差向量；FullSnap: 权威位
     int replayFrames = 0;                             // 其后本地输入帧数（ErrorTranslate 有意义）
     double errCm = 0.0;                               // 对账误差模长（cm）
+    bool bInstant = false;                            // 传送级分歧（errCm ≥ kInstantSnapCm）→ 施加端瞬发不走尾款平滑
 };
+
+// 瞬发阈值（2026-11-04 拉扯第五轮）：低于它=普通漂移，走"尾款平滑"逐帧归还（适配器侧指数衰减）；
+// 高于它=服务器硬分歧（长冻结钳制余量/传送级事件），平滑滑过去反而穿墙观感，瞬发落位。
+// <150cm 的常规残余（钳制零头/计时抖动）全部由尾款吸收——这是"30Hz 硬瞬移"拉扯感的最后一公里。
+constexpr float kInstantSnapCm = 150.0f;
 
 /**
  * 纯逻辑三方对账：权威位 vs 输入历史同 seq 样本。
@@ -54,6 +60,7 @@ inline Decision Evaluate(
         d.action = Decision::Action::FullSnap;
         d.errorX = authX; d.errorY = authY; d.errorZ = authZ;
         d.replayFrames = 0;
+        d.bInstant = true;
         d.errCm = historyCount > 0
             ? std::sqrt(
                   (authX - history[historyCount - 1].x) * (authX - history[historyCount - 1].x) +
@@ -77,6 +84,7 @@ inline Decision Evaluate(
 
     d.action = Decision::Action::ErrorTranslate;
     d.errorX = ex; d.errorY = ey; d.errorZ = ez;
+    d.bInstant = d.errCm >= kInstantSnapCm;
     return d;
 }
 
