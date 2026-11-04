@@ -189,7 +189,6 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 void ASightlineCharacter::Move(const FInputActionValue& Value) {
     const FVector2D Axis = Value.Get<FVector2D>();
     if (!Controller || Axis.IsNearlyZero()) return;
-    if (MatchSession.IsValid() && MatchSession->IsSelfDead()) return;   // 死亡期断移动意图（CMC 已定身=双保险）
     const FRotator YawRot(0.f, Controller->GetControlRotation().Yaw, 0.f);
     AddMovementInput(FRotationMatrix(YawRot).GetUnitAxis(EAxis::X), Axis.Y);
     AddMovementInput(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Axis.X);
@@ -197,9 +196,6 @@ void ASightlineCharacter::Move(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Look(const FInputActionValue& Value) {
     const FVector2D Axis = Value.Get<FVector2D>();
-    if (MatchSession.IsValid() && MatchSession->IsSelfDead()) return;   // 死亡期断视角（用户实锤"看自己瘫倒不正常"：
-                                                                        //  bUseControllerRotationYaw=true→鼠标还在
-                                                                        //  转胶囊→TPP 镜头绕尸体狂转，看不成瘫倒）
     AddControllerYawInput(Axis.X);
     AddControllerPitchInput(Axis.Y);
 }

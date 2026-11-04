@@ -108,6 +108,11 @@ public:
     // —— ep07 人机席位意图（仅房主；26/27 号——服务器 AddBot/RemoveBot）——
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void SendBotAdd(int32 Difficulty);                // 难度：0=易 1=中 2=难
+
+    /** 离开房间（契约 10 号·空 payload）：对局结束返回大厅——连接保持，服务器移出房间后广播
+     *  ROOM_LIST，GI 既有流程自动"切回大厅世界+显示大厅"（2026-11-05 结算"离开"按钮修） */
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendLeaveRoom();
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void SendBotRemove(int32 BotPid);
 

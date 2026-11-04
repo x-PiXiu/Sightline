@@ -40,6 +40,12 @@ void USightlineMatchSession::StartMatch() {
     Conn->Send(SightlineProtocol::MSG_C2S_START_MATCH, Empty);   // v3 契约 14：空 payload
 }
 
+void USightlineMatchSession::SendLeaveRoom() {
+    if (!Conn) return;
+    TArray<uint8> Empty;
+    Conn->Send(SightlineProtocol::MSG_C2S_LEAVE_ROOM, Empty);   // 契约 10：空 payload（对局离场钩子+大厅离开）
+}
+
 void USightlineMatchSession::SendFireRequest() {
     // M5 · D5-01：20 号空 payload——方向都不带（判定全用服务器权威状态）；节流在 Character 侧
     if (!Conn || !bInMatch) return;
