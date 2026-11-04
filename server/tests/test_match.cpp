@@ -525,6 +525,31 @@ int main() {
         CHECK(rp && !rp->rebasePending);
         CHECK(rp->x == sx + 40.f && rp->y == sy && rp->z == 92.f); // ★权威位逐分量=上报位（修复前 300~600uu 过冲+追爬）
     }
+    stage("自主换弹（29 号语义）：半匣上钟/换弹中火拒/重复换弹拒/到期满匣续射/未激活拒");
+    {
+        MatchService sm;
+        std::vector<RosterEntry> rs{{90, "a", 0}};
+        sm.StartMatch(7, rs);
+        CHECK(sm.Reload(90, 1000) == false);                   // 未激活（未上报）→ 拒
+        sm.UpdateEntity(90, 0, 0, 92, 0, 0, 0, 1, 1000);
+        std::uint64_t now = 1000;
+        std::uint32_t q = 1;
+        for (int i = 0; i < 10; ++i) {                         // 打 10 发（magUsed=10）
+            now += 150;
+            sm.UpdateEntity(90, 0, 0, 92, 0, 0, 0, ++q, now);
+            (void)sm.Fire(90, now + 5);
+        }
+        CHECK(sm.Reload(90, now) == true);                     // ★半匣自主换弹 ✓ 上钟
+        now += 100;
+        sm.UpdateEntity(90, 0, 0, 92, 0, 0, 0, ++q, now);
+        auto ev = sm.Fire(90, now + 5);
+        CHECK(ev.size() == 1 && ev[0].fire.bAccepted == false && ev[0].fire.gate == 1);   // 换弹中火拒（FireGate::Reload=1）
+        CHECK(sm.Reload(90, now + 50) == false);               // 重复换弹拒
+        now += 2600;                                           // 越过换弹窗
+        sm.UpdateEntity(90, 0, 0, 92, 0, 0, 0, ++q, now);
+        auto ev2 = sm.Fire(90, now + 5);
+        CHECK(ev2.size() == 1 && ev2[0].fire.bAccepted == true);   // ★到期满匣续射（gate 惰性补满生效）
+    }
     stage("ep07 重生选点排除已占用：活人占 A 旁 40cm→死者必落 B；两点全占→回退仍能重生");
     {
         MatchService om;

@@ -69,6 +69,12 @@ const Entity* MatchService::EntityById(std::uint32_t pid) const {
     return nullptr;
 }
 
+Entity* MatchService::FindEntity(std::uint32_t pid) {  // 声明早在头文件——首个定义（Reload 起用）
+    for (Entity& E : entities_)
+        if (E.playerId == pid) return &E;
+    return nullptr;
+}
+
 void MatchService::AbortMatch() {                      // ep07：终局中止（❗12——最后真人离开）
     bActive_ = false;
     bEnded_ = true;
@@ -255,6 +261,18 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
     }
     out.push_back(std::move(E));
     return out;
+}
+
+// ===== 自主换弹（2026-11-05 用户令·29 号）：换弹钟权威在服务器，客户端只发意图 =====
+bool MatchService::Reload(std::uint32_t playerId, std::uint64_t nowMs) {
+    if (!bActive_ || bEnded_) return false;                // 对局外/终局
+    Entity* E = FindEntity(playerId);
+    if (!E || !E->bHasReport) return false;                // 未激活=打不了也换不了
+    if (E->bDead) return false;                            // 死亡期（尸体无手）
+    if (nowMs < E->weapon.reloadUntilMs) return false;     // 已在换弹（重复 R 忽略）
+    if (E->weapon.magUsed == 0) return false;              // 满匣无须换
+    E->weapon.reloadUntilMs = nowMs + kReloadMs;           // 上钟（到期补满走 ConsumeWeaponGate 惰性）
+    return true;
 }
 
 // ===== M5：开火裁决（D5 系列；规则在 fire_judge.h 纯决策头，此处只编排）=====

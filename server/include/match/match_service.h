@@ -165,6 +165,12 @@ public:
      *  全房间广播事件。nowMs 由适配层注入（steady 时钟，域不持钟） */
     std::vector<MatchEvent> Fire(std::uint32_t shooterPid, std::uint64_t nowMs);
 
+    /** 自主换弹（2026-11-05 用户令：完整对局需可自主换弹·29 号）：换弹钟权威在服务器——客户端
+     *  R 键只发意图，本端校验后上钟；到期补满仍由 ConsumeWeaponGate 惰性完成（换弹中→弹匣空→
+     *  满匣一条状态机不打断）。静默布尔（无效=false，调用方落日志）——无事件无广播（远端换弹
+     *  表现 ep14） */
+    bool Reload(std::uint32_t playerId, std::uint64_t nowMs);
+
 private:
     std::vector<Entity> entities_;         // 在局实体（名册序；StartMatch 建，RemovePlayer 删）
     // 重生选点 RNG（2026-11-04 用户令：合同出生点均匀随机，替代 D7-03 离敌最远——可预期性差+

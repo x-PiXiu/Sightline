@@ -99,6 +99,19 @@ public:
             writer_.deliverMatch(match_.Fire(static_cast<std::uint32_t>(pid), Now_()));   // 注入钟（ADR-1 单钟）
         }, true);
 
+        // 29：自主换弹（2026-11-05·空 payload）——换弹钟权威在服务器；静默布尔落 INFO 日志
+        disp_.on(protocol::MSG_C2S_RELOAD, "自主换弹",
+                 [this](int fd, const std::string& payload) {
+            if (!payload.empty()) {
+                LOG_WARNING("[换弹] 非法 payload 长度=" + std::to_string(payload.size()) + " fd=" + std::to_string(fd));
+                return;
+            }
+            const int pid = lobby_.PlayerIdByFd(fd);
+            if (pid < 0) return;                             // 未登录：无效
+            if (match_.Reload(static_cast<std::uint32_t>(pid), NowMs()))
+                LOG_INFO("[换弹·请求] shooter=" + std::to_string(pid));
+        });
+
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
         disp_.on(protocol::MSG_C2S_START_MATCH, "开始对局",
                  [this](int fd, const std::string& payload) {

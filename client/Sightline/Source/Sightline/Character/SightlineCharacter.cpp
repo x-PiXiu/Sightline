@@ -38,6 +38,7 @@ namespace {
     constexpr const TCHAR* kFireActionPath     = TEXT("/Game/Code/Input/IA_Fire.IA_Fire");   // M5：仓库资产→构造期加载（BP 零手填）
     constexpr const TCHAR* kCameraTogglePath   = TEXT("/Game/Code/Input/IA_Camera.IA_Camera"); // M5：视角切换（D5-15，资产未建静默跳过）
     constexpr const TCHAR* kScoreboardActionPath = TEXT("/Game/Code/Input/IA_Scoreboard.IA_Scoreboard"); // ep07 收官：比分板 Tab 按住（资产未建静默跳过）
+    constexpr const TCHAR* kReloadActionPath    = TEXT("/Game/Code/Input/IA_Reload.IA_Reload");          // ep07 收官：R 自主换弹（29 号·资产未建静默跳过）
     // 和解尾款归还速率（2026-11-04 拉扯第五轮）：指数衰减 τ=1/14≈71ms，~95% 的误差在 210ms 内还完
     constexpr float kCorrectionRate = 14.f;
 
@@ -92,6 +93,8 @@ ASightlineCharacter::ASightlineCharacter() {
         if (CamTact.Succeeded()) CameraToggleAction = CamTact.Object;
         ConstructorHelpers::FObjectFinder<UInputAction> SBact(kScoreboardActionPath);
         if (SBact.Succeeded()) ScoreboardAction = SBact.Object;
+        ConstructorHelpers::FObjectFinder<UInputAction> Ract(kReloadActionPath);
+        if (Ract.Succeeded()) ReloadAction = Ract.Object;
     }
 }
 
@@ -183,6 +186,9 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     if (ScoreboardAction) {
         Input->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnScoreboardPressed);
         Input->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &ASightlineCharacter::OnScoreboardReleased);
+    }
+    if (ReloadAction) {
+        Input->BindAction(ReloadAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnReloadInput);
     }
 }
 
@@ -712,6 +718,20 @@ void ASightlineCharacter::OnScoreboardPressed() {
 
 void ASightlineCharacter::OnScoreboardReleased() {
     if (ScoreboardWidget.Get()) ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+// 自主换弹（2026-11-05 用户令·29 号）：R 键发意图——换弹钟权威在服务器（门序重构后两源共用）；
+// 本地钟同步上弦（表现层预测：换弹中 HUD/蒙太奇照旧），到期各自补满=双端锁相
+void ASightlineCharacter::OnReloadInput() {
+    const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+    if (!MatchSession.IsValid() || !MatchSession->IsInMatch()) return;   // 对局门
+    if (MatchSession->IsSelfDead()) return;                              // 死亡期（尸体无手）
+    if (NowMs < LocalReloadUntilMs) return;                              // 已在换弹
+    if (LocalMag >= kClientMag) return;                                  // 满匣无须换
+    LocalReloadUntilMs = NowMs + kClientReloadMs;                        // 本地钟（镜像服务器 2.5s）
+    if (ReloadMontage) PlayAnimMontage(ReloadMontage);
+    if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
+    MatchSession->SendReload();                                          // 服务器上钟（弹匣真相同步）
 }
 
 void ASightlineCharacter::OnCameraToggle() {

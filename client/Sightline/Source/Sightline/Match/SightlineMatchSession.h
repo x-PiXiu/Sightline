@@ -111,6 +111,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void SendBotAdd(int32 Difficulty);                // 难度：0=易 1=中 2=难
 
+    /** 自主换弹（2026-11-05·契约 29 号空 payload）：换弹钟权威在服务器——R 键只发意图 */
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendReload();
+
     /** 离开房间（契约 10 号·空 payload）：对局结束返回大厅——连接保持，服务器移出房间后广播
      *  ROOM_LIST，GI 既有流程自动"切回大厅世界+显示大厅"（2026-11-05 结算"离开"按钮修） */
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")

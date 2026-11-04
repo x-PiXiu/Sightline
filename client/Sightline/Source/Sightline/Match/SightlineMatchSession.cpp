@@ -40,6 +40,12 @@ void USightlineMatchSession::StartMatch() {
     Conn->Send(SightlineProtocol::MSG_C2S_START_MATCH, Empty);   // v3 契约 14：空 payload
 }
 
+void USightlineMatchSession::SendReload() {
+    if (!Conn) return;
+    TArray<uint8> Empty;
+    Conn->Send(SightlineProtocol::MSG_C2S_RELOAD, Empty);       // 契约 29：空 payload（服务器上钟）
+}
+
 void USightlineMatchSession::SendLeaveRoom() {
     if (!Conn) return;
     TArray<uint8> Empty;

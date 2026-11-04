@@ -39,6 +39,7 @@ namespace SightlineProtocol
         MSG_S2C_RESPAWN        = 24, // S→C  [4B pid][1B spawnIndex][2B invulnMs]=7B——服务器选点下发序号
         MSG_S2C_MATCH_END      = 25, // S→C  [1B 原因][1B n]{[4B pid][2B kills][2B deaths]}×n
         MSG_C2S_BOT_ADD        = 26, // C→S  [1B 难度]——仅房主
+        MSG_C2S_RELOAD          = 29, // C→S  (空)——自主换弹（28 留 ep08 SWITCH_WEAPON·契约 v4.7）
         MSG_C2S_BOT_REMOVE     = 27, // C→S  [4B botPid]——仅房主
     };
 

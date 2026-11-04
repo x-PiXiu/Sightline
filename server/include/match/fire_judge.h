@@ -98,13 +98,17 @@ enum class FireGate { Ok, Reloading, MagEmpty, RateLimited, Dead };
  *  未触发先补满的边角——审计修复①）；④射速容差 95ms<D5-14。
  *  ①"在对局中"由用例层判定（实体查找），不在此。静默语义（无回执）= D5-03，ep08 起违规可见。 */
 inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
-    if (w.magUsed >= kMagCapacity) {                               // ②③ 换弹状态机
-        if (w.reloadUntilMs == 0) {                                // ③ 弹匣空 → 触发换弹
-            w.reloadUntilMs = nowMs + kReloadMs;
-            return FireGate::MagEmpty;
-        }
-        if (nowMs < w.reloadUntilMs) return FireGate::Reloading;   // ② 换弹中
-        w.magUsed = 0;                                             // ② 到期就地补满
+    // 换弹状态机（2026-11-05 自主换弹重构）：reloadUntilMs 双源（③ 弹匣空自动触发 / 29 号自主 R 键）
+    // ——检查必须先于"弹匣空"分支且无条件执行（原实现嵌在 magUsed>=容量 分支内：半匣自主换弹
+    // 上钟后门不看它 → 换弹中照常开火=测试实锤）
+    if (w.reloadUntilMs > nowMs) return FireGate::Reloading;       // ② 换弹中（两源共用）
+    if (w.reloadUntilMs != 0) {                                    // ② 到期就地补满（一次性）
+        w.magUsed = 0;
+        w.reloadUntilMs = 0;
+    }
+    if (w.magUsed >= kMagCapacity) {                               // ③ 弹匣空 → 触发自动换弹（触发帧仍拒）
+        w.reloadUntilMs = nowMs + kReloadMs;
+        return FireGate::MagEmpty;
     }
     if (w.bHasFired && nowMs - w.lastFireMs < kFireMinIntervalMs)  // ④ 射速窗口（容差 95ms）
         return FireGate::RateLimited;

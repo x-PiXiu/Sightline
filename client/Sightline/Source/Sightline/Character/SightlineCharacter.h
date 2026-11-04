@@ -146,6 +146,8 @@ protected:
     TSubclassOf<UUserWidget> ScoreboardClass;   // ep07 收官：比分板（根类 UScoreboardWidgetBase·WBP_Scoreboard）
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
     TObjectPtr<UInputAction> ScoreboardAction;  // Tab 按住显示（资产未建静默跳过——CameraToggle 同款）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
+    TObjectPtr<UInputAction> ReloadAction;      // R 自主换弹（资产未建静默跳过——29 号契约 v4.7）
 
     // —— ep06 表现层：左手 IK 吸附（枪上左手护握 socket 为目标；ABP TwoBoneIK 消费 LH_IK_*）——
     /** 枪网格组件引用（BP Character Class Defaults 填——左手 IK 目标的宿主；换枪=换引用） */
@@ -215,6 +217,7 @@ private:
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
     void OnScoreboardPressed();                  // ep07 收官：Tab 按住显示比分板
     void OnScoreboardReleased();                 // 松开隐藏
+    void OnReloadInput();                        // ep07 收官：R 自主换弹（29 号·服务器上钟）
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
