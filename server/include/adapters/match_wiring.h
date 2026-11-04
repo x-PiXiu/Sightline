@@ -108,7 +108,7 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                             // 未登录：无效
-            if (match_.Reload(static_cast<std::uint32_t>(pid), NowMs()))
+            if (match_.Reload(static_cast<std::uint32_t>(pid), Now_()))
                 LOG_INFO("[换弹·请求] shooter=" + std::to_string(pid));
         });
 
