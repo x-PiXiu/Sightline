@@ -58,7 +58,10 @@ struct BotMemory {
     Vec2 lastKnown{};
     bool hasLastKnown = false;
     float aimErrDeg = 0.f;               // 当前瞄准误差
-    std::uint64_t nextCoverOkMs = 0;     // 撤退节流
+    std::uint64_t nextCoverOkMs = 0;     // 撤退窗截止（2026-11-05 语义=窗满无条件反击——原"节流"改窗）
+    float lastHpSeen = 100.f;            // 上次可见时的血量（受击检测=较它进一步下降——用户实锤
+                                         //  "受击后一直往后退"：原设计低血+可见=永久撤退，hp 永不恢复
+                                         //  →无限后撤/推拉振荡；改=受击触发一次 1.5s 脱战，到期反击）
 };
 
 struct BotIntent {
@@ -97,12 +100,17 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
         m.hasLastKnown = true;
     }
 
-    // —— 血量门：低血且可见敌 → 撤退（TakeCover 简化=背向敌撤退 400cm·D7-07 L2）——
-    if (w.visible && w.self.hp < t.hpCoverBelow) {
-        if (state != BotState::TakeCover) { m.nextCoverOkMs = nowMs + 1500; }
+    // —— 血量门：受击（血量较上次可见进一步下降且低于阈值）→ 短暂脱战 1.5s → 到期反击
+    //     （2026-11-05 用户实锤"受击后一直往后退"：原设计低血+可见敌=永久撤退——hp 永不恢复、
+    //      敌人一追就永远可见=无限后撤/推拉振荡。改=受击事件触发一个 1500ms 撤退窗，窗满无条件
+    //      转 Engage/Search；重入需新的伤害事件。D7-07 L2 的"找掩护"语义保留为短反应窗）——
+    if (w.visible && w.self.hp < t.hpCoverBelow && w.self.hp < m.lastHpSeen && nowMs >= m.nextCoverOkMs) {
+        m.nextCoverOkMs = nowMs + 1500;              // 撤退窗开启（1.5s）
         state = BotState::TakeCover;
-    } else if (state == BotState::TakeCover && (!w.visible || w.self.hp >= t.hpCoverBelow)) {
-        state = w.visible ? BotState::Engage : BotState::Search;
+    }
+    if (w.visible) m.lastHpSeen = w.self.hp;         // 可见时记账（不可见期间的伤害无法归因）
+    if (state == BotState::TakeCover && nowMs >= m.nextCoverOkMs) {
+        state = w.visible ? BotState::Engage : BotState::Search;   // 窗满=反击（打到底，不再无限后撤）
     }
 
     switch (state) {
@@ -159,7 +167,7 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
         break;
     }
     case BotState::TakeCover: {
-        if (nowMs >= m.nextCoverOkMs && (!w.visible || w.self.hp >= t.hpCoverBelow)) {
+        if (nowMs >= m.nextCoverOkMs) {              // 窗满=无条件反击（打到底；重生回满血后周期重置）
             state = w.visible ? BotState::Engage : BotState::Search;
             break;
         }

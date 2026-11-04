@@ -734,7 +734,11 @@ int main() {
         w.visible = SeenEnemy{2, 500.f, 0.f, 500.f};
         w.self.hp = 20.f;
         auto i3 = Decide(w, st, m, 1300 + 3100, t);
-        CHECK(st == BotState::TakeCover && i3.hasMove);
+        CHECK(st == BotState::TakeCover && i3.hasMove);   // 受击（100→20 新伤害）→ 脱战窗 1.5s
+        auto i4 = Decide(w, st, m, 1300 + 3100 + 1500, t);// 窗满 → 无条件反击（不再无限后撤·用户实锤）
+        CHECK(st == BotState::Engage);
+        auto i5 = Decide(w, st, m, 1300 + 3100 + 1550, t);// 下一拍：血没再降 → 不重入 Cover（反振荡）
+        CHECK(st == BotState::Engage);
     }
 
     // ── 2026-11-03 联调回归：同一服务进程连开多局（用户现场"开枪无回包"根因=终局字段跨局泄漏）──
