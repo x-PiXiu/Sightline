@@ -395,21 +395,31 @@ void ASightlineCharacter::EnterRagdoll() {
     if (UAnimInstance* Anim = MeshComp->GetAnimInstance())
         SavedMeshAnimClass = Anim->GetClass();               // ABP 类存档（重生还原；GetAnimClass 已弃用）
     SavedMeshProfile = MeshComp->GetCollisionProfileName();
+    SavedMeshParent = MeshComp->GetAttachParent();           // 原挂接父件（布娃娃起物理=引擎自动摘挂）
+    SavedMeshRelTransform = MeshComp->GetRelativeTransform(); // 原始相对位姿（趁仍挂接存档）
     MeshComp->SetAnimInstanceClass(nullptr);                 // 停 ABP 写位姿（与物理相搏=尸体抽搐）
     MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
-    MeshComp->SetAllBodiesSimulatePhysics(true);             // PA_Mannequin 全身瘫倒
+    MeshComp->SetSimulatePhysics(true);                      // 引擎标准布娃娃：自动摘挂+全身物理（PA_Mannequin）
 }
 
 void ASightlineCharacter::EndDeathFX() {
     GetWorldTimerManager().ClearTimer(DeathFxTimer);         // 死亡→瞬重生窗口的交接钟一并清
     EndInvulnBlink();                                        // 闪烁还原（幂等）
     USkeletalMeshComponent* MeshComp = GetMesh();
-    if (MeshComp && MeshComp->IsSimulatingPhysics()) {
-        MeshComp->SetAllBodiesSimulatePhysics(false);
-        MeshComp->SetSimulatePhysics(false);
-        MeshComp->SetAnimInstanceClass(SavedMeshAnimClass);  // ABP 复职（动画恢复驱动）
-        if (SavedMeshProfile != NAME_None) MeshComp->SetCollisionProfileName(SavedMeshProfile);
+    if (!MeshComp) return;
+    const bool bWasRagdolled = MeshComp->IsSimulatingPhysics() ||
+        (SavedMeshParent != nullptr && MeshComp->GetAttachParent() != SavedMeshParent);
+    if (!bWasRagdolled) return;                              // 未曾布娃娃：零副作用（防误 null 活人 ABP）
+    MeshComp->SetSimulatePhysics(false);
+    MeshComp->SetAllBodiesSimulatePhysics(false);
+    if (SavedMeshProfile != NAME_None) MeshComp->SetCollisionProfileName(SavedMeshProfile);
+    if (SavedMeshParent != nullptr && MeshComp->GetAttachParent() != SavedMeshParent) {
+        // ★回挂原父件+摆回原始相对位姿（UE 布娃娃还原经典坑：起物理自动摘挂，不回挂=网格体
+        //   永远躺在第一次倒下的世界位/姿态——胶囊带着躺姿走="移动的是躺着的尸体"）
+        MeshComp->AttachToComponent(SavedMeshParent, FAttachmentTransformRules::KeepRelativeTransform);
+        MeshComp->SetRelativeTransform(SavedMeshRelTransform);
     }
+    MeshComp->SetAnimInstanceClass(SavedMeshAnimClass);      // ABP 复职（最后一步：位姿骨架已就位）
 }
 
 void ASightlineCharacter::StartInvulnBlink(float InvulnSec) {
