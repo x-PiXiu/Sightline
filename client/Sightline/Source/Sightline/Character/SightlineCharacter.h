@@ -142,6 +142,10 @@ protected:
     TObjectPtr<UAnimMontage> EquipMontage;
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UAnimMontage> DeathMontage;      // ep07：死亡蒙太奇（AM_MM_Death_Front_01·Slot FullBody）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|UI")
+    TSubclassOf<UUserWidget> ScoreboardClass;   // ep07 收官：比分板（根类 UScoreboardWidgetBase·WBP_Scoreboard）
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Input")
+    TObjectPtr<UInputAction> ScoreboardAction;  // Tab 按住显示（资产未建静默跳过——CameraToggle 同款）
 
     // —— ep06 表现层：左手 IK 吸附（枪上左手护握 socket 为目标；ABP TwoBoneIK 消费 LH_IK_*）——
     /** 枪网格组件引用（BP Character Class Defaults 填——左手 IK 目标的宿主；换枪=换引用） */
@@ -209,6 +213,8 @@ private:
     UFUNCTION() void OnKill(const FSightlineKill& Kill);               // ep07：23 号（自己死亡表现+播报）
     UFUNCTION() void OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs, FVector SpawnPos);  // ep07：24 号（落位/插值重置）
     void OnCameraToggle();                       // D5-15：V 键切 TPP/FPP
+    void OnScoreboardPressed();                  // ep07 收官：Tab 按住显示比分板
+    void OnScoreboardReleased();                 // 松开隐藏
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
@@ -245,6 +251,7 @@ private:
     UPROPERTY() TObjectPtr<UUserWidget> CombatHudWidget = nullptr;   // ep07：血条
     UPROPERTY() TObjectPtr<UUserWidget> KillFeedWidget = nullptr;    // ep07：击杀播报
     UPROPERTY() TObjectPtr<UUserWidget> ResultWidget = nullptr;      // ep07：结算面板
+    UPROPERTY() TObjectPtr<UUserWidget> ScoreboardWidget = nullptr;  // ep07 收官：比分板（Tab 按住）
     FTimerHandle HitmarkerTimer;
     TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;

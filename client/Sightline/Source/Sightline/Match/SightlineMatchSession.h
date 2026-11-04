@@ -65,6 +65,13 @@ struct FSightlineScoreRow {
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchEnd, const TArray<FSightlineScoreRow>&, Rows);
 
+/** 比分板客户端缓存行（2026-11-05 比分板）：23 号事件流本地累加——TCP 可靠有序=事件流等价
+ *  状态流（D5-09 血量同款论证）；终局 25 号到时与服务器权威对账（日志） */
+struct FSightlineScore {
+    int32 Kills = 0;
+    int32 Deaths = 0;
+};
+
 UCLASS()
 class SIGHTLINE_API USightlineMatchSession : public UObject {
     GENERATED_BODY()
@@ -127,6 +134,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "Sightline Match")
     TArray<int32> GetEntityIds() const;   // 血量行枚举（血量缓存键序）
 
+    // —— 比分板观测面（2026-11-05：23 号事件流累加·Tab 按住显示）——
+    TArray<FSightlineScoreRow> GetScoreboard() const;   // 排序快照（kills 降序→deaths 升→pid 升稳定序）
+    FString NameOf(int32 Pid) const;                    // pid→名字（Registry 现查——KillFeed 同款上收公共）
+
 private:
     /** 一次输入的本地存根（环形缓冲行；(seq,pos,yaw)×1s——设计草案 §2.3） */
     struct FInputSample {
@@ -166,4 +177,5 @@ private:
     double ErrCurrentCm = 0.0;                         // 当前对账误差（cm；ε 判定的那条）
     double ErrPeakCm = 0.0;                            // 峰值误差（cm）
     TMap<int32, int32> EntityHp;                       // M5：对局期各实体血量（21 号驱动；D5-09 事件流）
+    TMap<int32, FSightlineScore> ScoreMap;             // 比分板客户端缓存（23 号事件流累加；15 号新局清账）
 };

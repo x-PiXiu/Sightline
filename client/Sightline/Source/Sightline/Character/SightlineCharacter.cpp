@@ -37,6 +37,7 @@ namespace {
     constexpr const TCHAR* kJumpActionPath     = TEXT("/Game/Code/Input/IA_Jump.IA_Jump");
     constexpr const TCHAR* kFireActionPath     = TEXT("/Game/Code/Input/IA_Fire.IA_Fire");   // M5：仓库资产→构造期加载（BP 零手填）
     constexpr const TCHAR* kCameraTogglePath   = TEXT("/Game/Code/Input/IA_Camera.IA_Camera"); // M5：视角切换（D5-15，资产未建静默跳过）
+    constexpr const TCHAR* kScoreboardActionPath = TEXT("/Game/Code/Input/IA_Scoreboard.IA_Scoreboard"); // ep07 收官：比分板 Tab 按住（资产未建静默跳过）
     // 和解尾款归还速率（2026-11-04 拉扯第五轮）：指数衰减 τ=1/14≈71ms，~95% 的误差在 210ms 内还完
     constexpr float kCorrectionRate = 14.f;
 
@@ -89,6 +90,8 @@ ASightlineCharacter::ASightlineCharacter() {
         if (Fact.Succeeded()) FireAction = Fact.Object;   // 资产未建时静默跳过（M5-A 步骤 1.1 建完即自动接线）
         ConstructorHelpers::FObjectFinder<UInputAction> CamTact(kCameraTogglePath);
         if (CamTact.Succeeded()) CameraToggleAction = CamTact.Object;
+        ConstructorHelpers::FObjectFinder<UInputAction> SBact(kScoreboardActionPath);
+        if (SBact.Succeeded()) ScoreboardAction = SBact.Object;
     }
 }
 
@@ -176,6 +179,10 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     }
     if (CameraToggleAction) {
         Input->BindAction(CameraToggleAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnCameraToggle);
+    }
+    if (ScoreboardAction) {
+        Input->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnScoreboardPressed);
+        Input->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &ASightlineCharacter::OnScoreboardReleased);
     }
 }
 
@@ -695,6 +702,16 @@ void ASightlineCharacter::SrvBakeOccluders() {
 
 // ===== M5 视角系统（D5-15v3：Lyra 同款——只切相机位置，不藏任何东西）=====
 
+void ASightlineCharacter::OnScoreboardPressed() {
+    if (!ScoreboardWidget.Get()) return;
+    if (auto* SB = Cast<UScoreboardWidgetBase>(ScoreboardWidget)) SB->Refresh();   // 显示前现拉现填
+    ScoreboardWidget->SetVisibility(ESlateVisibility::HitTestInvisible);   // 可见不挡准星输入
+}
+
+void ASightlineCharacter::OnScoreboardReleased() {
+    if (ScoreboardWidget.Get()) ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
+}
+
 void ASightlineCharacter::OnCameraToggle() {
     if (Camera) Camera->ToggleCameraMode();          // FPP(眼高) ↔ TPP(越肩)，偏移由组件 Tick 插值混合
 }
@@ -773,6 +790,15 @@ void ASightlineCharacter::CreateMatchUI() {
             ResultWidget->AddToViewport(45);
             if (auto* Result = Cast<UResultWidgetBase>(ResultWidget))
                 Result->BindSession(MatchSession.Get(), MatchSession.IsValid() ? MatchSession->GetSelfPlayerId() : 0);
+        }
+    }
+    if (ScoreboardClass) {                                 // ep07 收官：比分板（Tab 按住·ZOrder 最高）
+        ScoreboardWidget = CreateWidget<UUserWidget>(GetWorld(), ScoreboardClass);
+        if (ScoreboardWidget) {
+            ScoreboardWidget->AddToViewport(50);
+            ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);   // 按住才显示（自管理+Press 驱动）
+            if (auto* SB = Cast<UScoreboardWidgetBase>(ScoreboardWidget))
+                SB->BindSession(MatchSession.Get());
         }
     }
     UE_LOG(LogTemp, Log, TEXT("[对局UI] 对局HUD=%s 播报=%s 结算=%s（ep07 战斗 UI）"),

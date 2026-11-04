@@ -105,12 +105,8 @@ void UKillFeedWidgetBase::HandleKill(const FSightlineKill& Kill)
 
 FString UKillFeedWidgetBase::NameOf(int32 Pid) const
 {
-    // 击杀时刻现查 Registry（人机/真人统一——服务器名册即真相；结算面板同款）
-    if (Session.IsValid())
-        if (const auto* Reg = Session->GetRegistry())
-            for (const FSightlineEntityState& E : Reg->All())
-                if (E.PlayerId == Pid) return E.Name;
-    return FString::FromInt(Pid);
+    // 名字查询上收 MatchSession::NameOf（2026-11-05 比分板共用——消重）
+    return Session.IsValid() ? Session->NameOf(Pid) : FString::FromInt(Pid);
 }
 
 void UKillFeedWidgetBase::PushLine(const FString& Text)
@@ -119,6 +115,83 @@ void UKillFeedWidgetBase::PushLine(const FString& Text)
     if (KillLine2) KillLine2->SetText(KillLine1 ? KillLine1->GetText() : FText::GetEmpty());
     if (KillLine1) KillLine1->SetText(KillLine0 ? KillLine0->GetText() : FText::GetEmpty());
     if (KillLine0) KillLine0->SetText(FText::FromString(Text));
+}
+
+// ───────── 比分板（Tab 按住显示·谦卑对象）─────────
+void UScoreboardWidgetBase::BindSession(USightlineMatchSession* InSession)
+{
+    Session = InSession;
+    if (Session.IsValid())
+    {
+        Session->OnKill.AddDynamic(this, &UScoreboardWidgetBase::HandleKill);
+        Session->OnRespawn.AddDynamic(this, &UScoreboardWidgetBase::HandleRespawn);
+    }
+}
+
+void UScoreboardWidgetBase::NativeConstruct()
+{
+    Super::NativeConstruct();
+    SetVisibility(ESlateVisibility::Collapsed);        // Tab 按住才显示（结算面板同款自管理）
+}
+
+void UScoreboardWidgetBase::NativeDestruct()
+{
+    if (Session.IsValid())
+    {
+        Session->OnKill.RemoveDynamic(this, &UScoreboardWidgetBase::HandleKill);
+        Session->OnRespawn.RemoveDynamic(this, &UScoreboardWidgetBase::HandleRespawn);
+    }
+    Super::NativeDestruct();
+}
+
+void UScoreboardWidgetBase::HandleKill(const FSightlineKill& /*Kill*/)
+{
+    if (IsVisible()) Refresh();                        // 按住期间实时刷新（含人机互杀=全房间榜）
+}
+
+void UScoreboardWidgetBase::HandleRespawn(int32 /*Pid*/, int32, int32, FVector)
+{
+    if (IsVisible()) Refresh();
+}
+
+UTextBlock* UScoreboardWidgetBase::Cell(int32 Row, int32 Col)
+{
+    switch (Row)
+    {
+    case 0: return Col == 0 ? SRowName0 : Col == 1 ? SRowKill0 : SRowDeath0;
+    case 1: return Col == 1 ? SRowKill1 : Col == 2 ? SRowDeath1 : SRowName1;
+    case 2: return Col == 0 ? SRowName2 : Col == 1 ? SRowKill2 : SRowDeath2;
+    default: return Col == 0 ? SRowName3 : Col == 1 ? SRowKill3 : SRowDeath3;
+    }
+}
+
+void UScoreboardWidgetBase::Refresh()
+{
+    if (!Session.IsValid()) return;
+    const TArray<FSightlineScoreRow> Rows = Session->GetScoreboard();   // 排序快照（kills 降序）
+    for (int32 Row = 0; Row < 4; ++Row)
+    {
+        UTextBlock* NameT = Cell(Row, 0);
+        UTextBlock* KillT = Cell(Row, 1);
+        UTextBlock* DeathT = Cell(Row, 2);
+        if (!NameT || !KillT || !DeathT) continue;
+        if (Row < Rows.Num())
+        {
+            const FSightlineScoreRow& r = Rows[Row];
+            NameT->SetText(FText::FromString(Session->NameOf(r.pid)));
+            KillT->SetText(FText::AsNumber(r.kills));
+            DeathT->SetText(FText::AsNumber(r.deaths));
+            // 自机行高亮（青色——与 InvulnText 同色系；他人白色）
+            const bool bSelf = Session->IsSelfPlayer(r.pid);
+            NameT->SetColorAndOpacity(FSlateColor(bSelf ? FLinearColor(0.3f, 0.9f, 1.0f) : FLinearColor::White));
+        }
+        else
+        {
+            NameT->SetText(FText::GetEmpty());
+            KillT->SetText(FText::GetEmpty());
+            DeathT->SetText(FText::GetEmpty());
+        }
+    }
 }
 
 // ───────── 结算面板 ─────────

@@ -128,6 +128,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         ErrCurrentCm = 0.0; ErrPeakCm = 0.0; LastAckedSeq = 0;
         EntityHp.Reset();                              // M5：新对局血量清账（D5-09 事件流等价状态流）
         for (const FSightlineEntityState& R : Roster) EntityHp.Add(R.PlayerId, 100);   // 全员满血
+        ScoreMap.Empty();                              // 比分板：新对局清账（事件流从头累加）
         Registry->ApplyMatchStart(SelfPlayerId, Roster);
         OnMatchStarted.Broadcast();                    // GI 切对局关卡（生成由 PawnSpawner 延迟执行）
         return;
@@ -179,6 +180,9 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         Out.KillerPid = static_cast<int32>(K.killerPid);
         Out.RespawnDelayMs = static_cast<int32>(K.respawnDelayMs);
         Out.VictimHp = 0;
+        // 比分板累加（先于 Broadcast——订阅方读到新账；含人机互杀=全房间榜）
+        FSightlineScore& Kr = ScoreMap.FindOrAdd(Out.KillerPid); Kr.Kills++;
+        FSightlineScore& Vr = ScoreMap.FindOrAdd(Victim);        Vr.Deaths++;
         OnKill.Broadcast(Out);
         return;
     }
@@ -205,6 +209,15 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             rr.deaths = static_cast<int32>(r.deaths);
             Rows.Add(rr);
         }
+        // 比分对账（2026-11-05 比分板）：客户端事件流累加 vs 服务器权威——一行日志验"事件流≈状态流"
+        FString Diff;
+        for (const FSightlineScoreRow& r : Rows) {
+            const FSightlineScore* S = ScoreMap.Find(r.pid);
+            const int32 ck = S ? S->Kills : 0, cd = S ? S->Deaths : 0;
+            if (ck != r.kills || cd != r.deaths)
+                Diff += FString::Printf(TEXT(" [pid%d 客%dk/%dd 服%dk/%dd]"), r.pid, ck, cd, r.kills, r.deaths);
+        }
+        UE_LOG(LogSightline, Log, TEXT("[比分对账] %s"), Diff.IsEmpty() ? TEXT("一致") : *Diff);
         OnMatchEnd.Broadcast(Rows);
         return;
     }
@@ -237,6 +250,36 @@ TArray<int32> USightlineMatchSession::GetEntityIds() const {
     TArray<int32> Ids;
     EntityHp.GetKeys(Ids);
     return Ids;
+}
+
+// —— 比分板观测面（2026-11-05：23 号事件流累加·Tab 按住显示）——
+TArray<FSightlineScoreRow> USightlineMatchSession::GetScoreboard() const
+{
+    TArray<FSightlineScoreRow> Rows;
+    for (const auto& It : ScoreMap)
+    {
+        FSightlineScoreRow r;
+        r.pid = It.Key;
+        r.kills = It.Value.Kills;
+        r.deaths = It.Value.Deaths;
+        Rows.Add(r);
+    }
+    // 稳定确定性排序：kills 降序 → deaths 升序 → pid 升序
+    Rows.Sort([](const FSightlineScoreRow& A, const FSightlineScoreRow& B) {
+        if (A.kills != B.kills) return A.kills > B.kills;
+        if (A.deaths != B.deaths) return A.deaths < B.deaths;
+        return A.pid < B.pid;
+    });
+    return Rows;
+}
+
+FString USightlineMatchSession::NameOf(int32 Pid) const
+{
+    // 击杀/比分时刻现查 Registry（人机/真人统一——服务器名册即真相；KillFeed 同款上收公共）
+    if (Registry)
+        for (const FSightlineEntityState& E : Registry->All())
+            if (E.PlayerId == Pid) return E.Name;
+    return FString::FromInt(Pid);
 }
 
 // —— M3b 三方对账（设计草案 §2.3 + reconcile_state 定稿状态机）——
