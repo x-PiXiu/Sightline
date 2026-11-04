@@ -665,6 +665,11 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     if (bSelfShot && Result.bHit && CGhost.GetValueOnGameThread() != 0)
         DrawDebugSphere(GetWorld(), Result.HitPoint, 10.f, 10, FColor(0, 255, 80, 200),
                         false, 0.8f, 0, 1.5f);
+    // ep07 收官表现：命中位置伤害数字（自机命中·绿字=回溯绿球同视觉家族·0.8s 带阴影）。
+    // 伤害值暂取服务器恒定 25（D5-01 一枪 25·无爆头）；ep08 伤害公式系统化后改随 21 号下发
+    if (bSelfShot && Result.bHit)
+        DrawDebugString(GetWorld(), Result.HitPoint + FVector(0.f, 0.f, 30.f), TEXT("25"),
+                        nullptr, FColor(0, 255, 80), 0.8f, true);
     if (bSelfVictim && Result.bHit && !HurtFlashWidget.Get()) {
         static bool bWarned = false;
         if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[受击] 红闪未显示：HurtFlashWidget 为空（WBP_HurtFlash 未建或 HurtFlashClass 未填 BP）")); }

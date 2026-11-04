@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "GameFramework/PlayerController.h"
 
 // ───────── 血条 ─────────
 void UCombatHudWidgetBase::BindSession(USightlineMatchSession* InSession)
@@ -158,10 +159,16 @@ void UResultWidgetBase::HandleMatchEnd(const TArray<FSightlineScoreRow>& Rows)
     if (ScoreList) ScoreList->SetText(FText::FromString(List));
     if (ResultTitle) ResultTitle->SetText(FText::FromString(TEXT("对局结束")));
     SetVisibility(ESlateVisibility::Visible);          // 显示结算
+    // ep07 收官：对局结束弹鼠标（此前大厅 EnsureUIMouseCursor 显示过、切图后新 PC 默认隐藏——
+    // 结算按钮一直点不了）。离开回登录保持可见（登录要打字）；再来一局在 OnRematchClicked 收
+    if (APlayerController* PC = GetOwningPlayer())
+        PC->bShowMouseCursor = true;
 }
 
 void UResultWidgetBase::OnRematchClicked()
 {
+    if (APlayerController* PC = GetOwningPlayer())
+        PC->bShowMouseCursor = false;                  // 收鼠标（15 号切图新 PC 本会重置——防御双保险）
     if (Session.IsValid()) Session->StartMatch();      // 复走 14 号（房主校验在服务器）
     SetVisibility(ESlateVisibility::Collapsed);
 }
