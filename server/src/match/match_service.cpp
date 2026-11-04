@@ -183,12 +183,27 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
         E.invulnUntilMs = nowMs + kInvulnMs;             // 出生保护（D7-03）
         E.rebasePending = true;                          // 重生握手（❗9）
         E.histCount = 0; E.histHead = 0;                 // 历史环清空——死前轨迹不得跨越重生（❗8）
-        // 选点=合同出生点均匀随机（2026-11-04 用户令：重生就在已有出生点位随机选一个，不做
-        // "随机位置"也不做 D7-03 离敌最远——后者可预期（可蹲点）且出生点摊开后跳变 2~4km；
-        // 2s 无敌兜底出生保护）。落位仍钳入活动区（界外出生点数据由启动告警/烘焙红字拦）。
+        // 选点=合同出生点均匀随机（2026-11-04 用户令）+排除已占用（同轮补丁：随机不排位→人机
+        // 可重生在玩家点位上="还没移动就有人机叠在我身上"）。候选=150cm 内无活人的点；全占回退
+        // 全员随机（永不卡死）。落位仍钳入活动区（界外出生点数据由启动告警/烘焙红字拦）。
         if (!geometry_.spawnPoints.empty()) {            // 有合同点：服务器权威落位（人机首报同源）
-            std::uniform_int_distribution<std::size_t> pick(0, geometry_.spawnPoints.size() - 1);
-            const std::size_t picked = pick(rng_);       // 随机选中序（spawnIx/24 号回传语义不变）
+            std::vector<std::size_t> freeIx;
+            for (std::size_t i = 0; i < geometry_.spawnPoints.size(); ++i) {
+                const auto& sp = geometry_.spawnPoints[i];
+                bool occupied = false;
+                for (const Entity& O : entities_) {
+                    // 排除重生者本人：外层循环此处已 bDead=false 且仍站在尸体位（=上一个点）——
+                    // 不排除则自己占自己的候选点（尸体位在出生点旁时整列被排空→回退全员随机）
+                    if (O.playerId == E.playerId || !O.bHasReport || O.bDead) continue;
+                    const float dxx = sp.x - O.x, dyy = sp.y - O.y;
+                    if (dxx * dxx + dyy * dyy < kSpawnClearRadiusUu * kSpawnClearRadiusUu) { occupied = true; break; }
+                }
+                if (!occupied) freeIx.push_back(i);
+            }
+            if (freeIx.empty())
+                for (std::size_t i = 0; i < geometry_.spawnPoints.size(); ++i) freeIx.push_back(i);
+            std::uniform_int_distribution<std::size_t> pick(0, freeIx.size() - 1);
+            const std::size_t picked = freeIx[pick(rng_)];   // 随机选中序（spawnIx/24 号回传语义不变）
             const auto& sp = geometry_.spawnPoints[picked];
             E.x = std::clamp(sp.x, playMinX_, playMaxX_); // 界外出生点钳入活动区（同 StartMatch——
             E.y = std::clamp(sp.y, playMinY_, playMaxY_); //  24 号带钳后坐标=客户端传送不再被拽回）
@@ -232,8 +247,10 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
     E.entities.reserve(entities_.size());
     for (const Entity& Src : entities_) {
         if (!Src.bHasReport) continue;                       // 未上报者不入快照（避免 (0,0,0) 幻影出生）
-        const std::uint8_t flags2 =
-            static_cast<std::uint8_t>(Src.flags | (Src.bDead ? 0x02 : 0x00));  // bit1=dead（ep07 表现）
+        const std::uint8_t flags2 = static_cast<std::uint8_t>(
+            Src.flags | (Src.bDead ? 0x02 : 0x00) |
+            (nowMs < Src.invulnUntilMs ? 0x04 : 0x00));   // bit2=无敌期（2026-11-04 语义扩展·wire 不变长——
+                                                          //  客户端闪烁随本位实时同步，含"开火即破"提前结束）
         E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, flags2, Src.ackedSeq});
     }
     out.push_back(std::move(E));
@@ -286,6 +303,9 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         out.push_back(std::move(ev));
         return out;
     }
+    // 开火即破无敌（2026-11-04 用户令·CS/PUBG 惯例）：出生保护只防"被打"不保护"打人"——
+    // 否则重生者带着半隐身闪烁+无敌窗贴脸输出（"还没显示出来就被打死"因果链一环）
+    shooter->invulnUntilMs = 0;
     // ⑤ hitscan 求交（ep06 回溯）：判定时刻 = 请求到达 − 射手 RTT（钳 kMaxRewindMs·防伪造 ep09 预埋），
     //    目标位姿查其权威位时间线在该时刻的插值——服务器承认射手眼睛看到的世界
     const std::uint64_t judgeAtMs =

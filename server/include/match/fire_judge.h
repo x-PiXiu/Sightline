@@ -42,6 +42,8 @@ inline constexpr int           kKillLimit         = 10;      // ep07：先到 10
 // （80m×80m）；本常量曾按"4000=全宽"误读为 2000 → 97cb827 版把玩家/人机钳在地图中央 1/4，
 // 03:20 局拉扯感真凶。四个出生点全部在 ±4000 地板内（用户核实只有一个地板）。
 inline constexpr float         kPlayAreaHalfUu    = 4000.f;
+inline constexpr float         kSpawnClearRadiusUu = 150.f;  // ep07：重生选点排斥半径（候选点 150cm 内有活人即排除
+                                                              //  ——均匀随机+排占位，防"重生叠脸"；全占回退全员随机）
 inline constexpr float         kNavCellCm         = 50.f;    // ep07：导航栅格粒度（80×80@4000² 地图）
 inline constexpr float         kNavStepCm         = 45.f;    // ep07：可跨越台阶高（低于此的盒不挡路）
 inline constexpr float         kNavBodyTopCm      = 176.f;   // ep07：身体高度带顶（88×2——挡路判定用）

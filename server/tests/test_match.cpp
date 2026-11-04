@@ -525,6 +525,57 @@ int main() {
         CHECK(rp && !rp->rebasePending);
         CHECK(rp->x == sx + 40.f && rp->y == sy && rp->z == 92.f); // ★权威位逐分量=上报位（修复前 300~600uu 过冲+追爬）
     }
+    stage("ep07 重生选点排除已占用：活人占 A 旁 40cm→死者必落 B；两点全占→回退仍能重生");
+    {
+        MatchService om;
+        MapGeometry g;
+        g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{800, 0, 92, 180}};
+        om.SetGeometry(g);
+        std::vector<RosterEntry> rs{{80, "h", 0}, {81, "v", 1}};
+        om.StartMatch(6, rs);
+        om.UpdateEntity(80, 40, 0, 92, 0, 0, 0, 1, 1000);      // 活人贴 A 点 40cm（<150 → A 排除）
+        om.UpdateEntity(81, 800, 0, 92, 180, 0, 0, 1, 1000);   // 靶位 B（唯一自由候选）
+        std::uint64_t now = 1000;
+        bool killed = false;
+        for (int i = 0; i < 4; ++i) {                          // 4 发×25 → 击杀
+            now += 200;
+            om.UpdateEntity(80, 40, 0, 92, 0, 0, 0, static_cast<std::uint32_t>(2 + i), now);
+            auto ev = om.Fire(80, now + 10);
+            for (const auto& e : ev)
+                if (e.type == MatchEvent::Type::Kill) killed = true;
+        }
+        CHECK(killed);
+        now += 4000;
+        auto rev = om.Tick(now);                               // 到期重生：B 被死者占用（死者不入扫描）→
+        const auto* rr = find(rev, MatchEvent::Type::Respawn); //  A 被活人排斥 → 唯一候选=B（确定性）
+        CHECK(rr != nullptr && rr->respawnX == 800.f && rr->respawnY == 0.f);
+        // 全占回退：活人挪到 B 旁 40cm → A/B 双占 → 回退全员随机，仍必须重生
+        now += 100;
+        for (int i = 0; i < 8; ++i) {                          // 80 从 40 步行到 760（8×100uu 贴界）
+            now += 33;
+            om.UpdateEntity(80, float(40 + 90 * (i + 1)), 0.f, 92.f, 0.f, 0.f, 0x00, static_cast<std::uint32_t>(20 + i), now);
+        }
+        const auto* w80 = om.EntityById(80);
+        CHECK(w80 && w80->x == 760.f);                         // 界内诚实移动原样入权威
+        now += 2500;                                           // 越过 81 重生无敌窗（开火即破仅豁免射手——
+                                                               //  靶侧无敌须等表走完才能再被击杀）
+        om.UpdateEntity(81, 800.f, 0.f, 92.f, 180.f, 0.f, 0.f, 100, now);   // 81 重生后上报（真实世界客户端/
+                                                               //  人机驱动 30Hz 必报——否则历史环空=回溯采样空=永 miss）
+        om.UpdateEntity(80, 760.f, 0.f, 92.f, 0.f, 0.f, 0x00, 40, now);
+        bool killed2 = false;
+        for (int i = 0; i < 4; ++i) {                          // 再杀 81（此时 81 已在 B 重生过、活体）
+            now += 200;
+            om.UpdateEntity(80, 760.f, 0.f, 92.f, 0.f, 0.f, 0x00, static_cast<std::uint32_t>(41 + i), now);
+            auto ev = om.Fire(80, now + 10);
+            for (const auto& e : ev)
+                if (e.type == MatchEvent::Type::Kill) killed2 = killed2 || e.killVictim == 81;
+        }
+        CHECK(killed2);
+        now += 4000;
+        auto rev2 = om.Tick(now);                              // A 距 760>150 自由？A(0,0) 距 760 → 自由；
+        const auto* rr2 = find(rev2, MatchEvent::Type::Respawn);// B(800,0) 距 760 点 40 → 排斥 → 必落 A
+        CHECK(rr2 != nullptr && rr2->respawnX == 0.f && rr2->respawnY == 0.f);
+    }
     stage("ep07 无敌诊断：重生 2s 保护内完美瞄准=miss+最近候选[无敌]；保护过期=命中（选点随机下射手恒居西）");
     {
         MatchService iv;
