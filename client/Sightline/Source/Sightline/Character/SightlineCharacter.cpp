@@ -182,6 +182,7 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 void ASightlineCharacter::Move(const FInputActionValue& Value) {
     const FVector2D Axis = Value.Get<FVector2D>();
     if (!Controller || Axis.IsNearlyZero()) return;
+    if (MatchSession.IsValid() && MatchSession->IsSelfDead()) return;   // 死亡期断移动意图（CMC 已定身=双保险）
     const FRotator YawRot(0.f, Controller->GetControlRotation().Yaw, 0.f);
     AddMovementInput(FRotationMatrix(YawRot).GetUnitAxis(EAxis::X), Axis.Y);
     AddMovementInput(FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y), Axis.X);
@@ -189,6 +190,9 @@ void ASightlineCharacter::Move(const FInputActionValue& Value) {
 
 void ASightlineCharacter::Look(const FInputActionValue& Value) {
     const FVector2D Axis = Value.Get<FVector2D>();
+    if (MatchSession.IsValid() && MatchSession->IsSelfDead()) return;   // 死亡期断视角（用户实锤"看自己瘫倒不正常"：
+                                                                        //  bUseControllerRotationYaw=true→鼠标还在
+                                                                        //  转胶囊→TPP 镜头绕尸体狂转，看不成瘫倒）
     AddControllerYawInput(Axis.X);
     AddControllerPitchInput(Axis.Y);
 }
@@ -573,10 +577,16 @@ void ASightlineCharacter::TryFire() {
 
 // ===== ep07 死亡/重生（23/24 号；自己=表现+输入禁用，他人=蒙太奇+插值重置）=====
 void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
+    // 受害者 Pawn 解析（2026-11-04 用户实锤"自己死了不瘫倒"根因）：本地 Pawn 不在 Spawner 名册
+    // （PawnSpawner 只管远端——bSelf continue），按 pid 去 Spawner 查自己=恒 null → 自机死亡 FX
+    // 从未运行过（布娃娃/蒙太奇全部静默跳过，只有 IsSelfPlayer 分支的红屏/相机在跑）。
     ASightlineCharacter* VictimPawn = nullptr;
-    if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance()))
+    if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
+        VictimPawn = this;                                   // 自己=本 Pawn（GameMode 生成，不在名册）
+    } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (const USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
             VictimPawn = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Kill.VictimPid));
+    }
     if (VictimPawn) {
         VictimPawn->PlayAnimMontage(DeathMontage);               // 蒙太奇阶梯（未配置=静默）
         VictimPawn->StartDeathFX();                              // 布娃娃主方案：蒙太奇播完接物理瘫倒（ABP 停写位姿）
@@ -596,7 +606,7 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
             MoveComp->StopMovementImmediately();
             MoveComp->DisableMovement();
         }
-        if (DeathMontage) PlayAnimMontage(DeathMontage);         // 自己也播（覆盖表现）
+        // （蒙太奇已由上方 VictimPawn 共享块播放——本分支不再重复起播）
     }
 }
 
