@@ -1,0 +1,39 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="GP框架对象关系图" id="ep07_gp_mapping">
+    <mxGraphModel dx="1600" dy="1080" grid="0" page="1" pageWidth="1600" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1600" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="UE Gameplay 五件套 × Sightline 自研栈对照" style="text;html=1;fontSize=26;fontStyle=1;fontColor=#333333;align=left;verticalAlign=middle;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="16" width="940" height="40" as="geometry"/></mxCell>
+        <mxCell id="legend" value="图例&#10;□ 灰 UE 既有框架　■ 蓝 Sightline 自研&#10;实线 = 持有/生成　虚线 = 职责映射" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#cccccc;fontSize=15;align=left;spacing=10;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="14" width="510" height="96" as="geometry"/></mxCell>
+
+        <mxCell id="bandUE" value="UE 框架 · 借职责" style="rounded=1;whiteSpace=wrap;fillColor=#fafafa;strokeColor=#cccccc;fontSize=19;fontStyle=1;align=left;spacingLeft=16;verticalAlign=top;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="130" width="580" height="810" as="geometry"/></mxCell>
+        <mxCell id="bandS" value="Sightline 自研栈 · 不借管道" style="rounded=1;whiteSpace=wrap;fillColor=#fafafa;strokeColor=#cccccc;fontSize=19;fontStyle=1;align=left;spacingLeft=16;verticalAlign=top;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="880" y="130" width="660" height="810" as="geometry"/></mxCell>
+
+        <mxCell id="ueGM" value="GameMode&#10;规则·生成·仅服务器" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="190" width="480" height="100" as="geometry"/></mxCell>
+        <mxCell id="ueGS" value="GameState&#10;对局状态·全员副本" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="340" width="480" height="100" as="geometry"/></mxCell>
+        <mxCell id="uePS" value="PlayerState&#10;每玩家一行数据" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="490" width="480" height="100" as="geometry"/></mxCell>
+        <mxCell id="uePC" value="PlayerController&#10;输入意图" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="640" width="480" height="100" as="geometry"/></mxCell>
+        <mxCell id="uePawn" value="Pawn&#10;ASightlineCharacter" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="790" width="480" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="slMatch" value="MatchService&#10;编排除外·权威真相" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="190" width="580" height="100" as="geometry"/></mxCell>
+        <mxCell id="slSync" value="17 号快照流&#10;23/24/25 号事件流" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="340" width="580" height="100" as="geometry"/></mxCell>
+        <mxCell id="slRow" value="Entity 行 / 比分缓存&#10;EntityHp·ScoreMap" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="490" width="580" height="100" as="geometry"/></mxCell>
+        <mxCell id="slInput" value="IA_* 上行通道&#10;19/20/22/29 号" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="640" width="580" height="100" as="geometry"/></mxCell>
+        <mxCell id="slPawn" value="本地 = 预测+和解&#10;远端 = 插值+死亡表现" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=17;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="790" width="580" height="100" as="geometry"/></mxCell>
+
+        <mxCell id="eGSGM" value="拥有" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;fontSize=15;labelBackgroundColor=#ffffff;sketch=1;curveFitting=1;jiggle=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="ueGM" target="ueGS"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePCPS" value="持有" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;fontSize=15;labelBackgroundColor=#ffffff;sketch=1;curveFitting=1;jiggle=2;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="uePC" target="uePS"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePCPawn" value="Possess" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;fontSize=15;labelBackgroundColor=#ffffff;sketch=1;curveFitting=1;jiggle=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="uePC" target="uePawn"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="mGM" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ueGM" target="slMatch"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="mGS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ueGS" target="slSync"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="mPS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="uePS" target="slRow"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="mPC" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="uePC" target="slInput"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="mPawn" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;sketch=1;curveFitting=1;jiggle=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="uePawn" target="slPawn"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="concl" value="结论：为什么没用 GameState？——30Hz 快照 + 事件流的同步语义是定制的，通用复制管道替不了；五件套借「各司其职」，不借「复制管道」。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#b85450;fontSize=16;fontStyle=1;align=left;spacing=14;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="60" y="960" width="1480" height="90" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
