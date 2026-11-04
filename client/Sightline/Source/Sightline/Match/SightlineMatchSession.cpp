@@ -151,7 +151,8 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             }
             Registry->ApplyState(Pid,
                                  FVector(Ent.X, Ent.Y, Ent.Z), Ent.Yaw, Ent.Pitch,
-                                 (Ent.Flags & 0x01) != 0, static_cast<int32>(Ent.AckedSeq));
+                                 (Ent.Flags & 0x01) != 0, (Ent.Flags & 0x04) != 0,   // bit2=无敌（2026-11-04 语义扩展）
+                                 static_cast<int32>(Ent.AckedSeq));
         }
         return;
     }

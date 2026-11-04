@@ -74,7 +74,7 @@ public:
 
     /** 远端角色状态应用（PawnSpawner 经 17 快照调用）：快照入缓冲，插值在 Tick 里做。
      *  AckedSeq=服务器确认序号——速度的发端时间基准（Δack×输入拍），免疫到达抖动 */
-    void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, int32 AckedSeq = 0);
+    void ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, bool bInvuln, int32 AckedSeq = 0);
 
     /** 覆写引擎速度：远端角色返回插值速度（驱动 ABP 标准 GetVelocity 节点）；本地角色走 CMC 真速度 */
     virtual FVector GetVelocity() const override {
@@ -216,16 +216,12 @@ private:
     void WarmupFireChain();
     void ResetRemoteOnRespawn(FVector SpawnPos);   // ep07：远端重生（插值重置+幽灵环清+落位——❗10）                      // ep06 首枪预热：对局开始后静音热一遍开火链（火光/枪声/弹孔首次加载）
 
-    // —— ep07 收官表现：死亡布娃娃 + 无敌闪烁（阶梯容错：DeathMontage 未配置/资产缺失时静默降级）——
+    // —— ep07 收官表现：死亡布娃娃（阶梯容错）+ 无敌闪烁（17 号 flags bit2 服务端标志驱动）——
     /** 死亡表现入口：蒙太奇已配置→播完接布娃娃（防 ABP 接管站起）；未配置→立即布娃娃（零资产可用）。
      *  自机/远端同入口（OnKill 的 VictimPawn 单入口覆盖两者）；还原统一走 EndDeathFX */
     void StartDeathFX();
-    /** 死亡表现还原：关物理+还原 ABP 类+还原碰撞 Profile+清闪烁钟（重生时先于传送调用） */
+    /** 死亡表现还原：关物理+回挂网格+还原 ABP/碰撞 Profile+清无敌标志（重生时先于传送调用） */
     void EndDeathFX();
-    /** 远端无敌期网格闪烁（100ms 周期翻转可见性；InvulnSec 到期自动还原） */
-    void StartInvulnBlink(float InvulnSec);
-    void InvulnBlinkTick();
-    UFUNCTION() void EndInvulnBlink();
     void EnterRagdoll();
     UPROPERTY(Transient) TSubclassOf<UAnimInstance> SavedMeshAnimClass = nullptr;  // 死亡时保存 ABP 类（重生还原）
     FName SavedMeshProfile = NAME_None;            // 死亡时保存网格碰撞 Profile（还原不硬编码）
@@ -233,9 +229,9 @@ private:
     FTransform SavedMeshRelTransform = FTransform::Identity;  // 原始相对位姿（布娃娃前、仍挂接时存档）
     bool bRagdolled = false;                       // 布娃娃状态权威标志（EnterRagdoll 置位/EndDeathFX 清除——
                                                    //  还原以它为准，不做运行时状态推断）
+    bool bRemoteInvuln = false;                    // 远端无敌期（17 flags bit2 随快照刷新——Tick 按它闪烁，
+                                                   //  含服务器"开火即破"提前结束；自机无此需求走 HUD 倒计时）
     FTimerHandle DeathFxTimer;                     // 蒙太奇→布娃娃交接钟
-    FTimerHandle InvulnBlinkTimer;                 // 闪烁周期钟（100ms）
-    FTimerHandle InvulnEndTimer;                   // 无敌窗到期还原钟
     bool bFireHeld = false;
 
     // —— 和解尾款（2026-11-04 拉扯第五轮：纠正施加从"30Hz 硬瞬移"改"小额误差逐帧平滑归还"）——

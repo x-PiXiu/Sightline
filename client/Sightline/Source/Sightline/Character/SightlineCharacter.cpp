@@ -271,6 +271,13 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
             AnimInputs.LH_IK_Weight = 0.f;                        // 枪引用未填：IK 静默关闭（不干预动画）
         }
     }
+    // 无敌闪烁（2026-11-04 语义扩展：17 flags bit2 服务端权威驱动——闪烁起止与保护窗实时同步，
+    // 含"开火即破"提前结束；旧定时器版退役，24 号倒计时驱动不了提前破除）
+    if (!IsPlayerControlled()) {
+        const bool bShow = !bRemoteInvuln || (FMath::Fmod(FPlatformTime::Seconds(), 0.2) < 0.1);
+        if (GetMesh()) GetMesh()->SetVisibility(bShow, true);
+        if (WeaponMeshComp) WeaponMeshComp->SetVisibility(bShow);
+    }
     TickRemoteInterpolation(DeltaSeconds);
 
     // ep06 幽灵（Sightline.Ghost 1）：远端【权威位】标记球——实色 Pawn=插值渲染点，
@@ -345,10 +352,11 @@ void ASightlineCharacter::OnSelfCorrected(const FVector Error, const bool bFullS
     PendingCorrection = Error;
 }
 
-void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, int32 AckedSeq) {
+void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchDeg, bool bFalling, bool bInvuln, int32 AckedSeq) {
     const double Now = FPlatformTime::Seconds();
     RemotePitchTarget = PitchDeg;
     AnimInputs.bFalling = bFalling;
+    bRemoteInvuln = bInvuln;                             // 无敌标志随快照刷新（Tick 闪烁驱动源）
 
     // ep06 幽灵：权威位历史环 push（环形覆盖最老；纯 POD 数组，无 GC 触点）
     AuthorityHist[AuthHead] = {Now, Pos};
@@ -409,7 +417,9 @@ void ASightlineCharacter::EnterRagdoll() {
 
 void ASightlineCharacter::EndDeathFX() {
     GetWorldTimerManager().ClearTimer(DeathFxTimer);         // 死亡→瞬重生窗口的交接钟一并清
-    EndInvulnBlink();                                        // 闪烁还原（幂等）
+    bRemoteInvuln = false;                                   // 无敌标志还原（防御）
+    if (GetMesh()) GetMesh()->SetVisibility(true, true);     // 中断窗强制可见
+    if (WeaponMeshComp) WeaponMeshComp->SetVisibility(true);
     USkeletalMeshComponent* MeshComp = GetMesh();
     if (!MeshComp || !bRagdolled) { bRagdolled = false; return; }   // 未布娃娃：零副作用（防误伤活人 ABP）
     const bool bDetached = (MeshComp->GetAttachParent() != SavedMeshParent);
@@ -428,26 +438,6 @@ void ASightlineCharacter::EndDeathFX() {
            bDetached ? 1 : 0,
            MeshComp->GetAttachParent() ? TEXT("有") : TEXT("无"),
            SavedMeshAnimClass ? TEXT("有") : TEXT("无"));
-}
-
-void ASightlineCharacter::StartInvulnBlink(float InvulnSec) {
-    if (InvulnSec <= 0.f) return;
-    EndInvulnBlink();                                        // 幂等起表（清旧钟）
-    GetWorldTimerManager().SetTimer(InvulnBlinkTimer, this, &ASightlineCharacter::InvulnBlinkTick, 0.1f, true);
-    GetWorldTimerManager().SetTimer(InvulnEndTimer, this, &ASightlineCharacter::EndInvulnBlink, InvulnSec, false);
-}
-
-void ASightlineCharacter::InvulnBlinkTick() {
-    const bool bShow = !GetMesh() || !GetMesh()->IsVisible();
-    if (GetMesh()) GetMesh()->SetVisibility(bShow, true);    // 含挂点子件（true=PropagateToChildren）
-    if (WeaponMeshComp) WeaponMeshComp->SetVisibility(bShow);
-}
-
-void ASightlineCharacter::EndInvulnBlink() {
-    GetWorldTimerManager().ClearTimer(InvulnBlinkTimer);
-    GetWorldTimerManager().ClearTimer(InvulnEndTimer);
-    if (GetMesh()) GetMesh()->SetVisibility(true, true);     // 中断窗强制可见（重生走这里=必还原）
-    if (WeaponMeshComp) WeaponMeshComp->SetVisibility(true);
 }
 
 void ASightlineCharacter::ResetRemoteOnRespawn(FVector SpawnPos) {
@@ -597,6 +587,9 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
         // 死亡红屏保持（2026-11-04 收官：濒死反馈——清掉 0.3s 消隐钟保持 Visible，重生时收）
         GetWorldTimerManager().ClearTimer(HurtFlashTimer);
         if (HurtFlashWidget.Get()) HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);
+        // 死亡镜头切 TPP（用户实锤"自己死了没有布娃娃效果"——FPP 相机钉在胶囊眼位不跟尸体，
+        // 布娃娃其实在播但看不见；越肩镜头让玩家眼见自己瘫倒。重生还原 FPP，见 OnRespawn）
+        if (Camera) Camera->SetCameraMode(ESightlineCameraMode::ThirdPerson);
         // 死亡期定身（镜像服务器死亡冻结❗13）：服务器冻结尸体位、不认死亡期上报——客户端若照走，
         // 和解会把人一次次拉回尸体位（2026-11-03 联调"拉扯感"的客户端一半）；重生落位前解除
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) {
@@ -614,6 +607,8 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
         EndDeathFX();                                            // 布娃娃还原+ABP/碰撞 Profile 恢复（先于传送）
         GetWorldTimerManager().ClearTimer(HurtFlashTimer);       // 死亡红屏收
         if (HurtFlashWidget.Get()) HurtFlashWidget->SetVisibility(ESlateVisibility::Collapsed);
+        if (Camera) Camera->SetCameraMode(ESightlineCameraMode::FirstPerson);   // 镜头还原默认 FPP
+                                                                                // （死前手动 TPP 者一并回默认）
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
         LocalMag = kClientMag;                                   // 服务器重生满匣（Tick 里 magUsed=0）——
@@ -629,10 +624,9 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
                                                                  // 日志实锤：重生后 3.8s 横移 4.3km+下坠 3.4km）
     } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
-            if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid))) {
+            if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid)))
                 Remote->ResetRemoteOnRespawn(SpawnPos);          // ❗10：远端插值重置+幽灵环清空+权威落位
-                Remote->StartInvulnBlink(InvulnMs / 1000.f);     // 无敌期闪烁（2026-11-04 收官：InvulnMs 终于被消费）
-            }
+                                                                 //  （无敌闪烁不再由此驱动——17 bit2 随下一拍快照到达）
     }
 }
 
