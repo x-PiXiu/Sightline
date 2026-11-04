@@ -13,6 +13,7 @@
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimInstance.h"
 #include "DrawDebugHelpers.h"
 #include "HAL/IConsoleManager.h"
 #include "Match/SightlineEntityRegistry.h"
@@ -374,7 +375,65 @@ void ASightlineCharacter::ApplyState(const FVector& Pos, float Yaw, float PitchD
     }
 }
 
+// ===== ep07 收官表现：死亡布娃娃 + 无敌闪烁（阶梯容错：不配置资产也能跑）=====
+void ASightlineCharacter::StartDeathFX() {
+    // 阶梯：DeathMontage 已配置 → 蒙太奇先播（OnKill 已播），播完前接布娃娃（防动画播完 ABP 接管
+    // 站起来）；未配置 → 立即布娃娃（零资产零配置立即可用）。胶囊先停模拟（MOVE_None——防与尸体
+    // 物理相搏；自机 OnKill 随后 DisableMovement 幂等，远端无胶囊驱动本就免战）。
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+        MoveComp->SetMovementMode(MOVE_None);
+    const float Delay = DeathMontage ? FMath::Max(0.1f, DeathMontage->GetPlayLength() - 0.15f) : 0.f;
+    if (Delay > 0.01f)
+        GetWorldTimerManager().SetTimer(DeathFxTimer, this, &ASightlineCharacter::EnterRagdoll, Delay, false);
+    else
+        EnterRagdoll();
+}
+
+void ASightlineCharacter::EnterRagdoll() {
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp || MeshComp->IsSimulatingPhysics()) return; // 幂等（重复 23 号/交接钟竞态）
+    if (UAnimInstance* Anim = MeshComp->GetAnimInstance())
+        SavedMeshAnimClass = Anim->GetClass();               // ABP 类存档（重生还原；GetAnimClass 已弃用）
+    SavedMeshProfile = MeshComp->GetCollisionProfileName();
+    MeshComp->SetAnimInstanceClass(nullptr);                 // 停 ABP 写位姿（与物理相搏=尸体抽搐）
+    MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
+    MeshComp->SetAllBodiesSimulatePhysics(true);             // PA_Mannequin 全身瘫倒
+}
+
+void ASightlineCharacter::EndDeathFX() {
+    GetWorldTimerManager().ClearTimer(DeathFxTimer);         // 死亡→瞬重生窗口的交接钟一并清
+    EndInvulnBlink();                                        // 闪烁还原（幂等）
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (MeshComp && MeshComp->IsSimulatingPhysics()) {
+        MeshComp->SetAllBodiesSimulatePhysics(false);
+        MeshComp->SetSimulatePhysics(false);
+        MeshComp->SetAnimInstanceClass(SavedMeshAnimClass);  // ABP 复职（动画恢复驱动）
+        if (SavedMeshProfile != NAME_None) MeshComp->SetCollisionProfileName(SavedMeshProfile);
+    }
+}
+
+void ASightlineCharacter::StartInvulnBlink(float InvulnSec) {
+    if (InvulnSec <= 0.f) return;
+    EndInvulnBlink();                                        // 幂等起表（清旧钟）
+    GetWorldTimerManager().SetTimer(InvulnBlinkTimer, this, &ASightlineCharacter::InvulnBlinkTick, 0.1f, true);
+    GetWorldTimerManager().SetTimer(InvulnEndTimer, this, &ASightlineCharacter::EndInvulnBlink, InvulnSec, false);
+}
+
+void ASightlineCharacter::InvulnBlinkTick() {
+    const bool bShow = !GetMesh() || !GetMesh()->IsVisible();
+    if (GetMesh()) GetMesh()->SetVisibility(bShow, true);    // 含挂点子件（true=PropagateToChildren）
+    if (WeaponMeshComp) WeaponMeshComp->SetVisibility(bShow);
+}
+
+void ASightlineCharacter::EndInvulnBlink() {
+    GetWorldTimerManager().ClearTimer(InvulnBlinkTimer);
+    GetWorldTimerManager().ClearTimer(InvulnEndTimer);
+    if (GetMesh()) GetMesh()->SetVisibility(true, true);     // 中断窗强制可见（重生走这里=必还原）
+    if (WeaponMeshComp) WeaponMeshComp->SetVisibility(true);
+}
+
 void ASightlineCharacter::ResetRemoteOnRespawn(FVector SpawnPos) {
+    EndDeathFX();                                            // 尸体→重生：布娃娃/闪烁全还原（防上局残留）
     // ❗10：远端重生——插值窗重置（SnapCount=0→下一快照直摆落位）+幽灵历史环清空（死前轨迹不跨越重生）
     SnapCount = 0;
     SnapA = FSnapshot{}; SnapB = FSnapshot{};
@@ -510,10 +569,16 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
     if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance()))
         if (const USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
             VictimPawn = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Kill.VictimPid));
-    if (VictimPawn) VictimPawn->PlayAnimMontage(DeathMontage);   // 自己=本类（他人=远端同类）——同一入口
+    if (VictimPawn) {
+        VictimPawn->PlayAnimMontage(DeathMontage);               // 蒙太奇阶梯（未配置=静默）
+        VictimPawn->StartDeathFX();                              // 布娃娃主方案：蒙太奇播完接物理瘫倒（ABP 停写位姿）
+    }
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
         bFireHeld = false;                                       // 死亡期开火电平断（TryFire 门另加 bSelfDead）
         PendingCorrection = FVector::ZeroVector;                 // 尾款不与尸体定身相搏
+        // 死亡红屏保持（2026-11-04 收官：濒死反馈——清掉 0.3s 消隐钟保持 Visible，重生时收）
+        GetWorldTimerManager().ClearTimer(HurtFlashTimer);
+        if (HurtFlashWidget.Get()) HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);
         // 死亡期定身（镜像服务器死亡冻结❗13）：服务器冻结尸体位、不认死亡期上报——客户端若照走，
         // 和解会把人一次次拉回尸体位（2026-11-03 联调"拉扯感"的客户端一半）；重生落位前解除
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement()) {
@@ -528,6 +593,9 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Pid)) {
         // 自己：清预测输入环（❗9——防和解拉回尸体）+ 解除死亡定身 + 落位重生点（Spawn_{n+1} 同源）+ 无敌闪
         MatchSession->ClearPredictionInput();   // ❗9：清预测输入环（防和解拉回尸体）
+        EndDeathFX();                                            // 布娃娃还原+ABP/碰撞 Profile 恢复（先于传送）
+        GetWorldTimerManager().ClearTimer(HurtFlashTimer);       // 死亡红屏收
+        if (HurtFlashWidget.Get()) HurtFlashWidget->SetVisibility(ESlateVisibility::Collapsed);
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
         LocalMag = kClientMag;                                   // 服务器重生满匣（Tick 里 magUsed=0）——
@@ -543,8 +611,10 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
                                                                  // 日志实锤：重生后 3.8s 横移 4.3km+下坠 3.4km）
     } else if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
         if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner())
-            if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid)))
+            if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Pid))) {
                 Remote->ResetRemoteOnRespawn(SpawnPos);          // ❗10：远端插值重置+幽灵环清空+权威落位
+                Remote->StartInvulnBlink(InvulnMs / 1000.f);     // 无敌期闪烁（2026-11-04 收官：InvulnMs 终于被消费）
+            }
     }
 }
 

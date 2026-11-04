@@ -24,6 +24,7 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
     UFUNCTION() void HandleFireResult(const FSightlineFireResult& Result);
     UFUNCTION() void HandleRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs, FVector SpawnPos);
@@ -32,11 +33,15 @@ protected:
     UProgressBar* HealthBar = nullptr;
     UPROPERTY(meta = (BindWidgetOptional))
     UTextBlock* HealthText = nullptr;
+    /** 自机无敌倒计时（2026-11-04 收官：24 号 InvulnMs 终于被消费）——可摆可不摆，不摆=静默降级 */
+    UPROPERTY(meta = (BindWidgetOptional))
+    UTextBlock* InvulnText = nullptr;
 
 private:
     void SetHp(int32 Hp, int32 MaxHp);
     TWeakObjectPtr<USightlineMatchSession> Session;
     int32 SelfPid = 0;
+    double InvulnRemainSec = 0.0;                  // >0=自机无敌剩余（NativeTick 递减驱动）
 };
 
 /** 击杀播报（3 行循环——最新在上；数据=OnKill 23 号） */

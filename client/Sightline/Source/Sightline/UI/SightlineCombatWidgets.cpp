@@ -22,6 +22,24 @@ void UCombatHudWidgetBase::NativeConstruct()
 {
     Super::NativeConstruct();
     SetHp(100, 100);                                   // 初始满血
+    if (InvulnText) InvulnText->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UCombatHudWidgetBase::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+    Super::NativeTick(MyGeometry, InDeltaTime);
+    if (!InvulnText) return;
+    if (InvulnRemainSec > 0.0)
+    {
+        InvulnRemainSec = FMath::Max(0.0, InvulnRemainSec - InDeltaTime);
+        if (InvulnRemainSec > 0.0)
+        {
+            InvulnText->SetText(FText::FromString(FString::Printf(TEXT("无敌 %.1f 秒"), InvulnRemainSec)));
+            InvulnText->SetVisibility(ESlateVisibility::HitTestInvisible);   // 可见不挡输入
+            return;
+        }
+    }
+    InvulnText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UCombatHudWidgetBase::NativeDestruct()
@@ -40,9 +58,13 @@ void UCombatHudWidgetBase::HandleFireResult(const FSightlineFireResult& Result)
     SetHp(Result.VictimHp, 100);
 }
 
-void UCombatHudWidgetBase::HandleRespawn(int32 Pid, int32 /*SpawnIndex*/, int32 /*InvulnMs*/, FVector /*SpawnPos*/)
+void UCombatHudWidgetBase::HandleRespawn(int32 Pid, int32 /*SpawnIndex*/, int32 InvulnMs, FVector /*SpawnPos*/)
 {
-    if (Session.IsValid() && Session->IsSelfPlayer(Pid)) SetHp(100, 100);
+    if (Session.IsValid() && Session->IsSelfPlayer(Pid))
+    {
+        SetHp(100, 100);
+        InvulnRemainSec = InvulnMs / 1000.0;           // 无敌倒计时入账（NativeTick 递减；不摆 InvulnText=静默）
+    }
 }
 
 void UCombatHudWidgetBase::SetHp(int32 Hp, int32 MaxHp)
