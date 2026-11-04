@@ -138,14 +138,16 @@ struct EntityLeaveMsg {
  *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
  *  result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中。
  *  victimHp=命中后余血：第 5 期供 HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动） */
-struct FireResultMsg {
+struct FireResultMsg {                             // v4.6：+1B gate（2026-11-05 弹匣漂移根治——被拒射击
+                                                   //  回传射手本人撤销本地预测扣弹，双端换弹钟锁相）
     std::uint32_t shooterPid = 0;
     std::uint8_t result = 0;
     std::uint32_t victimPid = 0;
     float hitX = 0.f, hitY = 0.f, hitZ = 0.f;
     std::uint8_t victimHp = 0;
+    std::uint8_t gate = 0;                         // 0=正常判定 / 非0=被武器门拒（1 换弹 2 弹匣 3 射速 4 死亡）
 
-    static constexpr std::size_t kSize = 22;
+    static constexpr std::size_t kSize = 23;
 
     std::string Encode() const {
         std::string s(kSize, '\0');
@@ -161,6 +163,7 @@ struct FireResultMsg {
         wrU32(5, victimPid);
         wrF(9, hitX); wrF(13, hitY); wrF(17, hitZ);
         s[21] = static_cast<char>(victimHp);
+        s[22] = static_cast<char>(gate);
         return s;
     }
 };

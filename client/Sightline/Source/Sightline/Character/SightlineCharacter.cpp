@@ -645,6 +645,12 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
 
 void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     // 三分流（图=代码 fire_client_flow）：命中音/他人枪声/受击音 + 远端开火动画（D5-10v2）
+    if (Result.Gate != 0) {
+        // 被武器门拒（2026-11-05 弹匣漂移根治）：撤销本地预测扣弹=双端弹匣/换弹钟锁相——
+        // "死窗"族灭绝（服务端空匣/换弹期间客户端不再有幻影弹药空放）。无弹孔/无伤害数字。
+        LocalMag = FMath::Min(LocalMag + 1, kClientMag);
+        return;
+    }
     if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）
     const bool bSelfShot = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.ShooterPid);
     const bool bSelfVictim = MatchSession.IsValid() && MatchSession->IsSelfPlayer(Result.VictimPid);

@@ -38,6 +38,8 @@ struct FSightlineFireResult {
     UPROPERTY(BlueprintReadOnly) int32 VictimPid = 0;
     UPROPERTY(BlueprintReadOnly) FVector HitPoint = FVector::ZeroVector;   // 命中面/射线终点（tracer 停墙）
     UPROPERTY(BlueprintReadOnly) int32 VictimHp = 0;                       // 命中后余血（HUD 血量行）
+    UPROPERTY(BlueprintReadOnly) int32 Gate = 0;                           // 0=正常判定 / 非0=被武器门拒
+                                                                           // （2026-11-05 弹匣漂移根治：射手撤销预测扣弹）
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFireResult, const FSightlineFireResult&, Result);
 

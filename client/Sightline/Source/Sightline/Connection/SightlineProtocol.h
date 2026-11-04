@@ -173,8 +173,9 @@ namespace SightlineProtocol
         }
     };
 
-    /** 21 FIRE_RESULT（22B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]
-     *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪 */
+    /** 21 FIRE_RESULT（v4.6·23B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]
+     *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
+     *  gate 非 0=被武器门拒（2026-11-05 弹匣漂移根治：回传射手撤销本地预测扣弹——双端弹匣/换弹钟锁相） */
     struct FFireResult
     {
         uint32 ShooterPid = 0;
@@ -182,8 +183,9 @@ namespace SightlineProtocol
         uint32 VictimPid = 0;
         float HitX = 0.f, HitY = 0.f, HitZ = 0.f;   // 命中面/射线终点（tracer 停墙）
         uint8 VictimHp = 0;       // 命中后余血（HUD 血量行；ep07 接血条）
+        uint8 Gate = 0;           // 0=正常判定 / 非0=被武器门拒（1 换弹 2 弹匣 3 射速 4 死亡）
 
-        static constexpr int32 Size = 22;
+        static constexpr int32 Size = 23;
 
         static bool Parse(const TArray<uint8>& Payload, FFireResult& Out)
         {
@@ -195,6 +197,7 @@ namespace SightlineProtocol
             Out.HitY       = ReadF32(Payload, 13);
             Out.HitZ       = ReadF32(Payload, 17);
             Out.VictimHp   = Payload[21];
+            Out.Gate       = Payload[22];
             return true;
         }
     };

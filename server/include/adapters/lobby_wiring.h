@@ -188,7 +188,15 @@ public:
                 if (!F.bAccepted) {
                     LOG_INFO("[射击拒绝] shooter=" + std::to_string(F.shooterPid) +
                               " 原因=" + GateName[F.gate % 5]);
-                    break;                                   // 被武器门拦下：不广播 21 号（静默丢 D5-03）
+                    // 2026-11-05 弹匣漂移根治（D5-03 修订）：被拒射击回传射手本人（21 号+gate）——
+                    // 客户端撤销本地预测扣弹=双端弹匣/换弹钟锁相（"死窗"族灭绝）。广播全员无害：
+                    // 他人客户端按"非自机+gate 过滤"；人机的拒绝在驱动器已就地丢弃不进此路径。
+                    const sightline::wire::FireResultMsg m{
+                        F.shooterPid, 0, 0, 0.f, 0.f, 0.f, 0, F.gate};
+                    const std::string p = m.Encode();
+                    for (int fd : lobby_.RoomMemberFds(e.roomId))
+                        send(fd, protocol::MSG_S2C_FIRE_RESULT, p);
+                    break;
                 }
                 std::string judgeLine = "[射击判定] shooter=" + std::to_string(F.shooterPid) +
                           " 眼位=(" + std::to_string(D.oX) + "," + std::to_string(D.oY) + "," + std::to_string(D.oZ) + ")" +
