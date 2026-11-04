@@ -302,7 +302,7 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
 
     // ②③④ 武器门（换弹含到期补满 / 弹匣空触发换弹 / 射速容差 95ms——fire_judge 纯函数）
     const FireGate gate = ConsumeWeaponGate(shooter->weapon, nowMs);
-    if (gate != FireGate::Ok) {                              // 静默丢（D5-03）——诊断数据仍回传适配层落日志
+    if (gate != FireGate::Ok) {                              // 拒收回传（v4.6：bAccepted=false + gate 随 21 号广播）
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
@@ -404,7 +404,8 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     }
 
     // ⑦ 扣弹 + 记时（judgeAtMs 预留：ep06 回溯只换判定时刻，本流水线其余步骤不动）
-    shooter->weapon.magUsed++;
+    ConsumeAmmo(shooter->weapon, nowMs);                     // 空匣即上钟（2026-11-05 死窗根除——
+                                                             //  原 ③ 下一发才触发=比客户端钟晚整个换弹窗）
     shooter->weapon.lastFireMs = nowMs;
     shooter->weapon.bHasFired = true;
 

@@ -24,7 +24,8 @@ build_test() {
     /tmp/test_lobby
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp \
-        -o /tmp/test_match
+        src/logger/logger.cpp -o /tmp/test_match   # logger：BotDriver 日志依赖（2026-11-05 勘误——
+                                                   #  对齐 test 头注释标准行，此前漏致链接失败）
     /tmp/test_match
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_wire.cpp -o /tmp/test_wire     # v4 wire 结构体（header-only）

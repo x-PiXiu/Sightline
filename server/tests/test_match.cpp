@@ -183,7 +183,7 @@ int main() {
     CHECK(ConsumeWeaponGate(w, 1050) == FireGate::RateLimited);  // 50ms < 95ms 容差 → 拒
     CHECK(ConsumeWeaponGate(w, 1097) == FireGate::Ok);           // 97ms ≥ 95ms → 收
     w.magUsed = kMagCapacity;
-    CHECK(ConsumeWeaponGate(w, 2000) == FireGate::MagEmpty);     // ③ 触发换弹（reloadUntil=4500）
+    CHECK(ConsumeWeaponGate(w, 2000) == FireGate::MagEmpty);     // ③ 卫哨（直改状态路径；常规触发已前移 ConsumeAmmo）
     CHECK(ConsumeWeaponGate(w, 4000) == FireGate::Reloading);    // ② 换弹中
     CHECK(ConsumeWeaponGate(w, 4600) == FireGate::Ok);           // ② 到期就地补满
     CHECK(w.magUsed == 0);
@@ -257,12 +257,33 @@ int main() {
     }
     for (int i = 0; i <= 26; ++i) (void)fm.Fire(10, 1400 + i * 100);   // 打满剩余（mag 3+27=30）
     const auto RejMag = fm.Fire(10, 4100);
-    CHECK(RejMag.size() == 1 && !RejMag[0].fire.bAccepted);      // ③ 弹匣空 → 触发换弹（诊断事件回传）
-    CHECK(fm.Fire(10, 5000).size() == 1 && !fm.Fire(10, 5000).empty());   // ② 换弹中（第二次调用落在 4100+900ms 仍换弹中）
+    CHECK(RejMag.size() == 1 && !RejMag[0].fire.bAccepted && RejMag[0].fire.gate == 1);   // ② 换弹中（钟已由 ConsumeAmmo 在打空瞬间上=4000+2500）
+    CHECK(fm.Fire(10, 5000).size() == 1 && !fm.Fire(10, 5000).empty());   // ② 换弹中（5000 < 6500）
     fm.UpdateEntity(10, 0, 0, 90, 0, 0, 0, 3);                   // 射手转回 +X
-    const auto fEv3 = fm.Fire(10, 6600);                          // ② 到期补满（4100+2500）→ 正常出膛
+    const auto fEv3 = fm.Fire(10, 6600);                          // ② 到期补满（6500=打空弹 4000+2500）→ 正常出膛
     CHECK(fEv3.size() == 1 && fEv3[0].fire.bHit && fEv3[0].fire.victimPid == 11);
     CHECK(fEv3[0].fire.victimHp == 25);                           // 前已两中（75→50）→ 50-25=25
+
+    stage("死窗根除（2026-11-05 用户日志三窗口实锤）：打空瞬间钟已上（无需下一发尝试）→ 复火首枪到期即接受");
+    {
+        MatchService dm;
+        std::vector<RosterEntry> rosterD{{30, "a", 0}, {31, "b", 0}};
+        dm.StartMatch(1, rosterD);
+        dm.SetGeometry(MapGeometry{});
+        dm.UpdateEntity(30, 0, 0, 90, 0, 0, 0, 1);
+        dm.UpdateEntity(31, 500, 300, 90, 0, 0, 0, 1);           // 侧偏 300 > r=40：全程脱靶（Kill 事件不掺和——
+                                                                 //  本 stage 只验门/弹匣记账；命中路径 e2e 已盖）
+        for (int i = 0; i < 30; ++i)                             // 30 发打空（第 30 发 t=3900 消费）
+            CHECK(dm.Fire(30, 1000 + i * 100).size() == 1);
+        const auto* de = dm.EntityById(30);
+        CHECK(de && de->weapon.magUsed == kMagCapacity);
+        CHECK(de->weapon.reloadUntilMs == 3900 + kReloadMs);     // ★核心：不发第 31 发钟已上（原实现此刻=0
+                                                                 //  ——复火才发现空匣再上钟=比客户端晚整个换弹窗）
+        const auto r1 = dm.Fire(30, 3950);                        // 客户端补满后复火（原死窗内）
+        CHECK(r1.size() == 1 && !r1[0].fire.bAccepted && r1[0].fire.gate == 1);   // 换弹中拒（钟 6400 前有效）
+        const auto r2 = dm.Fire(30, 6410);                        // 钟到期+10ms 首枪 → 直接接受（无第二段拒绝）
+        CHECK(r2.size() == 1 && r2[0].fire.bAccepted);
+    }
 
     stage("M5 几何合同装载：ParseMapGeometry（适配层核心，纯文本可测——整洁架构体检第 3 条）");
     const std::string geo = R"({

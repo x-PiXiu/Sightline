@@ -224,10 +224,15 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         // 生成节奏由 NS 的 NM_WeaponTrigger（TriggerSpacing）负责；这里只表达"想开火"的电平
         const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
         const bool bMatchLive = MatchSession.IsValid() && MatchSession->IsInMatch();   // 对局门：与 TryFire 同源
-        if (LocalMag == 0 && NowMs >= LocalReloadUntilMs)
-            LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣时上弦——
+        // 换弹到期补满（2026-11-05 修订：原门槛 LocalMag==0 只覆盖打空自动换弹——自主换弹
+        //（R·29 号）半匣上钟后永不补满=换弹前后弹数不变，用户实锤 28→28）
+        if (LocalReloadUntilMs != 0 && NowMs >= LocalReloadUntilMs && LocalMag < kClientMag)
+        {
+            LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣/自主 R 上弦——
                                                      // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
                                                      // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
+            LocalReloadUntilMs = 0;                  // 钟清零=换弹态结束（换弹中 HUD 随之消失）
+        }
         const bool bTrigger = bMatchLive && !MatchSession->IsSelfDead() && bFireHeld && LocalMag > 0 && NowMs >= LocalReloadUntilMs;
         // ep06 表现层：弹药/换弹 HUD 行（key=3，GI 的 ping 行=1、和解行=2；本地弹匣预测态直读，
         // 与服务器扣弹镜像同步——换弹钟倒数即"换弹时间"上屏）
@@ -603,6 +608,8 @@ void ASightlineCharacter::OnKill(const FSightlineKill& Kill) {
     if (MatchSession.IsValid() && MatchSession->IsSelfPlayer(Kill.VictimPid)) {
         bFireHeld = false;                                       // 死亡期开火电平断（TryFire 门另加 bSelfDead）
         PendingCorrection = FVector::ZeroVector;                 // 尾款不与尸体定身相搏
+        LocalReloadUntilMs = 0;                                  // 死亡取消换弹（2026-11-05 用户实锤：
+                                                                 //  死亡后"换弹中"倒数照走——钟随死亡清）
         // 死亡红屏保持（2026-11-04 收官：濒死反馈——清掉 0.3s 消隐钟保持 Visible，重生时收）
         GetWorldTimerManager().ClearTimer(HurtFlashTimer);
         if (HurtFlashWidget.Get()) HurtFlashWidget->SetVisibility(ESlateVisibility::Visible);
@@ -655,6 +662,11 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
         // 被武器门拒（2026-11-05 弹匣漂移根治）：撤销本地预测扣弹=双端弹匣/换弹钟锁相——
         // "死窗"族灭绝（服务端空匣/换弹期间客户端不再有幻影弹药空放）。无弹孔/无伤害数字。
         LocalMag = FMath::Min(LocalMag + 1, kClientMag);
+        // 拒收回补外显（2026-11-05 死窗校验增补："降级可以但必须喊一声"——本轮死窗 1 发零头
+        // 悬案即因静默不可观测）。健康对局应几乎不出现；连续出现=双端武器状态失锁，先查弹余/换弹钟。
+        UE_LOG(LogSightline, Warning,
+               TEXT("[开火] 被武器门拒 gate=%d（1=换弹中 2=弹匣空 3=射速 4=死亡/终局）弹余回补→%d"),
+               Result.Gate, LocalMag);
         return;
     }
     if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）

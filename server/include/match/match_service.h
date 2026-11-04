@@ -160,9 +160,10 @@ public:
     void SetGeometry(const MapGeometry& geometry);
 
     /** 20 号开火裁决（唯一入口）。①在对局（未在局/未上报=丢）→ ②③④ 武器门（fire_judge 纯函数，
-     *  任一不过静默丢——D5-03 无回执，ep08 起违规可见）→ ⑤ hitscan 求交（先遮挡原语后实体圆柱，
-     *  取最近 t；judgeAtMs 预留=ep06 回溯只换判定时刻）→ ⑥ 扣血钳 0 → ⑦ 扣弹记时 → ⑧ FireResult
-     *  全房间广播事件。nowMs 由适配层注入（steady 时钟，域不持钟） */
+     *  任一不过=拒收回传——21 号 v4.6 gate 字节，客户端撤销预测扣弹）→ ⑤ hitscan 求交（先遮挡
+     *  原语后实体圆柱，取最近 t；judgeAtMs 预留=ep06 回溯只换判定时刻）→ ⑥ 扣血钳 0 →
+     *  ⑦ 扣弹+空匣即上钟（ConsumeAmmo——2026-11-05 死窗根除）→ ⑧ FireResult 全房间广播事件。
+     *  nowMs 由适配层注入（steady 时钟，域不持钟） */
     std::vector<MatchEvent> Fire(std::uint32_t shooterPid, std::uint64_t nowMs);
 
     /** 自主换弹（2026-11-05 用户令：完整对局需可自主换弹·29 号）：换弹钟权威在服务器——客户端

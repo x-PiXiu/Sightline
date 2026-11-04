@@ -18,7 +18,7 @@ namespace sightline::match {
 inline constexpr float        kDamagePerShot      = 25.f;    // 命中扣血（100 血 4 枪见底）
 inline constexpr float        kMaxHp              = 100.f;
 inline constexpr int          kMagCapacity        = 30;      // 弹匣（D5-07）
-inline constexpr std::uint64_t kReloadMs          = 2500;    // 打空自动换弹（服务器权威计时）
+inline constexpr std::uint64_t kReloadMs          = 2500;    // 打空自动换弹（服务器权威计时——2026-11-05 起钟在扣弹瞬间即上，见 ConsumeAmmo）
 inline constexpr std::uint64_t kFireMinIntervalMs = 95;      // 服务器阈值 < 客户端步进 100ms（D5-14 容差吸抖动）
 inline constexpr float        kMaxRangeUu         = 1000000.f; // 10km=数值护栏（float 精度安全上限）——实际无距离限制（用户裁决 2026-10-27：去除射程限制），任何对局地图不可能触及
 // —— FPP 相机镜像合同（2026-10-29 用户令：准星=判定射线——弹孔/命中与准星重合）——
@@ -94,9 +94,10 @@ struct WeaponState {
 
 enum class FireGate { Ok, Reloading, MagEmpty, RateLimited, Dead };
 
-/** 门 ②③④（消费式：通过即更新状态）。②③=换弹状态机（触发/进行/到期补满，reloadUntil==0 卫哨防
- *  未触发先补满的边角——审计修复①）；④射速容差 95ms<D5-14。
- *  ①"在对局中"由用例层判定（实体查找），不在此。静默语义（无回执）= D5-03，ep08 起违规可见。 */
+/** 门 ②③④（消费式：通过即更新状态）。②=换弹状态机（进行/到期补满，reloadUntil==0 卫哨防
+ *  未触发先补满的边角——审计修复①）；③=空匣触发卫哨（常规触发已前移至 ConsumeAmmo 扣弹
+ *  时刻——2026-11-05 死窗根除）；④射速容差 95ms<D5-14。
+ *  ①"在对局中"由用例层判定（实体查找），不在此。被拒回传=21 号 v4.6 gate 字节（适配层广播）。 */
 inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
     // 换弹状态机（2026-11-05 自主换弹重构）：reloadUntilMs 双源（③ 弹匣空自动触发 / 29 号自主 R 键）
     // ——检查必须先于"弹匣空"分支且无条件执行（原实现嵌在 magUsed>=容量 分支内：半匣自主换弹
@@ -106,13 +107,25 @@ inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
         w.magUsed = 0;
         w.reloadUntilMs = 0;
     }
-    if (w.magUsed >= kMagCapacity) {                               // ③ 弹匣空 → 触发自动换弹（触发帧仍拒）
-        w.reloadUntilMs = nowMs + kReloadMs;
-        return FireGate::MagEmpty;
+    if (w.magUsed >= kMagCapacity) {                               // ③ 卫哨（2026-11-05 死窗根除后常规路径不可达：
+        w.reloadUntilMs = nowMs + kReloadMs;                       //  ConsumeAmmo 扣弹即上钟）——防御绕过 Fire
+        return FireGate::MagEmpty;                                 //  扣弹路径的空匣（直改状态/未来 bot）
     }
     if (w.bHasFired && nowMs - w.lastFireMs < kFireMinIntervalMs)  // ④ 射速窗口（容差 95ms）
         return FireGate::RateLimited;
     return FireGate::Ok;
+}
+
+/** 消费一发 + 空匣即上钟（2026-11-05 死窗根除）：换弹钟在打空瞬间（扣弹时刻）即上——
+ *  "服务器权威计时"名副其实。原实现把触发寄存在 ConsumeWeaponGate ③（下一发尝试才
+ *  发现空匣），比客户端本地钟（打空瞬间上）晚整个客户端换弹窗 2.5s → 每匣一次的复火
+ *  死窗（2026-11-05 用户日志三窗口 38 发零判定实锤；同场手动 R 29 号对照组无死窗）。
+ *  到期补满仍走 ConsumeWeaponGate ② 惰性完成——一条状态机不打断。双端钟差=打空弹的
+ *  单向时延（≤RTT）：客户端补满后首发到达 ≥ 服务器到期（本地门保证不早发），边界
+ *  相撞由 v4.6 拒收回补自愈（≤1 发，客户端拒收 Warning 日志可见）。 */
+inline void ConsumeAmmo(WeaponState& w, std::uint64_t nowMs) {
+    ++w.magUsed;
+    if (w.magUsed >= kMagCapacity) w.reloadUntilMs = nowMs + kReloadMs;   // 空匣即上钟（打空弹=换弹第一帧）
 }
 
 inline float DamageApply(float hp) { return std::max(0.f, hp - kDamagePerShot); }   // 钳 0 不死（D5-02v2）
