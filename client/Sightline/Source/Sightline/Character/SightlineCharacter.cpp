@@ -391,7 +391,7 @@ void ASightlineCharacter::StartDeathFX() {
 
 void ASightlineCharacter::EnterRagdoll() {
     USkeletalMeshComponent* MeshComp = GetMesh();
-    if (!MeshComp || MeshComp->IsSimulatingPhysics()) return; // 幂等（重复 23 号/交接钟竞态）
+    if (!MeshComp || bRagdolled) return;                     // 幂等（重复 23 号/交接钟竞态）
     if (UAnimInstance* Anim = MeshComp->GetAnimInstance())
         SavedMeshAnimClass = Anim->GetClass();               // ABP 类存档（重生还原；GetAnimClass 已弃用）
     SavedMeshProfile = MeshComp->GetCollisionProfileName();
@@ -400,26 +400,34 @@ void ASightlineCharacter::EnterRagdoll() {
     MeshComp->SetAnimInstanceClass(nullptr);                 // 停 ABP 写位姿（与物理相搏=尸体抽搐）
     MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
     MeshComp->SetSimulatePhysics(true);                      // 引擎标准布娃娃：自动摘挂+全身物理（PA_Mannequin）
+    bRagdolled = true;
+    UE_LOG(LogSightline, Log, TEXT("[死亡FX] 布娃娃 parent=%s simOn=%d anim=%s"),
+           SavedMeshParent ? TEXT("有") : TEXT("无"),
+           MeshComp->IsSimulatingPhysics() ? 1 : 0,
+           SavedMeshAnimClass ? TEXT("有") : TEXT("无"));
 }
 
 void ASightlineCharacter::EndDeathFX() {
     GetWorldTimerManager().ClearTimer(DeathFxTimer);         // 死亡→瞬重生窗口的交接钟一并清
     EndInvulnBlink();                                        // 闪烁还原（幂等）
     USkeletalMeshComponent* MeshComp = GetMesh();
-    if (!MeshComp) return;
-    const bool bWasRagdolled = MeshComp->IsSimulatingPhysics() ||
-        (SavedMeshParent != nullptr && MeshComp->GetAttachParent() != SavedMeshParent);
-    if (!bWasRagdolled) return;                              // 未曾布娃娃：零副作用（防误 null 活人 ABP）
+    if (!MeshComp || !bRagdolled) { bRagdolled = false; return; }   // 未布娃娃：零副作用（防误伤活人 ABP）
+    const bool bDetached = (MeshComp->GetAttachParent() != SavedMeshParent);
     MeshComp->SetSimulatePhysics(false);
     MeshComp->SetAllBodiesSimulatePhysics(false);
     if (SavedMeshProfile != NAME_None) MeshComp->SetCollisionProfileName(SavedMeshProfile);
-    if (SavedMeshParent != nullptr && MeshComp->GetAttachParent() != SavedMeshParent) {
-        // ★回挂原父件+摆回原始相对位姿（UE 布娃娃还原经典坑：起物理自动摘挂，不回挂=网格体
-        //   永远躺在第一次倒下的世界位/姿态——胶囊带着躺姿走="移动的是躺着的尸体"）
+    // ★回挂原父件+摆回原始相对位姿，两步都无条件（UE 布娃娃还原经典坑：起物理自动摘挂，不回挂=
+    //   网格体永远躺在第一次倒下的世界位/姿态——胶囊带着躺姿走="移动的是躺着的尸体"；
+    //   未摘挂但相对位姿被物理拖走的变体同样被 SetRelativeTransform 覆盖）
+    if (SavedMeshParent != nullptr && IsValid(SavedMeshParent))
         MeshComp->AttachToComponent(SavedMeshParent, FAttachmentTransformRules::KeepRelativeTransform);
-        MeshComp->SetRelativeTransform(SavedMeshRelTransform);
-    }
-    MeshComp->SetAnimInstanceClass(SavedMeshAnimClass);      // ABP 复职（最后一步：位姿骨架已就位）
+    MeshComp->SetRelativeTransform(SavedMeshRelTransform);
+    MeshComp->SetAnimInstanceClass(SavedMeshAnimClass);      // ABP 复职（最后一步：骨架位已就位）
+    bRagdolled = false;
+    UE_LOG(LogSightline, Log, TEXT("[死亡FX] 还原 detached=%d parent=%s anim=%s"),
+           bDetached ? 1 : 0,
+           MeshComp->GetAttachParent() ? TEXT("有") : TEXT("无"),
+           SavedMeshAnimClass ? TEXT("有") : TEXT("无"));
 }
 
 void ASightlineCharacter::StartInvulnBlink(float InvulnSec) {

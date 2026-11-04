@@ -231,6 +231,8 @@ private:
     FName SavedMeshProfile = NAME_None;            // 死亡时保存网格碰撞 Profile（还原不硬编码）
     UPROPERTY(Transient) TObjectPtr<USceneComponent> SavedMeshParent = nullptr;    // 布娃娃起物理=引擎自动摘挂——还原必须回挂原父件
     FTransform SavedMeshRelTransform = FTransform::Identity;  // 原始相对位姿（布娃娃前、仍挂接时存档）
+    bool bRagdolled = false;                       // 布娃娃状态权威标志（EnterRagdoll 置位/EndDeathFX 清除——
+                                                   //  还原以它为准，不做运行时状态推断）
     FTimerHandle DeathFxTimer;                     // 蒙太奇→布娃娃交接钟
     FTimerHandle InvulnBlinkTimer;                 // 闪烁周期钟（100ms）
     FTimerHandle InvulnEndTimer;                   // 无敌窗到期还原钟
