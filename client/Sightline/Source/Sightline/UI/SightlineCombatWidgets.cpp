@@ -251,6 +251,10 @@ void UResultWidgetBase::OnLeaveClicked()
     // ep07 收官：走契约 10 号离房（连接保持）——服务器移出房间广播 ROOM_LIST → GI 既有流程
     // "切回大厅世界+显示大厅"（2026-11-05 用户实锤"点返回大厅后大厅页面没有显示"：
     //  原接 NotifyLinkLost=断链回登录，大厅自然不显示）
-    if (Session.IsValid()) Session->SendLeaveRoom();
+    if (Session.IsValid())
+    {
+        Session->SendLeaveRoom();                      // 契约 10 号：服务器侧对局离场+移出房间
+        Session->NotifyLinkLost();                     // 客户端镜像：清 bInMatch/Registry（调试面板/和解 HUD 随离开收起）
+    }
     SetVisibility(ESlateVisibility::Collapsed);
 }

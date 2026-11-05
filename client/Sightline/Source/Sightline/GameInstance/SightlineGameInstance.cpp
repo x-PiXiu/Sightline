@@ -10,6 +10,7 @@
 #include "Game/SightlineDecalManagerSubsystem.h"
 #include "Game/SightlineGameMode.h"
 #include "GameFramework/Pawn.h"
+#include "Containers/Ticker.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -574,8 +575,25 @@ void USightlineGameInstance::HandleRoomListForUI(const TArray<FRoomInfo>& Rooms)
             if (APlayerController* PC = GetFirstLocalPlayerController())
                 PC->ClientTravel(TEXT("/Engine/Maps/Templates/OpenWorld"), ETravelType::TRAVEL_Absolute);
             UE_LOG(LogSightline, Log, TEXT("[GI] 离开对局 → 切回大厅世界"));
+            // 大厅 UI 延迟显示（2026-11-05 用户实锤"落在空场景"）：ShowLobbyScreen 原
+            // 同步执行=控件建进将死的旧世界，异步 LoadMap 完成连控件一起拆 → 新世界空无一物。
+            // FTSTicker 挂引擎全局核（跨世界切换存活）0.7s 守门=等 OpenLevel 落定（与
+            // PendingArenaSpawn 0.6s 同族先例），顺带 EnsureUIMouseCursor（对局中鼠标隐藏）
+            TWeakObjectPtr<USightlineGameInstance> WeakThis(this);
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+                [WeakThis](float) {
+                    if (WeakThis.IsValid())
+                    {
+                        WeakThis->ShowLobbyScreen();
+                        WeakThis->EnsureUIMouseCursor();
+                    }
+                    return false;                          // 单次
+                }), 0.7f);
         }
-        ShowLobbyScreen();
+        else
+        {
+            ShowLobbyScreen();                             // 非对局中（房间→大厅列表）：无切图，即时显示
+        }
     }
 }
 
