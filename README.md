@@ -14,7 +14,7 @@
 | 第 3 期 · 移动同步 + 网络滑块 | [BV1NYn56zEyk](https://www.bilibili.com/video/BV1NYn56zEyk/) | `ep03` | 朴素移动同步，损伤滑块 0~300ms | 30Hz 上报每包 21B |
 | 第 4 期 · 预测 · 和解 · 插值 | [BV1X3nY6iEfE](https://www.bilibili.com/video/BV1X3nY6iEfE/) | `ep04` | 三部曲 + 主从 Reactor + 压测 | 3 万同时在线全绿；单测 125 断言 |
 | 第 5 期 · hitscan 与服务器权威命中 | 待定时 | `ep05` | 20 号空包 + 四道门 + 解析求交 + 贴花管理器 | 全链 RTT 45ms（判定 1ms）；单测 160 断言 |
-| 第 6 期 · 延迟补偿回溯 | 待定时 | `ep06` | 历史环 32 槽 + judgeAt=now−rtt + 22 号上报 + 幽灵三色 | 回溯关 21.4%→开 39.7%（滑块 300ms）；单测 97 断言 |
+| 第 6 期 · 延迟补偿回溯 | [BV1u8x46ZE7R](https://www.bilibili.com/video/BV1u8x46ZE7R/) | `ep06` | 历史环 32 槽 + judgeAt=now−rtt + 22 号上报 + 幽灵三色 | 回溯关 21.4%→开 39.7%（滑块 300ms）；单测 97 断言 |
 | 第 7 期 · 死亡与结算 | 已定时 | `ep07` | 服务器权威死亡/重生/结算 + 人机三件套 + 比分板 + 死窗根除（扣弹即上钟） | 一局完整对局 ≈85s；死窗 38/147 发→0；单测 238 断言 |
 
 每期代码快照 = 对应 tag，可 `git checkout epNN` 复现当期状态。
