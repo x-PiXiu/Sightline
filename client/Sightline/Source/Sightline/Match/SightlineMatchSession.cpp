@@ -122,7 +122,11 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             const uint8 NameLen = Payload[Off]; ++Off;
             if (Payload.Num() < Off + NameLen + 1) return;
             FUTF8ToTCHAR ToTchar(reinterpret_cast<const ANSICHAR*>(&Payload[Off]), NameLen);
-            S.Name = FString(ToTchar.Get(), ToTchar.Length());
+            // ⚠ UE 无 (指针,拷贝长度) FString 构造——FString(ptr, N) 绑定的是弃用的 (Str, ExtraSlack)
+            //  =NUL 结尾 strlen 语义；而 FUTF8ToTCHAR 精确长度缓冲不补 NUL → strlen 越界读堆残留 →
+            //  名字拖任意垃圾字符（实锤：cdp䁡/Bot1寿陇翿/cdp☾ 随分配漂移 → Slate 字形回退逐帧刷屏）。
+            //  修=ConstructFromPtrSizeWithSlack 按 Len 精确拷贝（5.7 引擎源码实勘 ConstructWithLength）。
+            S.Name = FString::ConstructFromPtrSizeWithSlack(ToTchar.Get(), ToTchar.Length(), 0);
             FString HexStr;                                    // 名字乱码定案（2026-11-03"Bot1寿陇翿"）：
             for (int32 b = 0; b < NameLen; ++b)                // 线上探针已证服务端字节干净（426f7431），
                 HexStr += FString::Printf(TEXT("%02X "), Payload[Off + b]);   // 此行回显客户端实收字节
