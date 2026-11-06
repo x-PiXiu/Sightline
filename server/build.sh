@@ -16,6 +16,21 @@ if [[ "${SIGHTLINE_REQUIRE_DEPS:-0}" == "1" ]]; then
     DEPS_FLAGS="-DSIGHTLINE_REQUIRE_DEPS=1"
 fi
 
+# 步骤 4：lua5.4 + vendored sol2 条件接入（缺库=零依赖 lite 构建照跑·E2 同哲学；
+# scripting_lua.cpp 有 #if 守卫，缺 lua 时 glob 进来也是空 TU）
+LUA_LIB=""
+LUA_INC=""
+for d in /usr/include/lua5.4 /usr/local/include/lua5.4; do
+    [ -f "$d/lua.h" ] && LUA_INC="-I$d"
+done
+if [ -n "$LUA_INC" ] && [ -f third_party/sol2/include/sol/sol.hpp ]; then
+    FLAGS="$FLAGS $LUA_INC -I third_party/sol2/include -DSIGHTLINE_HAS_LUA=1"
+    LUA_LIB="-llua5.4"
+    echo "· Lua 5.4 + sol2 已接入（步骤 4）"
+else
+    echo "· Lua 未接入（缺 lua5.4 或 sol2——零依赖 lite 构建）"
+fi
+
 build_deps() {
     # shellcheck disable=SC2086
     $CXX $FLAGS $DEPS_FLAGS tests/deps_smoke.cpp -o /tmp/deps_smoke
@@ -27,7 +42,7 @@ build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
         src/match/match_service.cpp src/adapters/*.cpp \
-        -o sightline_server -lpthread
+        -o sightline_server -lpthread $LUA_LIB
     echo "✓ sightline_server 编译完成"
 }
 
@@ -47,8 +62,14 @@ build_test() {
     $CXX $FLAGS tests/test_ports.cpp -o /tmp/test_ports   # ep08 步骤 2：端口/值对象/纯策略（零依赖）
     /tmp/test_ports
     # shellcheck disable=SC2086
-    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp -o /tmp/test_config  # 步骤 3：配置体系
+    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp src/logger/logger.cpp -o /tmp/test_config $LUA_LIB  # 步骤 3：配置体系（logger=scripting_lua 的日志依赖·步骤 4 连带）
     /tmp/test_config
+    if [ -n "$LUA_INC" ]; then
+        # shellcheck disable=SC2086
+        $CXX $FLAGS tests/test_lua_policy.cpp src/adapters/scripting_lua.cpp src/logger/logger.cpp \
+            -o /tmp/test_lua_policy $LUA_LIB   # 步骤 4：Lua 策略对拍/门禁
+        /tmp/test_lua_policy
+    fi
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_v48.cpp src/match/match_service.cpp -o /tmp/test_v48  # 步骤 6：契约 v4.8
     /tmp/test_v48

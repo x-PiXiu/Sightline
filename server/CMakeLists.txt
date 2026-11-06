@@ -27,9 +27,12 @@ set(SIGHTLINE_OPTIONAL_INCS "")
 
 if(SIGHTLINE_ENABLE_LUA)
     find_package(Lua 5.4 REQUIRED)
-    find_path(SOL2_INCLUDE_DIR "sol/sol.hpp")
+    # sol2 默认用仓库 vendored 版（third_party/sol2·v3.3.1 版本锁死·步骤 1 入仓）
     if(NOT SOL2_INCLUDE_DIR)
-        message(FATAL_ERROR "SIGHTLINE_ENABLE_LUA=ON 但找不到 sol/sol.hpp（sol2 为 header-only，请设置 SOL2_INCLUDE_DIR）")
+        set(SOL2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/sol2/include)
+    endif()
+    if(NOT EXISTS "${SOL2_INCLUDE_DIR}/sol/sol.hpp")
+        message(FATAL_ERROR "SIGHTLINE_ENABLE_LUA=ON 但找不到 sol/sol.hpp（设 SOL2_INCLUDE_DIR 或拉 third_party/sol2）")
     endif()
     list(APPEND SIGHTLINE_OPTIONAL_LIBS ${LUA_LIBRARIES})
     list(APPEND SIGHTLINE_OPTIONAL_INCS ${LUA_INCLUDE_DIR} ${SOL2_INCLUDE_DIR})
@@ -81,6 +84,12 @@ add_library(sightline_adapters STATIC
     src/adapters/config_service.cpp
 )
 target_include_directories(sightline_adapters PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# 步骤 4：Lua 适配层仅在 ENABLE_LUA=ON 时入编（宏同时门控 main.cpp 的接线与测试注册）
+if(SIGHTLINE_ENABLE_LUA)
+    target_sources(sightline_adapters PRIVATE src/adapters/scripting_lua.cpp)
+    target_compile_definitions(sightline_adapters PUBLIC SIGHTLINE_HAS_LUA=1)
+    target_include_directories(sightline_adapters PUBLIC ${LUA_INCLUDE_DIR} ${SOL2_INCLUDE_DIR})
+endif()
 
 # ============ 第 3 期：服务器本体（装配根） ============
 add_executable(sightline_server
@@ -142,3 +151,11 @@ add_test(NAME test_config COMMAND test_config)
 add_executable(test_v48 tests/test_v48.cpp)
 target_link_libraries(test_v48 PRIVATE sightline_match)
 add_test(NAME test_v48 COMMAND test_v48)
+
+# ============ ep08 步骤 4：Lua 策略对拍/门禁（ENABLE_LUA 时才编）============
+if(SIGHTLINE_ENABLE_LUA)
+    add_executable(test_lua_policy tests/test_lua_policy.cpp)
+    target_link_libraries(test_lua_policy PRIVATE sightline_adapters sightline_core ${LUA_LIBRARIES})   # core=logger（scripting_lua 日志依赖）
+    # WORKING_DIRECTORY=源码根：测试读 assets/scripts/damage.lua 相对路径（build.sh 从源码根跑·同约定）
+    add_test(NAME test_lua_policy COMMAND test_lua_policy WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()

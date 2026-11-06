@@ -62,6 +62,7 @@ public:
         if (head == "rollback") return Command{Command::Kind::Rollback, {}};
         if (head == "version")  return Command{Command::Kind::Version, {}};
         if (head == "help")     return Command{Command::Kind::Help, {}};
+        if (head == "patch")    return Command{Command::Kind::Patch, rest};   // patch <name>：脚本名，源码由运行时自读 scriptDir
         return Command{Command::Kind::Help, "未知命令: " + head};
     }
 

@@ -30,7 +30,12 @@
 #include "adapters/lobby_wiring.h"
 #include "adapters/map_geometry.h"
 #include "adapters/match_wiring.h"
-#include "adapters/config_service.h"          // ep08 步骤 3：配置适配器（4 个端口同一对象）
+#include "adapters/config_service.h"
+#include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
+
+#ifndef SIGHTLINE_HAS_LUA
+#define SIGHTLINE_HAS_LUA 0
+#endif          // ep08 步骤 3：配置适配器（4 个端口同一对象）
 #include "adapters/stdin_command_source.h"
 #include "adapters/null_persistence.h"
 #include "adapters/wire_sink.h"
@@ -134,6 +139,13 @@ namespace {
         }
         return candidates.front();   // 不存在 = 内建默认配置（v0-builtin），lite 裸跑
     }
+
+    // 步骤 4：脚本目录 = 配置文件所在目录（同一白名单解析链的 parent——路径只解析一次）
+    std::string ResolveScriptDir() {
+        const std::string cfg = ResolveConfigPath();
+        const auto pos = cfg.find_last_of("/\\");
+        return pos == std::string::npos ? std::string("assets/scripts") : cfg.substr(0, pos);
+    }
 } // namespace
 
 int main() {
@@ -195,11 +207,32 @@ int main() {
     adapters::StdinCommandSource commands;                  // reload / rollback / version / help
     adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
     adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
-    // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线——此前 OrchestratorDeps
-    // 持 damage/bot 指针零引用=空挂；编排器只经五视图组装 GameConfig 推给 MatchService）
-    match.SetDamagePolicy(&damagePolicy);
+    // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
+    // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
+    // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 才建，此前 LuaBotPolicy 内部走内建=行为零变化。
     botDriver.SetBotTuning(&config);
+#if SIGHTLINE_HAS_LUA
+    auto luaRt = adapters::LuaRuntime::Create(
+        adapters::LuaRuntimeConfig{ResolveScriptDir(), 32u * 1024 * 1024});
+    std::unique_ptr<adapters::LuaDamagePolicy> luaDmg;
+    std::unique_ptr<adapters::LuaBotPolicy> luaBot;
+    adapters::LuaRuntime* patchChan = nullptr;
+    if (luaRt) {                       // E2：状态都起不来 → 整体落回内建（服务照起）
+        luaDmg = std::make_unique<adapters::LuaDamagePolicy>(luaRt, &config);
+        luaBot = std::make_unique<adapters::LuaBotPolicy>(luaRt);
+        match.SetDamagePolicy(luaDmg.get());
+        botDriver.SetBotPolicy(luaBot.get());
+        patchChan = luaRt.get();       // patch 命令通道（§10.2.6 唯一新增注入位）
+        LOG_INFO("[Lua] 策略层已接（damage=lua·bot=lua(步8生效)·patch=可用）");
+    } else {
+        match.SetDamagePolicy(&damagePolicy);
+        botDriver.SetBotPolicy(&botPolicy);
+        LOG_WARNING("[Lua] 运行时创建失败——全量内建兜底");
+    }
+#else
+    match.SetDamagePolicy(&damagePolicy);
     botDriver.SetBotPolicy(&botPolicy);
+#endif
     sightline::application::ApplicationOrchestrator app{
         sightline::application::OrchestratorDeps{
             .now = nowMs,
@@ -213,6 +246,9 @@ int main() {
             .audit = persistence,
             .board = persistence,
             .version = config,
+#if SIGHTLINE_HAS_LUA
+            .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
+#endif
             .match = match,
             .botDriver = botDriverPort,
             .lobby = lobby,

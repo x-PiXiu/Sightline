@@ -77,7 +77,7 @@ struct AuditRecord {
 };
 
 struct ConsoleCommand {
-    enum class Kind { Reload, Rollback, Version, Help };
+    enum class Kind { Reload, Rollback, Version, Help, Patch };   // Patch=步骤4（arg=脚本名）
     Kind kind = Kind::Help;
     std::string arg;   // reload [note] 的操作动机（§3.6 / v1.4 补齐）
 };

@@ -113,9 +113,24 @@ private:
         case ConsoleCommand::Kind::Version:
             SetNotice("version: " + d_.version.Version());   // v1.6：按值返回
             break;
+        case ConsoleCommand::Kind::Patch: {
+            // 步骤 4：公式/决策面热修（IPatchChannel）。source 空=运行时自读 scriptDir（IO 在适配器）。
+            // patch 审计行随步骤 5 AuditWal 落库（lite 下 LOG 行已带时间戳记录——双钟分立：
+            // 这里不拿 steady 的 d_.now() 充当 UTC 审计时钟）。
+            if (!d_.patches) {
+                SetNotice("patch 未启用（Lua 运行时未装——构建缺 lua5.4 或未注入）");
+            } else {
+                const auto r = d_.patches->Patch(c.arg, {});
+                if (r.ok)
+                    d_.wire.BroadcastConfig(d_.version.Snapshot());   // §10.2.3：伤害输出可能变→刷新 30 号
+                SetNotice(r.ok ? "patch 生效 " + r.versionOrError
+                               : "patch 拒收: " + r.versionOrError);
+            }
+            break;
+        }
         case ConsoleCommand::Kind::Help:
             SetNotice(c.arg.empty()
-                ? "命令: reload [note] | rollback | version | help"
+                ? "命令: reload [note] | rollback | version | patch <name> | help"
                 : c.arg);
             break;
         }
