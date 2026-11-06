@@ -38,8 +38,16 @@ struct ConfigWireSnapshot {
 
 struct IConfigVersion {
     virtual ~IConfigVersion() = default;
-    virtual std::string_view Version() const = 0;
+    virtual std::string Version() const = 0;                  // 按值返回（v1.6：view 指可变成员=reload 后悬垂）
     virtual ConfigWireSnapshot Snapshot() const = 0;   // G5：MatchWiring 拼 30 号只读这里
+};
+
+// 死亡/重生/回溯规则视图（v1.6 收口③）：deathmatch/rewind 两组此前零消费者（改 respawn_ms 不生效）。
+// ISP：MatchService 需要的规则面独立成口，不牵动武器/公式/审计。
+struct IMatchRules {
+    virtual ~IMatchRules() = default;
+    virtual sightline::match::DeathmatchRules Deathmatch() const = 0;
+    virtual sightline::match::RewindRules Rewind() const = 0;
 };
 
 // —— 辅助 POD：用例层拥有，适配器只返回/消费（禁止用例层 import 适配器类型）——

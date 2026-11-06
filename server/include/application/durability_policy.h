@@ -9,12 +9,7 @@
 
 namespace sightline::application {
 
-struct QueueState {
-    std::size_t depth = 0;
-    std::size_t capacity = 0;   // 0 表示不设上限（仅调试用）
-    Durability cls = Durability::BestEffort;
-    SinkHealth health{};
-};
+// QueueState 已上移 ports.h（v1.6：IMatchArchive::State() 按值返回，完整定义须在端口头）。
 
 struct DurabilityPolicy {
     static QueueAction Classify(const QueueState& s) {

@@ -1,6 +1,7 @@
 // wire_sink.h —— ep08 步骤 3：把既有 FrameWriter 适配成用例层 IWireSink 端口
 // 用例层不认识 FrameWriter；这一层只做 span → vector 的形状转换（谦卑对象）。
-// BroadcastConfig 在步骤 6 契约 v4.8 落地时由本类实现 30 号广播。
+// BroadcastConfig（v1.6 收口⑥）：快照由编排器传入（用例定时机与内容），本层只编码下发——
+// 端口入参不再被丢弃，FrameWriter 不再自持 IConfigVersion*（第二入口已灭）。
 #pragma once
 #include <span>
 #include <vector>
@@ -19,9 +20,8 @@ public:
         writer_.deliverMatch(v);
     }
 
-    // 30 号 S2C_CONFIG_VERSION 广播：编排器只发意图，载荷组装留在 FrameWriter（G5）
-    void BroadcastConfig(const sightline::application::ConfigWireSnapshot&) override {
-        writer_.BroadcastConfigVersion();
+    void BroadcastConfig(const sightline::application::ConfigWireSnapshot& snap) override {
+        writer_.BroadcastConfigVersion(snap);   // 入参真正被用（v1.6：不再忽略快照另取视图）
     }
 
 private:

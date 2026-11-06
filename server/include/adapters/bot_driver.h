@@ -12,11 +12,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "application/config_views.h"   // v1.6 G2：IBotTuning 视图（bot 段热更即时生效）
 #include "lobby/lobby.h"
 #include "logger/logger.h"
 #include "match/bot_brain.h"
 #include "match/match_service.h"
 #include "match/nav_grid.h"
+#include "match/policies.h"              // v1.6 收口②：IBotPolicy（决策策略端口）
 #include "match/perception.h"
 
 namespace adapters {
@@ -152,6 +154,10 @@ public:
         return out;
     }
 
+    // v1.6 收口②/G2：组合根注入——配置视图（bot 段热更即时）与决策策略（步骤 4 换 Lua 实现同口）。
+    void SetBotTuning(const sightline::application::IBotTuning* t) { tuning_ = t; }
+    void SetBotPolicy(sightline::match::IBotPolicy* p) { botPolicy_ = p; }
+
 private:
     struct Bot {
         std::uint32_t pid = 0;
@@ -172,7 +178,14 @@ private:
         bool wasDead = false;
     };
 
-    static sightline::match::BotTuning TuneFor(std::uint8_t diff) {
+    // v1.6 注入位：配置视图（G2·中档基准热更）+ 决策策略（收口②·步骤 4 换 Lua 同口）。
+    // 组合根注入，进程期存活；nullptr=内建路径（测试/未注入零变化）。
+    const sightline::application::IBotTuning* tuning_ = nullptr;
+    sightline::match::IBotPolicy* botPolicy_ = nullptr;
+
+    // G2（v1.6）：中档（默认 diff=1）=配置表 bot 段（IBotTuning 视图·热更即时生效）；
+    // 0/2 档保留内置绝对档位（难度档位进表=后续演进，ep08 范围外）。
+    sightline::match::BotTuning TuneFor(std::uint8_t diff) const {
         sightline::match::BotTuning t;
         if (diff == 0) {                                     // 易：反应慢·误差大·枪稀
             t.reactMs = 400.f; t.errStartDeg = 6.f; t.errEndDeg = 3.f; t.errDecayDegPerS = 1.5f;
@@ -180,6 +193,8 @@ private:
         } else if (diff >= 2) {                              // 难：反应快·误差小·枪密
             t.reactMs = 120.f; t.errStartDeg = 2.f; t.errEndDeg = 0.5f; t.errDecayDegPerS = 5.f;
             t.fireIntervalMs = 250.f;
+        } else {
+            return tuning_ ? tuning_->Get() : sightline::match::BotTuning{};   // 中=配置表
         }
         return t;
     }
@@ -229,8 +244,11 @@ private:
         if (!waypoints_.empty()) w.patrolTarget = waypoints_[b.wp % waypoints_.size()];
 
         // ── 行动·移动（栅格寻路兜底：LOS 直行 / 否则 A* 路径逐段走）──
-        sightline::match::BotIntent intent =
-            sightline::match::Decide(w, b.st, b.mem, nowMs, t);   // 非常量：moveTarget 出界钳制就地改写
+        // 收口②：决策走策略端口（未注入=内建 Decide 原路径——238 断言零变化；注入后
+        // Builtin=Sanitize(Decide)，步骤 4 换 Lua 实现同口）
+        sightline::match::BotIntent intent = botPolicy_
+            ? botPolicy_->Decide(w, b.st, b.mem, nowMs, t)
+            : sightline::match::Decide(w, b.st, b.mem, nowMs, t);   // 非常量：moveTarget 出界钳制就地改写
         if (intent.hasMove) {
             intent.moveTarget = ClampMoveTarget(nav_, intent.moveTarget);   // 意图目标钳制（见函数注释；权威边界在域层 UpdateEntity）
             const bool direct = sightline::match::GridLOS(

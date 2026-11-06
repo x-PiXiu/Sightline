@@ -12,10 +12,10 @@
 
 #include "application/config_views.h"
 #include "application/durability_policy.h"
-#include "application/policies.h"
 #include "application/ports.h"
 #include "lobby/lobby.h"
 #include "match/match_service.h"
+#include "match/policies.h"        // v1.6：端口已迁 match/（消费方拥有——见 policies.h 头注）
 
 namespace sightline::application {
 
@@ -23,14 +23,14 @@ struct OrchestratorDeps {
     std::function<std::uint64_t()> now;          // ADR-1 单钟：main.cpp:78 nowMs，唯一注入点
     IConfigSource&  config;
     ICombatParams&  combat;
+    IBotTuning&     tuning;              // v1.6 收口③：bot 段（ApplyConfig 用）
+    IMatchRules&    rules;               // v1.6 收口③：deathmatch/rewind（此前零消费者）
     ICommandSource& commands;
     IWireSink&      wire;
     IMatchArchive&  archive;
     IAuditSink&     audit;
     ILeaderboard&   board;
     IConfigVersion& version;
-    IDamagePolicy*  damage = nullptr;            // 步骤 4 接 Lua 策略
-    IBotPolicy*     bot = nullptr;
     IPatchChannel*  patches = nullptr;          // 步骤 4 注入 LuaRuntime；步骤 3 为空
     match::MatchService&       match;
     IBotDriver&                botDriver;
@@ -40,7 +40,7 @@ struct OrchestratorDeps {
 class ApplicationOrchestrator {
 public:
     explicit ApplicationOrchestrator(OrchestratorDeps d) : d_(std::move(d)) {
-        ApplyWeaponTable();        // 启动即把配置表投喂给对局用例（默认表逐字段等于 ep07 常量）
+        ApplyConfig();              // 启动即把完整规则快照投喂对局用例（默认=ep07 常量）
     }
 
     void OnFrame() {
@@ -55,12 +55,20 @@ public:
             if (e.type == MatchEvent::Type::Ended) d_.lobby.SetRoomInMatch(e.roomId, false);
     }
 
-    // 事件源 ③：MatchWiring 20 号处理器经回调把 Fire 事件送到同一订阅点（B1 修复）
-    void OnFireEvents(std::vector<MatchEvent> events) { Fanout(events); }
+    // 事件源 ③：MatchWiring 的 Fire/StartMatch/RemovePlayer 处理器经回调送同一订阅点（B1 修复）。
+    // v1.6 收口⑥：MatchStart 在此触发 30 号广播——「开局先 15 号后 30 号」的时序归用例层
+    // （此前由 FrameWriter 内部在 MatchStart 编码后自播=第二数据入口，已收敛为端口单一入口）。
+    void OnWiringEvents(std::vector<MatchEvent> events) {
+        bool bStart = false;
+        for (const auto& e : events)
+            if (e.type == MatchEvent::Type::MatchStart) bStart = true;
+        Fanout(events);                                        // 15 号先出（DeliverMatch）
+        if (bStart) d_.wire.BroadcastConfig(d_.version.Snapshot());   // 30 号随后
+    }
 
     // G4：配置变更是独立域事件，不混进 MatchEvent 流；编排器订阅后写审计 + 触发 30 号广播。
     void OnConfigChanged(const ConfigChanged& e) {
-        ApplyWeaponTable();        // 数值类即时生效：下一发即按新表判定（§3.5 演示第一拍）
+        ApplyConfig();         // 数值类即时生效：下一发即按新表判定（§3.5 演示第一拍）
         d_.audit.Append(AuditRecord{e.version, e.note, "config_service", e.diffDigest, e.atUtcMs});
         d_.wire.BroadcastConfig(d_.version.Snapshot());
         SetNotice("配置生效 " + e.version + " · " + e.note);
@@ -75,12 +83,19 @@ public:
 private:
     void SetNotice(std::string s) { notice_ = std::move(s); }
 
-    // 配置表 → 对局用例的纯值快照（用例层不认识 ConfigService；只经三张只读视图）
-    void ApplyWeaponTable() {
-        std::array<match::WeaponParams, 4> table{};
-        for (std::size_t i = 0; i < table.size(); ++i)
-            table[i] = d_.combat.Weapon(static_cast<match::EWeaponType>(i));
-        d_.match.SetWeaponTable(table, d_.version.Snapshot().weaponCount, d_.combat.MaxHp());
+    // 完整规则快照 → 对局用例（用例层不认识 ConfigService；经五张只读视图组装 GameConfig）。
+    // v1.6 收口③：deathmatch/rewind/bot 三组随行——此前只推武器表，改 respawn_ms 不生效。
+    void ApplyConfig() {
+        match::GameConfig c;                       // 默认=ep07 常量（视图缺项时安全回退）
+        c.maxHp = d_.combat.MaxHp();
+        for (std::size_t i = 0; i < c.weapons.size(); ++i)
+            c.weapons[i] = d_.combat.Weapon(static_cast<match::EWeaponType>(i));
+        c.weaponCount = d_.version.Snapshot().weaponCount;
+        c.formula = d_.combat.Formula();
+        c.bot = d_.tuning.Get();
+        c.deathmatch = d_.rules.Deathmatch();
+        c.rewind = d_.rules.Rewind();
+        d_.match.SetConfig(c);
     }
 
     void Dispatch(const ConsoleCommand& c) {
@@ -96,7 +111,7 @@ private:
             SetNotice("rollback → 内存回退上一版（与磁盘分叉）");
             break;
         case ConsoleCommand::Kind::Version:
-            SetNotice("version: " + std::string(d_.version.Version()));
+            SetNotice("version: " + d_.version.Version());   // v1.6：按值返回
             break;
         case ConsoleCommand::Kind::Help:
             SetNotice(c.arg.empty()
@@ -109,16 +124,33 @@ private:
     void Fanout(std::span<const MatchEvent> es) {
         if (es.empty()) return;
         d_.wire.DeliverMatch(es);
-        // 事件分级（§5.3）：终局/击杀=Must，其余 BestEffort；纯策略分类结果在步骤 5
-        // 由 persistence worker 执行 WAL / 丢弃计数，此处只把决策与事件一并交付。
+        // §5.3 分级（v1.6 收口⑤）：终局/击杀=Must，其余 BestEffort——
+        // 决策归纯策略（DurabilityPolicy），执行归 sink（按 QueueAction 真分派，不再
+        // 「算出 SpillToWal 却只当 !=DropAndCount 用」的假分派）；状态由执行者自报（State()）。
         Durability cls = Durability::BestEffort;
-        for (const auto& e : es)
+        for (const auto& e : es) {
             if (e.type == MatchEvent::Type::Ended || e.type == MatchEvent::Type::Kill)
                 cls = Durability::Must;
-        const QueueState st{0, 1024, cls, SinkHealth{}};
-        if (DurabilityPolicy::Classify(st) != QueueAction::DropAndCount)
+            if (e.type == MatchEvent::Type::Kill)
+                d_.board.OnKill(e.killKiller);   // 榜单真接线（此前 (void)d_.board 悬空）
+        }
+        QueueState st = d_.archive.State();      // 执行者自报（lite：无界+恒健康）
+        st.cls = cls;
+        switch (DurabilityPolicy::Classify(st)) {
+        case QueueAction::Enqueue:
             d_.archive.Ingest(es, cls);
-        (void)d_.board;   // 步骤 5：Kill 事件 → 榜单增量
+            break;
+        case QueueAction::SpillToWal:
+            // lite 无 WAL 执行者（步骤 5 装）：Must 事件降级到计数执行者——
+            // 真实 WAL 落地时此分支改交 AuditWal；降级路径必须在此显式可见（不许静默）。
+            d_.archive.Ingest(es, cls);
+            break;
+        case QueueAction::DropAndCount:
+            break;                               // BestEffort 满：丢（lite 无队列走不到）
+        case QueueAction::Defer:
+            d_.archive.Ingest(es, cls);          // 步骤 5：延迟重试语义
+            break;
+        }
     }
 
     OrchestratorDeps d_;

@@ -34,8 +34,8 @@ public:
     // ep08 步骤 3（B1 修复）：Fire 是第三处事件源。注入后由编排器统一扇出，
     // MatchWiring 不认识编排器类型（只有 std::function），也不直接依赖任何具体 sink；
     // 未注入时保持 ep07 原路径，238 断言与既有行为零变化。
-    using FireEventSink = std::function<void(std::vector<sightline::match::MatchEvent>&&)>;
-    void SetFireEventSink(FireEventSink cb) { fireSink_ = std::move(cb); }
+    using MatchEventSink = std::function<void(std::vector<sightline::match::MatchEvent>&&)>;
+    void SetMatchEventSink(MatchEventSink cb) { eventSink_ = std::move(cb); }
 
     void Register() {
         // 19：位置上报 v2（v4 R10——对局期内替代 16）——Parse 集中校验（messages.h 唯一长度守门）
@@ -103,7 +103,7 @@ public:
             if (pid < 0) return;                             // 未登录：无效
             LOG_INFO("[开火·请求] shooter=" + std::to_string(pid) + " fd=" + std::to_string(fd));
             auto events = match_.Fire(static_cast<std::uint32_t>(pid), Now_());   // 注入钟（ADR-1 单钟）
-            if (fireSink_) fireSink_(std::move(events));       // ep08：第三处事件源交编排器
+            if (eventSink_) eventSink_(std::move(events));     // ep08：Fire 事件源交编排器
             else writer_.deliverMatch(events);                 // 未注入 = ep07 原路径
         }, true);
 
@@ -165,7 +165,13 @@ public:
             for (const auto& m : lobby_.RoomRoster(roomId))
                 entries.push_back({m.playerId, m.name, 0});
             lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
-            writer_.deliverMatch(match_.StartMatch(roomId, entries));
+            // v1.6 收口⑥：StartMatch 事件走同一订阅点（编排器在此触发 15 号后 30 号广播
+            // + MatchStart 进归档流=战报开档）；未注入回调 = ep07 原路径。
+            {
+                auto evs = match_.StartMatch(roomId, entries);
+                if (eventSink_) eventSink_(std::move(evs));
+                else writer_.deliverMatch(evs);
+            }
             // 活动区数据校验（数据问题数据入口拦——与"掩体压出生点"同族纪律）：出生点在合同地板
             // 之外 → 域已钳入界内（锚/24 号同源），但请挪回地板重烘焙，否则重生/开局仍在钳制边缘
             if (const auto& g = match_.Geometry(); !g.spawnPoints.empty())
@@ -251,7 +257,12 @@ private:
     void HandleMemberGone(int fd) {
         const int pid = lobby_.PlayerIdByFd(fd);
         if (pid < 0) return;
-        writer_.deliverMatch(match_.RemovePlayer(static_cast<uint32_t>(pid)));
+        // v1.6：离场事件同走订阅点（EntityLeave 进归档流=战报完整性）；未注入=原路径
+        {
+            auto evs = match_.RemovePlayer(static_cast<uint32_t>(pid));
+            if (eventSink_) eventSink_(std::move(evs));
+            else writer_.deliverMatch(evs);
+        }
     }
 
     MessageDispatcher& disp_;
@@ -260,7 +271,7 @@ private:
     FrameWriter& writer_;
     BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）；声明序=构造初始化序（-Wreorder）
     std::function<std::uint64_t()> now_;   // 注入钟（ADR-1 单钟·2026-11-04 双钟复盘）——空=回退 system
-    FireEventSink fireSink_;               // ep08：第三处事件源（可空=保持原路径）
+    MatchEventSink eventSink_;   // v1.6：Fire/StartMatch/RemovePlayer 三源统一点（可空=保持原路径）
 };
 
 } // namespace adapters

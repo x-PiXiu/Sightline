@@ -14,6 +14,8 @@
 #include <vector>
 
 #include "match/fire_judge.h"   // 实体层纯决策（WeaponState/几何合同/求交）——依赖向内
+#include "match/game_config.h"  // ep08 v1.6：SetConfig 推值快照（DeathmatchRules/RewindRules 消费源）
+#include "match/policies.h"     // ep08 v1.6 收口②：IDamagePolicy 端口（消费方拥有——Fire 走它）
 
 namespace sightline::match {
 
@@ -176,9 +178,13 @@ public:
     bool Reload(std::uint32_t playerId, std::uint64_t nowMs);
 
     // ===== ep08 v4.8：第二把武器 + 配置表接线 =====
-    /** 组合根在启动与每次配置生效时投喂一份纯值快照（零端口依赖，238 断言仍走默认表）。 */
-    void SetWeaponTable(const std::array<WeaponParams, 4>& table,
-                        std::uint8_t count, std::uint16_t maxHp);
+    /** 组合根/编排器在启动与每次配置生效时投喂一份完整规则快照（v1.6 收口③：死亡/重生/回溯
+     *  规则一并进——此前只推武器表，改 respawn_ms 不生效）。只取本用例执行的字段
+     *  （武器/血量/死亡规则/回溯钳制）；formula/bot 归各自消费者（策略/BotDriver 视图）。
+     *  默认值逐字段等于 ep07 常量——238 断言未注入时行为零变化。 */
+    void SetConfig(const GameConfig& c);
+    /** 收口②：伤害策略注入（nullptr=内建 DamageApply 路径，测试桩与 Lua fallback 同口）。 */
+    void SetDamagePolicy(IDamagePolicy* p) { damage_ = p; }
     /** 28 号换枪意图：旧枪在途换弹取消 + 新枪满匣 + 首发免射速（A4/D7 连带项一并复位）。 */
     bool SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t nowMs);
     std::uint8_t WeaponTypeOf(std::uint32_t playerId) const;
@@ -206,6 +212,12 @@ private:
         WeaponParams{}, WeaponParams{}};
     std::uint8_t weaponCount_ = 2;
     std::uint16_t maxHp_ = 100;
+    // v1.6 收口③：死亡/重生/回溯规则随 SetConfig 进（默认=ep07 常量）——
+    // 此前 6 处仍读 kInvulnMs/kRespawnMs/kKillLimit/kSpawnClearRadiusUu/kMaxRewindMs 编译期常量，
+    // 配置表 deathmatch/rewind 两组零消费者（改表不生效）。
+    DeathmatchRules deathmatch_{};
+    RewindRules rewind_{};
+    IDamagePolicy* damage_ = nullptr;   // 收口②：nullptr=内建 DamageApply（238 断言路径）
     Entity* FindEntity(std::uint32_t pid);             // 内部查找（非 const 版复用）
 };
 

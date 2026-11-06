@@ -31,12 +31,10 @@ public:
     FrameWriter(ConnTable& conns, const sightline::lobby::LobbyService& lobby)
         : conns_(conns), lobby_(lobby) {}
 
-    // ep08 G5：30 号载荷组装 = 数据格式翻译 = 适配器职责；只读视图由组合根注入。
-    void SetConfigVersion(const sightline::application::IConfigVersion* v) { configVersion_ = v; }
-
-    void BroadcastConfigVersion() {
-        if (!configVersion_) return;
-        const auto snap = configVersion_->Snapshot();
+    // ep08 G5（v1.6 收口⑥·单一入口）：30 号载荷组装=数据格式翻译=适配器职责；
+    // 快照由用例层经 IWireSink 端口传入（编排器定时机：MatchStart 后 / reload 后）。
+    // 此前 FrameWriter 另持 IConfigVersion* 自播=第二数据入口，已收敛。
+    void BroadcastConfigVersion(const sightline::application::ConfigWireSnapshot& snap) {
         sightline::wire::ConfigVersionMsg msg;
         msg.version = snap.version;
         for (const auto& [type, w] : snap.weapons)
@@ -135,7 +133,8 @@ public:
                     send(fd, protocol::MSG_S2C_MATCH_START, p);
                 LOG_INFO("[出站] MATCH_START 房=" + std::to_string(e.roomId) +
                          " 名册=" + std::to_string(e.roster.size()));
-                BroadcastConfigVersion();                   // ep08：15 号后广播 30 号（开局参数同步）
+                // 30 号广播时机已收口到用例层（v1.6：orchestrator.OnWiringEvents 在
+                // DeliverMatch(15 号) 之后经 IWireSink 端口播——此处不再自播，单一入口）。
                 break;
             }
             case MT::EntityLeave: {
@@ -287,7 +286,6 @@ private:
 
     ConnTable& conns_;
     const sightline::lobby::LobbyService& lobby_;
-    const sightline::application::IConfigVersion* configVersion_ = nullptr;   // ep08：可空（未注入时不发 30 号）
 };
 
 // ===== 入站：msgid → Handler 注册表（开闭原则：新消息只注册）=====

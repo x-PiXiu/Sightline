@@ -3,7 +3,7 @@
 // 对应设计草案 §9「策略单测（零 IO）」与步骤 2 验收门「新不变式单测绿 / 238 断言行为零变化」。
 // 纪律：零 Lua、零 DB、零网络、零线程；只 include 实体层与用例层纯头文件。
 #include "application/durability_policy.h"
-#include "application/policies.h"
+#include "match/policies.h"     // v1.6：端口已迁 match/
 #include "match/game_config.h"
 #include "match/invariants.h"
 
@@ -59,7 +59,7 @@ int main() {
         CHECK(match::DamageInvariants::Clamp(100.f, -inf) == 100.f);   // ±Inf 同属非有限：不掉血，不静默致死
         CHECK(match::DamageInvariants::Clamp(0.f, -inf) == 0.f);        // upper 随 hp 走
 
-        app::BuiltinDamagePolicy builtin;
+        match::BuiltinDamagePolicy builtin;   // v1.6：端口已迁 match/（消费方拥有）
         CHECK(builtin.Apply(100.f, 25.f, {}) == 75.f);   // 等价现行 DamageApply（钳 0 不死）
         CHECK(builtin.Apply(10.f, 25.f, {}) == 0.f);
     }

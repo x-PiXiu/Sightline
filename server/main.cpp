@@ -36,7 +36,7 @@
 #include "adapters/wire_sink.h"
 #include "adapters/bot_driver_port.h"
 #include "application/orchestrator.h"
-#include "application/policies.h"
+#include "match/policies.h"     // v1.6：端口已迁 match/
 #include "lobby/lobby.h"
 #include "match/match_service.h"
 #include "protocol/msg_ids.h"
@@ -187,28 +187,32 @@ int main() {
     std::map<int, int> fdWorker;                         // fd → worker 下标（选择计数的 main 侧账本）
 
     // ===== ep08 步骤 3：配置 / 端口 / 编排器（组合根只做 new + 注入，不含业务节律）=====
-    adapters::ConfigService config(ResolveConfigPath());     // IConfigSource + 三张只读视图
-    writer.SetConfigVersion(&config);                         // G5：30 号只读视图注入（开局/热更广播）
-    sightline::application::BuiltinDamagePolicy damagePolicy;
-    sightline::application::BuiltinBotPolicy botPolicy;
+    adapters::ConfigService config(ResolveConfigPath());     // IConfigSource + 四张只读视图（五端口）
+    sightline::match::BuiltinDamagePolicy damagePolicy;      // v1.6：策略端口已迁 match/（消费方拥有）
+    sightline::match::BuiltinBotPolicy botPolicy;
     adapters::NullPersistence persistence;                   // §5.7 lite 模式（full 由步骤 5 装配）
     adapters::WireSinkAdapter wireSink(writer);              // FrameWriter → IWireSink
     adapters::StdinCommandSource commands;                  // reload / rollback / version / help
     adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
     adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
+    // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线——此前 OrchestratorDeps
+    // 持 damage/bot 指针零引用=空挂；编排器只经五视图组装 GameConfig 推给 MatchService）
+    match.SetDamagePolicy(&damagePolicy);
+    botDriver.SetBotTuning(&config);
+    botDriver.SetBotPolicy(&botPolicy);
     sightline::application::ApplicationOrchestrator app{
         sightline::application::OrchestratorDeps{
             .now = nowMs,
             .config = config,
             .combat = config,
+            .tuning = config,
+            .rules = config,
             .commands = commands,
             .wire = wireSink,
             .archive = persistence,
             .audit = persistence,
             .board = persistence,
             .version = config,
-            .damage = &damagePolicy,
-            .bot = &botPolicy,
             .match = match,
             .botDriver = botDriverPort,
             .lobby = lobby,
@@ -250,8 +254,8 @@ int main() {
     adapters::MessageDispatcher dispatcher;
     adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟
     // ③ 号事件源：20 号 Fire 事件经回调进编排器，与 ①/② 在同一订阅点扇出（B1 修复）
-    matchWiring.SetFireEventSink([&app](std::vector<sightline::match::MatchEvent>&& es) {
-        app.OnFireEvents(std::move(es));
+    matchWiring.SetMatchEventSink([&app](std::vector<sightline::match::MatchEvent>&& es) {
+        app.OnWiringEvents(std::move(es));                  // v1.6：Fire/StartMatch/RemovePlayer 三源统一点
     });
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);

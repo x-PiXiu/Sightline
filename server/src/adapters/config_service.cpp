@@ -1,5 +1,7 @@
 // config_service.cpp —— ep08 步骤 3：配置适配器实现（首批 src/adapters/*.cpp）
-// 纪律：本文件只做「格式转换 + 并发机制 + 生命周期」，业务校验一律调用实体层 GameConfig::Validate()。
+// 纪律（v1.6 收口①收紧）：本文件只做「格式转换 + 并发机制 + 生命周期」——
+//   · 格式层检查（键存在/数字型/存储边界防截断/顶层键表/字符串→EWeaponType 映射）留在此；
+//   · 业务边界与跨字段关系一律由实体层 GameConfig::Validate() 裁决（唯一真相）。
 // 数据表解析用零依赖的轻量 Lua 表 reader（只认 key = number / key = { ... } 的纯数据子集），
 // 不引入 Lua VM —— 公式 / 决策热修才是 Lua 的领地（步骤 4），lite 模式因此零外部依赖。
 #include "adapters/config_service.h"
@@ -185,7 +187,8 @@ bool ConfigService::ParseFile(const std::string& path, mc::GameConfig& out,
 
     unsigned u = 0;
     mc::GameConfig c;
-    if (!UInt(root, "rules.max_hp", 255, u, err)) return false;
+    // 存储边界（uint16 上限=防截断，格式层）；业务边界（1..255 等）归 Validate() 唯一裁决。
+    if (!UInt(root, "rules.max_hp", 65535, u, err)) return false;
     c.maxHp = static_cast<std::uint16_t>(u);
     if (!UInt(root, "deathmatch.respawn_ms", 65535, u, err)) return false;
     c.deathmatch.respawnMs = static_cast<std::uint16_t>(u);
@@ -225,9 +228,9 @@ bool ConfigService::ParseFile(const std::string& path, mc::GameConfig& out,
         else { err = "未知武器键: " + name + "（契约锁只认 rifle / pistol，整表拒收）"; return false; }
         const auto idx = static_cast<std::size_t>(type);
         const std::string p = "weapons." + name + ".";
-        if (!UInt(root, p + "damage", 255, u, err)) return false;
+        if (!UInt(root, p + "damage", 255, u, err)) return false;   // 255=uint8 存储边界
         c.weapons[idx].damage = static_cast<std::uint8_t>(u);
-        if (!UInt(root, p + "mag", 100, u, err)) return false;
+        if (!UInt(root, p + "mag", 255, u, err)) return false;      // 255=存储边界；业务 1..100 归 Validate()
         c.weapons[idx].mag = static_cast<std::uint8_t>(u);
         if (!UInt(root, p + "reload_ms", 65535, u, err)) return false;
         c.weapons[idx].reloadMs = static_cast<std::uint16_t>(u);
@@ -235,8 +238,11 @@ bool ConfigService::ParseFile(const std::string& path, mc::GameConfig& out,
         c.weapons[idx].fireMs = static_cast<std::uint16_t>(u);
         ++count;
     }
-    if (!sawRifle) { err = "weapons 必须含 rifle（EWeaponType::Rifle=0 契约锁）"; return false; }
-    if (count == 0 || count > c.weapons.size()) { err = "weapons 数量越界（1..4）"; return false; }
+    // 数量/越界裁决归 Validate()（唯一真相）；此处只记账。
+    // 以下三项留此=格式层：sawRifle（30 号 payload 按 0..count-1 连续发——slot 0 缺失时
+    // Validate 无法分辨「文件没写 rifle」与「用了默认值」，只有解析器看得见）、未知武器键
+    // （字符串→EWeaponType 映射）、顶层键表（schema——struct 不携带未知键）。
+    if (!sawRifle) { err = "weapons 必须含 rifle（30 号 payload 按 slot 0..N-1 连续编码）"; return false; }
     c.weaponCount = static_cast<std::uint8_t>(count);
 
     out = c;
@@ -297,7 +303,9 @@ mc::WeaponParams ConfigService::Weapon(mc::EWeaponType t) const {
 
 mc::FormulaParams ConfigService::Formula() const { return cfg_.load()->formula; }
 mc::BotTuning ConfigService::Get() const { return cfg_.load()->bot; }
-std::string_view ConfigService::Version() const { return version_; }
+std::string ConfigService::Version() const { return version_; }   // v1.6 收口④：按值返回
+mc::DeathmatchRules ConfigService::Deathmatch() const { return cfg_.load()->deathmatch; }
+mc::RewindRules ConfigService::Rewind() const { return cfg_.load()->rewind; }
 
 app::ConfigWireSnapshot ConfigService::Snapshot() const {
     const auto c = cfg_.load();

@@ -2,6 +2,7 @@
 // 纪律：本目录不得 include 适配器目录、网络库、协议字节层或任何第三方驱动头。
 // §11.6 自检命令第 1 / 2 / 4 条负责钉住这条依赖方向。
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -18,10 +19,20 @@ enum class Durability : std::uint8_t { Must, BestEffort, Projection };
 struct SinkHealth { bool mysql = false, mongo = false, redis = false; };
 enum class QueueAction : std::uint8_t { Enqueue, DropAndCount, SpillToWal, Defer };
 struct DegradeDecision { bool continueMatch = true; bool warn = false; };
+// QueueState 住本头（v1.6 收口⑤）：IMatchArchive::State() 按值返回它——执行者自报队列状态，
+// 编排器不再硬编码假状态（此前 depth=0/health={} 的假分类是要灭的）。
+struct QueueState {
+    std::size_t depth = 0;
+    std::size_t capacity = 0;   // 0 表示不设上限（lite/调试用）
+    Durability cls = Durability::BestEffort;
+    SinkHealth health{};
+};
 
 struct IMatchArchive {
     virtual ~IMatchArchive() = default;
     virtual void Ingest(std::span<const MatchEvent> events, Durability d) = 0;
+    // 执行者自报状态（v1.6）：分类决策基于真实队列/健康位，不许编排器代填。
+    virtual QueueState State() const = 0;
 };
 
 struct IAuditSink {

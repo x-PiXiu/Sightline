@@ -107,11 +107,13 @@ int main() {
     // ---- 5) 换枪状态机 + per-weapon 换弹钟 ----
     {
         mc::MatchService m;
-        std::array<mc::WeaponParams, 4> table{
-            mc::kDefaultWeaponParams,
-            mc::WeaponParams{20, 12, 1800, 220},
-            mc::WeaponParams{}, mc::WeaponParams{}};
-        m.SetWeaponTable(table, 2, 100);
+        mc::GameConfig gc;                              // v1.6：SetWeaponTable → SetConfig（完整规则快照）
+        gc.weapons = {mc::kDefaultWeaponParams,
+                      mc::WeaponParams{20, 12, 1800, 220},
+                      mc::WeaponParams{}, mc::WeaponParams{}};
+        gc.weaponCount = 2;
+        gc.maxHp = 100;
+        m.SetConfig(gc);
         m.StartMatch(1, {{1, "alpha", 0}});
         m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
         CHECK(m.WeaponTypeOf(1) == 0);
