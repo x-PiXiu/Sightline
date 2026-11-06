@@ -39,6 +39,9 @@ RealPersistence::~RealPersistence() { Shutdown(); }
 void RealPersistence::Start() {
     // worker 内先做初始连接（连接的创建与使用同线程——避免跨线程交接连接对象）
     worker_ = std::thread([this] { WorkerLoop(); });
+    // 等初始连接落定（上限 1s）——否则横幅与健康位竞态，可能打出全 ✗/半绿的假状态
+    for (int i = 0; i < 100 && !started_.load(); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 void RealPersistence::Shutdown() {
@@ -138,6 +141,7 @@ void RealPersistence::WorkerLoop() {
         healthMongo_.store(mongo_.Connect(cfg_.mongoUri));
     else
         healthMongo_.store(false);
+    started_.store(true);                       // 初始三连完成（横幅可读真实位）
 
     auto lastRetry = std::chrono::steady_clock::now();
     bool sawStopping = false;

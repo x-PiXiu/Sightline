@@ -159,6 +159,17 @@ int main() {
     CHECK(ok2 && audits == 1);
 
     // Redis 榜（OnKill 投影）——检查连接同样要 AUTH（面板 Redis requirepass；漏=NOAUTH 错误回执）
+    // SIGHTLINE_EXPECT_REDIS_DOWN=1：降级门（§5.5）——死 Redis URI 下断言翻转：
+    //   mysql/mongo 照常落（零中断实证）+ OnKill 标记被丢计数 + 横幅 Redis✗
+    const bool expectDown = std::getenv("SIGHTLINE_EXPECT_REDIS_DOWN") != nullptr;
+    if (expectDown) {
+        CHECK(p.Dropped() >= 2);                              // 两个 Kill 标记被丢+计数
+        CHECK(p.HealthLine().find("Redis") != std::string::npos &&
+              p.HealthLine().find("✗") != std::string::npos); // 横幅如实显✗
+        p.Shutdown();
+        std::printf("全部通过：%d 项断言 OK（步骤 5 降级门·Redis 死·其余零中断）\n", g_checked);
+        return 0;
+    }
     redisContext* rc = redisConnect("127.0.0.1", 6379);
     CHECK(rc != nullptr && !rc->err);
     {

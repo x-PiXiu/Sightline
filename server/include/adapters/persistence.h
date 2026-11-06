@@ -113,6 +113,7 @@ private:
     std::thread worker_;
     std::atomic<bool> stopping_{false};
     std::atomic<bool> rebuildReq_{false};
+    std::atomic<bool> started_{false};              // 初始三连完成（Start 等它→横幅读真实健康位）
 
     // 健康位（worker 写 · State() 读）
     std::atomic<bool> healthMysql_{false};
