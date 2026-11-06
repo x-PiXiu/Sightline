@@ -6,17 +6,23 @@
 #include <cstdint>
 #include <span>
 
+#include "adapters/audit_wal.h"   // lite 审计落盘（§5.7.2——inline Append 调用需完整类型）
 #include "application/ports.h"
 
 namespace adapters {
 
 class NullPersistence final : public sightline::application::IPersistencePorts {
 public:
+    // wal 非空：Append 额外写 WAL 文件（lite 模式的审计不丢）；空=纯计数（旧行为）
+    explicit NullPersistence(AuditWal* wal = nullptr) : wal_(wal) {}
     void Ingest(std::span<const sightline::application::MatchEvent> events,
                 sightline::application::Durability) override {
         events_ += events.size();
     }
-    void Append(const sightline::application::AuditRecord&) override { ++audits_; }
+    void Append(const sightline::application::AuditRecord& r) override {
+        ++audits_;
+        if (wal_) wal_->AppendAudit(r);      // §5.7.2：lite 审计落 WAL（full 启动回放补写）
+    }
     void OnKill(std::uint32_t) override { ++kills_; }
     void Rebuild() override { ++rebuilds_; }
     // v1.6 收口⑤：执行者自报状态。lite 的 sink=内存计数器——恒健康、无队列（capacity=0
@@ -35,6 +41,7 @@ public:
     std::size_t Kills() const { return kills_; }
 
 private:
+    AuditWal* wal_ = nullptr;
     std::size_t events_ = 0, audits_ = 0, kills_ = 0, rebuilds_ = 0;
 };
 

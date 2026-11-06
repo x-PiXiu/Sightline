@@ -42,11 +42,17 @@ if(SIGHTLINE_ENABLE_DB)
     if(NOT PkgConfig_FOUND)
         message(FATAL_ERROR "SIGHTLINE_ENABLE_DB=ON 需要 pkg-config")
     endif()
-    # pkg-config 名按发行版调整：hiredis / libmariadbcpp(或 mariadb) / libmongocxx
-    pkg_check_modules(HIREDIS    REQUIRED IMPORTED_TARGET hiredis)
-    pkg_check_modules(MARIADBCPP REQUIRED IMPORTED_TARGET libmariadbcpp)
-    pkg_check_modules(MONGOCXX   REQUIRED IMPORTED_TARGET libmongocxx)
-    list(APPEND SIGHTLINE_OPTIONAL_LIBS PkgConfig::HIREDIS PkgConfig::MARIADBCPP PkgConfig::MONGOCXX)
+    # 步骤 5 实勘对齐（2026-11-06）：实际用 hiredis + libmysqlclient(C) + libmongoc(C·方案 B)
+    # ——原稿的 libmariadbcpp/libmongocxx 是 C++ 连接器，本实现未用（头文件前置声明零依赖）。
+    pkg_check_modules(HIREDIS REQUIRED IMPORTED_TARGET hiredis)
+    pkg_check_modules(MONGOC   REQUIRED IMPORTED_TARGET libmongoc-1.0)
+    find_path(MYSQL_INCLUDE_DIR NAMES mysql/mysql.h)
+    find_library(MYSQL_CLIENT_LIB NAMES mysqlclient)
+    if(NOT MYSQL_INCLUDE_DIR OR NOT MYSQL_CLIENT_LIB)
+        message(FATAL_ERROR "SIGHTLINE_ENABLE_DB=ON 但找不到 mysql 客户端（libmysqlclient-dev）")
+    endif()
+    list(APPEND SIGHTLINE_OPTIONAL_LIBS PkgConfig::HIREDIS PkgConfig::MONGOC ${MYSQL_CLIENT_LIB})
+    list(APPEND SIGHTLINE_OPTIONAL_INCS ${MYSQL_INCLUDE_DIR})
 endif()
 
 message(STATUS "[ep08] Lua=${SIGHTLINE_ENABLE_LUA} DB=${SIGHTLINE_ENABLE_DB} REQUIRE_DEPS=${SIGHTLINE_REQUIRE_DEPS}")
@@ -82,8 +88,24 @@ target_include_directories(sightline_match PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
 # 只挂最外层；实体 / 用例 / 全部单测仍零外部依赖。新增适配器 .cpp 需在此显式登记。
 add_library(sightline_adapters STATIC
     src/adapters/config_service.cpp
+    src/adapters/audit_wal.cpp            # 零依赖（lite 审计 WAL 也用）——无条件入编
 )
 target_include_directories(sightline_adapters PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# 步骤 5：三库翻译单元（文件级 #if SIGHTLINE_HAS_DB 守卫——宏由本开关统一给）
+if(SIGHTLINE_ENABLE_DB)
+    target_sources(sightline_adapters PRIVATE
+        src/adapters/persistence.cpp
+        src/adapters/mysql_store.cpp
+        src/adapters/redis_store.cpp
+        src/adapters/mongo_store.cpp)
+    target_compile_definitions(sightline_adapters PUBLIC SIGHTLINE_HAS_DB=1)
+    if(SIGHTLINE_OPTIONAL_INCS)
+        target_include_directories(sightline_adapters PUBLIC ${SIGHTLINE_OPTIONAL_INCS})
+    endif()
+    if(SIGHTLINE_OPTIONAL_LIBS)
+        target_link_libraries(sightline_adapters PUBLIC ${SIGHTLINE_OPTIONAL_LIBS})
+    endif()
+endif()
 # 步骤 4：Lua 适配层仅在 ENABLE_LUA=ON 时入编（宏同时门控 main.cpp 的接线与测试注册）
 if(SIGHTLINE_ENABLE_LUA)
     target_sources(sightline_adapters PRIVATE src/adapters/scripting_lua.cpp)
@@ -146,6 +168,13 @@ add_test(NAME test_ports COMMAND test_ports)
 add_executable(test_config tests/test_config.cpp)
 target_link_libraries(test_config PRIVATE sightline_adapters)
 add_test(NAME test_config COMMAND test_config)
+
+# ============ ep08 步骤 5：持久化纯单测（零连接·ENABLE_DB 时才编）============
+if(SIGHTLINE_ENABLE_DB)
+    add_executable(test_persistence tests/test_persistence.cpp)
+    target_link_libraries(test_persistence PRIVATE sightline_adapters)
+    add_test(NAME test_persistence COMMAND test_persistence)
+endif()
 
 # ============ ep08 步骤 6：契约 v4.8 wire + 换枪状态机 ============
 add_executable(test_v48 tests/test_v48.cpp)

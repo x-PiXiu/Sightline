@@ -32,6 +32,7 @@
 #include "adapters/match_wiring.h"
 #include "adapters/config_service.h"
 #include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
+#include "adapters/persistence.h"      // 步骤 5：full 模式持久化（含三 sink/WAL）
 
 #ifndef SIGHTLINE_HAS_LUA
 #define SIGHTLINE_HAS_LUA 0
@@ -148,7 +149,28 @@ namespace {
     }
 } // namespace
 
-int main() {
+// §5.7.1 双模式开关：--db-profile=X > --with-db 简写 > SIGHTLINE_DB_PROFILE > 默认 lite。
+// 装配决策只在组合根（红线：用例/sink 内部不得读 profile）。
+std::string ResolveDbProfile(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a.rfind("--db-profile=", 0) == 0) return a.substr(13);   // sizeof("--db-profile=")-1，避免依赖 <cstring>
+        if (a == "--with-db") return "full";
+    }
+    if (const char* e = std::getenv("SIGHTLINE_DB_PROFILE")) return e;
+    return "lite";
+}
+
+std::string EnvOr(const char* key, const char* defv) {
+    if (const char* v = std::getenv(key)) return v;
+    return defv;
+}
+
+std::string ResolveWalPath() {
+    return EnvOr("SIGHTLINE_WAL", "assets/db/audit.wal");
+}
+
+int main(int argc, char** argv) {
     // ===== main 只干装配（最脏的一层，整洁架构最外圈）=====
     // 1. 日志装配
     common::logger::Logger::getInstance().addSink(
@@ -202,7 +224,35 @@ int main() {
     adapters::ConfigService config(ResolveConfigPath());     // IConfigSource + 四张只读视图（五端口）
     sightline::match::BuiltinDamagePolicy damagePolicy;      // v1.6：策略端口已迁 match/（消费方拥有）
     sightline::match::BuiltinBotPolicy botPolicy;
-    adapters::NullPersistence persistence;                   // §5.7 lite 模式（full 由步骤 5 装配）
+    // ===== ep08 步骤 5：持久化双模式（§5.7——装配只在此处，用例层零感知）=====
+    const std::string dbProfile = ResolveDbProfile(argc, argv);
+    std::unique_ptr<sightline::application::IPersistencePorts> persistence;
+    adapters::RealPersistence* realP = nullptr;
+    std::unique_ptr<adapters::AuditWal> liteWal;             // lite：审计→WAL（§5.7.2）
+#if SIGHTLINE_HAS_DB
+    if (dbProfile == "full") {
+        adapters::RealPersistenceConfig rpc;
+        rpc.mysqlDsn = EnvOr("SIGHTLINE_MYSQL_DSN", "127.0.0.1:3306:sightline:sightline:sightline");   // 面板 MySQL（sightline 专用账号·db_up.sh 建号）
+        rpc.redisUri = EnvOr("SIGHTLINE_REDIS_URI", "127.0.0.1:6379");
+        rpc.mongoUri = EnvOr("SIGHTLINE_MONGO_URI", "mongodb://127.0.0.1:27017");   // 宝塔 MongoDB 8.0.32（无密码·§5.5 默认）
+        rpc.walPath  = ResolveWalPath();
+        auto rp = std::make_unique<adapters::RealPersistence>(std::move(rpc));
+        rp->Start();                                          // worker 内连三库（同线程生与用）
+        rp->SetConfigVersion(config.Version());
+        const auto replayed = rp->ReplayWal();                // 上次 spill/lite 审计 → MySQL 补写
+        realP = rp.get();
+        LOG_INFO("[DB] profile=full · " + realP->HealthLine() +
+                 (replayed ? " · WAL回放=" + std::to_string(replayed) : ""));
+        persistence = std::move(rp);
+    } else
+#endif
+    {
+        if (dbProfile == "full")
+            LOG_WARNING("[DB] 本构建未启用 DB（SIGHTLINE_HAS_DB=0）——回退 lite");
+        liteWal = std::make_unique<adapters::AuditWal>(ResolveWalPath());
+        persistence = std::make_unique<adapters::NullPersistence>(liteWal.get());
+        LOG_INFO("[DB] profile=lite · 持久化未启用（对局照常）· 审计→" + liteWal->Path());
+    }
     adapters::WireSinkAdapter wireSink(writer);              // FrameWriter → IWireSink
     adapters::StdinCommandSource commands;                  // reload / rollback / version / help
     adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
@@ -242,9 +292,9 @@ int main() {
             .rules = config,
             .commands = commands,
             .wire = wireSink,
-            .archive = persistence,
-            .audit = persistence,
-            .board = persistence,
+            .archive = *persistence,
+            .audit = *persistence,
+            .board = *persistence,
             .version = config,
 #if SIGHTLINE_HAS_LUA
             .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
@@ -253,8 +303,11 @@ int main() {
             .botDriver = botDriverPort,
             .lobby = lobby,
         }};
-    config.Subscribe([&app](const sightline::application::ConfigChanged& e) {
+    config.Subscribe([&app, realP](const sightline::application::ConfigChanged& e) {
         app.OnConfigChanged(e);                             // G4：审计 + G5：30 号广播（步骤 6）
+#if SIGHTLINE_HAS_DB
+        if (realP) realP->SetConfigVersion(e.version);      // 步骤 5：后续对局落库盖新章（符号在受守卫 TU）
+#endif
     });
 
     // 5.5 几何合同装载（D5-08v2：编辑器烘焙产物，构建期数据——拒绝运行时上报）。
@@ -354,7 +407,10 @@ int main() {
         if (gShutdownRequested) {
             LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
             writer.deliver(lobby.ShutdownBroadcast());
-            app.Shutdown();          // ep08：停止接帧（步骤 5 的队列排水 / 线程汇合在此挂接）
+            app.Shutdown();          // ep08：停止接帧
+#if SIGHTLINE_HAS_DB
+            if (realP) realP->Shutdown();   // 步骤 5（B6）：停 ingest → 2s 排水 → join worker
+#endif
             loop.quit();
         }
     };

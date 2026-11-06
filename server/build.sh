@@ -31,6 +31,18 @@ else
     echo "· Lua 未接入（缺 lua5.4 或 sol2——零依赖 lite 构建）"
 fi
 
+# 步骤 5：三库客户端条件接入（mysql+hiredis+libmongoc 三件齐才开——缺一即 lite，
+# 与 E2「脚本是增强不是依赖」同哲学；persistence/store .cpp 有 #if 守卫=空 TU）
+DB_LIBS=""
+if [ -f /usr/include/mysql/mysql.h ] && [ -f /usr/include/hiredis/hiredis.h ] \
+   && pkg-config --exists libmongoc-1.0 2>/dev/null; then
+    FLAGS="$FLAGS -DSIGHTLINE_HAS_DB=1 $(pkg-config --cflags libmongoc-1.0)"
+    DB_LIBS="$(pkg-config --libs libmongoc-1.0) -lmysqlclient -lhiredis"
+    echo "· 三库客户端已接入（步骤 5·mysql+hiredis+libmongoc）"
+else
+    echo "· 三库未接入（缺 mysql/hiredis/libmongoc 之一——lite 构建）"
+fi
+
 build_deps() {
     # shellcheck disable=SC2086
     $CXX $FLAGS $DEPS_FLAGS tests/deps_smoke.cpp -o /tmp/deps_smoke
@@ -42,7 +54,7 @@ build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
         src/match/match_service.cpp src/adapters/*.cpp \
-        -o sightline_server -lpthread $LUA_LIB
+        -o sightline_server -lpthread $LUA_LIB $DB_LIBS
     echo "✓ sightline_server 编译完成"
 }
 
@@ -62,13 +74,24 @@ build_test() {
     $CXX $FLAGS tests/test_ports.cpp -o /tmp/test_ports   # ep08 步骤 2：端口/值对象/纯策略（零依赖）
     /tmp/test_ports
     # shellcheck disable=SC2086
-    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp src/logger/logger.cpp -o /tmp/test_config $LUA_LIB  # 步骤 3：配置体系（logger=scripting_lua 的日志依赖·步骤 4 连带）
+    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp src/logger/logger.cpp -o /tmp/test_config $LUA_LIB $DB_LIBS  # 步骤 3：配置体系（logger/db=步骤 4/5 连带）
     /tmp/test_config
     if [ -n "$LUA_INC" ]; then
         # shellcheck disable=SC2086
         $CXX $FLAGS tests/test_lua_policy.cpp src/adapters/scripting_lua.cpp src/logger/logger.cpp \
             -o /tmp/test_lua_policy $LUA_LIB   # 步骤 4：Lua 策略对拍/门禁
         /tmp/test_lua_policy
+    fi
+    if [ -n "$DB_LIBS" ]; then
+        # shellcheck disable=SC2086
+        $CXX $FLAGS tests/test_persistence.cpp src/adapters/persistence.cpp \
+            src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp \
+            src/adapters/audit_wal.cpp src/logger/logger.cpp \
+            -o /tmp/test_persistence $LUA_LIB $DB_LIBS   # 步骤 5：持久化纯单测（不连库）
+        /tmp/test_persistence
+        # shellcheck disable=SC2086
+        $CXX $FLAGS tests/test_db_integration.cpp src/adapters/persistence.cpp src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp src/adapters/audit_wal.cpp src/logger/logger.cpp -o /tmp/test_db_integration $LUA_LIB $DB_LIBS   # 步骤 5：真库冒烟（env 门控·缺省跳过）
+        /tmp/test_db_integration
     fi
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_v48.cpp src/match/match_service.cpp -o /tmp/test_v48  # 步骤 6：契约 v4.8
