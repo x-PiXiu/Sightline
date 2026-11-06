@@ -21,6 +21,15 @@ struct FSightlineLocalState {
     UPROPERTY(BlueprintReadOnly) bool bFalling = false;
 };
 
+/** ep08 v4.8：30 号运行时参数覆盖层（服务器配置表的唯一客户端副本） */
+struct FSightlineWeaponParams {
+    int32 Damage = 25;
+    int32 Mag = 30;
+    int32 ReloadMs = 2500;
+    int32 FireIntervalMs = 95;
+};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConfigVersion, const FString&, Version);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMatchStarted);        // 15 收到 → GI 切对局关卡
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchEntityLeft, int32, PlayerId);
 // M3b 和解动作过界（纯数据，D3-17 同款）：Error=对账误差向量；bFullSnap=true 时 Error 即绝对权威位
@@ -115,6 +124,19 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
     void SendReload();
 
+    /** ep08 v4.8：28 号换枪意图（1B type）；服务器权威状态 + 配置表校验 */
+    UFUNCTION(BlueprintCallable, Category = "Sightline Match")
+    void SendSwitchWeapon(int32 WeaponType);
+
+    // —— ep08：运行时参数覆盖层（30 号驱动；未收到 30 号时回退编译期默认值）——
+    FSightlineWeaponParams WeaponParams(int32 WeaponType) const;
+    int32 DamageOf(int32 WeaponType) const { return WeaponParams(WeaponType).Damage; }
+    int32 MagOf(int32 WeaponType) const { return WeaponParams(WeaponType).Mag; }
+    int32 ReloadMsOf(int32 WeaponType) const { return WeaponParams(WeaponType).ReloadMs; }
+    int32 FireIntervalMsOf(int32 WeaponType) const { return WeaponParams(WeaponType).FireIntervalMs; }
+    const FString& GetConfigVersion() const { return ConfigVersion; }
+    int32 RemoteWeaponTypeOf(int32 Pid) const;
+
     /** 离开房间（契约 10 号·空 payload）：对局结束返回大厅——连接保持，服务器移出房间后广播
      *  ROOM_LIST，GI 既有流程自动"切回大厅世界+显示大厅"（2026-11-05 结算"离开"按钮修） */
     UFUNCTION(BlueprintCallable, Category = "Sightline Match")
@@ -129,6 +151,7 @@ public:
     UPROPERTY(BlueprintAssignable) FOnKill OnKill;                     // ep07：23 号（击杀播报+比分源）
     UPROPERTY(BlueprintAssignable) FOnRespawn OnRespawn;               // ep07：24 号（落位+无敌窗）
     UPROPERTY(BlueprintAssignable) FOnMatchEnd OnMatchEnd;             // ep07：25 号（结算面板）
+    UPROPERTY(BlueprintAssignable) FOnConfigVersion OnConfigVersion;   // ep08：30 号（HUD 版本行）
 
     // —— M3c Debug HUD 观测面（GI 每帧取用；AddOnScreenDebugMessage 扩展，D4-08）——
     int32  GetReconcileCount() const { return ReconcileCount; }   // 和解次数（≥ε 触发）
@@ -189,4 +212,7 @@ private:
     double ErrPeakCm = 0.0;                            // 峰值误差（cm）
     TMap<int32, int32> EntityHp;                       // M5：对局期各实体血量（21 号驱动；D5-09 事件流）
     TMap<int32, FSightlineScore> ScoreMap;             // 比分板客户端缓存（23 号事件流累加；15 号新局清账）
+    TArray<FSightlineWeaponParams> RuntimeParams;      // ep08：30 号 per-weapon 参数覆盖层
+    FString ConfigVersion;                             // ep08：HUD 版本行（v7-a3f2c1d8）
+    TMap<int32, int32> RemoteWeaponType;               // ep08：17 号 flags bit3~4 → 远端武器表现
 };

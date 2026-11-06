@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sightline 服务器统一构建入口（第 2 期起）
-# 用法：./build.sh [server|test|all]   （默认 all：先 server 后单测）
+# 用法：./build.sh [server|deps|test|all]   （默认 all：server → deps → 单测）
+# ep08 步骤 1：deps 只跑依赖探针；SIGHTLINE_REQUIRE_DEPS=1 时缺库判失败（§5.7 lite 默认零前置）
 # 旗标说明：-Werror=switch 把"switch 漏枚举 case"从警告升级为编译错误——
 #          FrameWriter 对领域事件的穷尽性由编译器强制（D2 决策：A 方案，2026-10-09）
 set -euo pipefail
@@ -10,10 +11,22 @@ CXX=${CXX:-g++}
 FLAGS="-std=c++20 -Wall -Wswitch -Werror=switch -I include"
 # 注：不加 -Wextra——其 missing-field-initializers 对 Event 的"部分初始化+成员默认值"模式是噪音
 
+DEPS_FLAGS=""
+if [[ "${SIGHTLINE_REQUIRE_DEPS:-0}" == "1" ]]; then
+    DEPS_FLAGS="-DSIGHTLINE_REQUIRE_DEPS=1"
+fi
+
+build_deps() {
+    # shellcheck disable=SC2086
+    $CXX $FLAGS $DEPS_FLAGS tests/deps_smoke.cpp -o /tmp/deps_smoke
+    /tmp/deps_smoke
+    echo "✓ deps_smoke 完成"
+}
+
 build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
-        src/match/match_service.cpp \
+        src/match/match_service.cpp src/adapters/*.cpp \
         -o sightline_server -lpthread
     echo "✓ sightline_server 编译完成"
 }
@@ -30,11 +43,21 @@ build_test() {
     # shellcheck disable=SC2086
     $CXX $FLAGS tests/test_wire.cpp -o /tmp/test_wire     # v4 wire 结构体（header-only）
     /tmp/test_wire
+    # shellcheck disable=SC2086
+    $CXX $FLAGS tests/test_ports.cpp -o /tmp/test_ports   # ep08 步骤 2：端口/值对象/纯策略（零依赖）
+    /tmp/test_ports
+    # shellcheck disable=SC2086
+    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp -o /tmp/test_config  # 步骤 3：配置体系
+    /tmp/test_config
+    # shellcheck disable=SC2086
+    $CXX $FLAGS tests/test_v48.cpp src/match/match_service.cpp -o /tmp/test_v48  # 步骤 6：契约 v4.8
+    /tmp/test_v48
 }
 
 case "${1:-all}" in
     server) build_server ;;
+    deps)   build_deps ;;
     test)   build_test ;;
-    all)    build_server; build_test ;;
-    *)      echo "用法: ./build.sh [server|test|all]"; exit 2 ;;
+    all)    build_server; build_deps; build_test ;;
+    *)      echo "用法: ./build.sh [server|deps|test|all]"; exit 2 ;;
 esac

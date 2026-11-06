@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameInstance/SightlineGameInstance.h"
 #include "InputAction.h"
+#include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "Sightline.h"
 #include "UObject/ConstructorHelpers.h"
@@ -49,9 +50,11 @@ namespace {
                                                // （100ms 是 300ms 时代遗留：间隔回 33ms 后 Alpha 恒 0=30Hz 跳格）
     constexpr float kRotInterpSpeed = 10.f;    // 朝向/俯仰平滑速度
     // —— M5 开火（表现层预测常量=服务器合同镜像；D5-14 客户端步进 100ms>服务器容差 95ms）——
-    constexpr uint64 kClientFireIntervalMs = 100;
-    constexpr int32  kClientMag            = 30;
-    constexpr uint64 kClientReloadMs       = 2500;
+    // ep08：以下仅作「30 号未到达前」的兜底值；运行期一律读 MatchSession 的运行时参数覆盖层
+    constexpr uint64 kFallbackFireIntervalMs = 100;
+    constexpr int32  kFallbackMag            = 30;
+    constexpr uint64 kFallbackReloadMs       = 2500;
+    constexpr int32  kFallbackDamage         = 25;
     // —— M5 弹孔贴花（落点短程探针参数；回收走引擎 LifeSpan 无需 FIFO）——
     constexpr float  kDecalProbeBackCm = 15.f; // 探针起点=落点向射手侧回退（墙面外侧）
     constexpr float  kDecalProbeFwdCm  = 5.f;  // 探针终点=落点向墙内推进（短程：天端点探不到=自动跳过）
@@ -128,6 +131,7 @@ void ASightlineCharacter::BeginPlay() {
             MatchSession->OnFireResult.AddDynamic(this, &ASightlineCharacter::OnFireResult);   // M5：三分流（本地角色处理全房间开火结果）
             MatchSession->OnKill.AddDynamic(this, &ASightlineCharacter::OnKill);               // ep07：死亡/播报
             MatchSession->OnRespawn.AddDynamic(this, &ASightlineCharacter::OnRespawn);         // ep07：落位/插值重置
+            MatchSession->OnConfigVersion.AddDynamic(this, &ASightlineCharacter::OnConfigVersionHandler); // ep08：30 号 HUD 版本行
             GetWorldTimerManager().SetTimer(ReportTimer, this,
                 &ASightlineCharacter::SampleLocalState, 1.0f / 30.0f, true);
         }
@@ -190,6 +194,9 @@ void ASightlineCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
     if (ReloadAction) {
         Input->BindAction(ReloadAction, ETriggerEvent::Started, this, &ASightlineCharacter::OnReloadInput);
     }
+    // ep08 v4.8：数字键 1/2 换枪（不依赖新增 IA 资产；输入门在 ApplyWeaponSwitch 内）
+    PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ASightlineCharacter::OnSwitchRifle);
+    PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ASightlineCharacter::OnSwitchPistol);
 }
 
 void ASightlineCharacter::Move(const FInputActionValue& Value) {
@@ -226,9 +233,9 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         const bool bMatchLive = MatchSession.IsValid() && MatchSession->IsInMatch();   // 对局门：与 TryFire 同源
         // 换弹到期补满（2026-11-05 修订：原门槛 LocalMag==0 只覆盖打空自动换弹——自主换弹
         //（R·29 号）半匣上钟后永不补满=换弹前后弹数不变，用户实锤 28→28）
-        if (LocalReloadUntilMs != 0 && NowMs >= LocalReloadUntilMs && LocalMag < kClientMag)
+        if (LocalReloadUntilMs != 0 && NowMs >= LocalReloadUntilMs && LocalMag < WMag())
         {
-            LocalMag = kClientMag;                   // 到期补满（换弹钟在 TryFire 空匣/自主 R 上弦——
+            LocalMag = WMag();                   // 到期补满（换弹钟在 TryFire 空匣/自主 R 上弦——
                                                      // 补弹若只住 TryFire 会死锁：bTrigger 要 LocalMag>0，
                                                      // TryFire 又只有 bTrigger 才被调=按住打空即永久哑火）
             LocalReloadUntilMs = 0;                  // 钟清零=换弹态结束（换弹中 HUD 随之消失）
@@ -243,7 +250,7 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
                     FString::Printf(TEXT("换弹中 %.1fs"), (LocalReloadUntilMs - NowMs) / 1000.0));
             else
                 GEngine->AddOnScreenDebugMessage(3, 0.f, LocalMag > 10 ? FColor::White : FColor::Red,
-                    FString::Printf(TEXT("弹药 %d/%d"), LocalMag, kClientMag));
+                    FString::Printf(TEXT("弹药 %d/%d"), LocalMag, WMag()));
         }
         if (MuzzleFXComp) {
             if (bTrigger && !MuzzleFXComp->IsActive())
@@ -567,13 +574,13 @@ void ASightlineCharacter::TryFire() {
     if (NowMs < NextFireAllowedMs) return;           // 本地节流（表现层预测先行一拍）
     if (LocalMag <= 0) {
         if (NowMs < LocalReloadUntilMs) return;      // 换弹中（镜像服务器状态机，D5-13 热区拆账：无 UI 不纠偏）
-        LocalMag = kClientMag;                       // 到期补满
+        LocalMag = WMag();                       // 到期补满
     }
-    NextFireAllowedMs = NowMs + kClientFireIntervalMs;
+    NextFireAllowedMs = NowMs + WFireMs();
     --LocalMag;
     if (LocalMag == 0)
     {
-        LocalReloadUntilMs = NowMs + kClientReloadMs;   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
+        LocalReloadUntilMs = NowMs + WReloadMs();   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
         // ep06 表现层：换弹动作+音（打空瞬间播；钟是权威、蒙太奇只是表现层随行——
         // 时长不齐不强扭：Lyra 换弹节奏≈2.4s vs 钟 2.5s，差 0.1s 无感）
         if (ReloadMontage) PlayAnimMontage(ReloadMontage);
@@ -637,7 +644,10 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
                                                                                 // （死前手动 TPP 者一并回默认）
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
-        LocalMag = kClientMag;                                   // 服务器重生满匣（Tick 里 magUsed=0）——
+        CurrentWeaponType = 0;                                   // ep08：服务器重生回 Rifle（D7 连带复位）
+        NextFireAllowedMs = 0;                                   // ep08：射速钟清零，重生首帧不被挡
+        bFireHeld = false;
+        LocalMag = WMag();                                       // 服务器重生满匣（Tick 里 magUsed=0）——
         LocalReloadUntilMs = 0;                                  // 客户端镜像同步重置（死后 28/30 残留=双端漂移源）
         // v4.5：传送坐标=24 号下发的服务器权威落位（与锚定握手锚点同源——不再自查表：
         //  FindSpawnStart 关卡实时位置漂移会让传送点≠锚，rebase 拒放行→和解拉扯+和解暴增）
@@ -661,7 +671,7 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     if (Result.Gate != 0) {
         // 被武器门拒（2026-11-05 弹匣漂移根治）：撤销本地预测扣弹=双端弹匣/换弹钟锁相——
         // "死窗"族灭绝（服务端空匣/换弹期间客户端不再有幻影弹药空放）。无弹孔/无伤害数字。
-        LocalMag = FMath::Min(LocalMag + 1, kClientMag);
+        LocalMag = FMath::Min(LocalMag + 1, WMag());
         // 拒收回补外显（2026-11-05 死窗校验增补："降级可以但必须喊一声"——本轮死窗 1 发零头
         // 悬案即因静默不可观测）。健康对局应几乎不出现；连续出现=双端武器状态失锁，先查弹余/换弹钟。
         UE_LOG(LogSightline, Warning,
@@ -696,11 +706,11 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     if (bSelfShot && Result.bHit && CGhost.GetValueOnGameThread() != 0)
         DrawDebugSphere(GetWorld(), Result.HitPoint, 10.f, 10, FColor(0, 255, 80, 200),
                         false, 0.8f, 0, 1.5f);
-    // ep07 收官表现：命中位置伤害数字（自机命中·绿字=回溯绿球同视觉家族·0.8s 带阴影）。
-    // 伤害值暂取服务器恒定 25（D5-01 一枪 25·无爆头）；ep08 伤害公式系统化后改随 21 号下发
+    // ep08：命中飘字取 30 号运行时参数（改表 25→50 后与血条同帧一致）；
+    // 权威余血仍以 21 号 VictimHp 为准，Lua 公式热修时此处显示基础值（§6.1 边界 1）
     if (bSelfShot && Result.bHit)
-        DrawDebugString(GetWorld(), Result.HitPoint + FVector(0.f, 0.f, 30.f), TEXT("25"),
-                        nullptr, FColor(0, 255, 80), 0.8f, true);
+        DrawDebugString(GetWorld(), Result.HitPoint + FVector(0.f, 0.f, 30.f),
+                        FString::FromInt(WDamage()), nullptr, FColor(0, 255, 80), 0.8f, true);
     if (bSelfVictim && Result.bHit && !HurtFlashWidget.Get()) {
         static bool bWarned = false;
         if (!bWarned) { bWarned = true; UE_LOG(LogSightline, Warning, TEXT("[受击] 红闪未显示：HurtFlashWidget 为空（WBP_HurtFlash 未建或 HurtFlashClass 未填 BP）")); }
@@ -732,6 +742,46 @@ void ASightlineCharacter::OnScoreboardReleased() {
     if (ScoreboardWidget.Get()) ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
 }
 
+// ep08：30 号到达 → HUD 调试行显示版本号（演示「改表不重启」的第二证据）
+void ASightlineCharacter::OnConfigVersionHandler(const FString& Version) {
+    if (GEngine)
+        GEngine->AddOnScreenDebugMessage(9, 3.f, FColor::Cyan,
+            FString::Printf(TEXT("[配置 %s]"), *Version));
+}
+
+// ===== ep08 v4.8：运行时参数覆盖层（30 号）；未收到 30 号时回退编译期兜底值 =====
+int32 ASightlineCharacter::WDamage() const {
+    return MatchSession.IsValid() ? MatchSession->DamageOf(CurrentWeaponType) : kFallbackDamage;
+}
+int32 ASightlineCharacter::WMag() const {
+    return MatchSession.IsValid() ? MatchSession->MagOf(CurrentWeaponType) : kFallbackMag;
+}
+int32 ASightlineCharacter::WReloadMs() const {
+    return MatchSession.IsValid() ? MatchSession->ReloadMsOf(CurrentWeaponType)
+                                  : static_cast<int32>(kFallbackReloadMs);
+}
+int32 ASightlineCharacter::WFireMs() const {
+    return MatchSession.IsValid() ? MatchSession->FireIntervalMsOf(CurrentWeaponType)
+                                  : static_cast<int32>(kFallbackFireIntervalMs);
+}
+
+void ASightlineCharacter::OnSwitchRifle()  { ApplyWeaponSwitch(0); }
+void ASightlineCharacter::OnSwitchPistol() { ApplyWeaponSwitch(1); }
+
+void ASightlineCharacter::ApplyWeaponSwitch(const int32 WeaponType) {
+    if (!MatchSession.IsValid() || !MatchSession->IsInMatch()) return;   // 对局门
+    if (MatchSession->IsSelfDead()) return;                              // 死亡期输入禁用
+    if (CurrentWeaponType == WeaponType) return;                          // 幂等
+    CurrentWeaponType = WeaponType;
+    LocalMag = WMag();                    // A4：新枪满匣
+    LocalReloadUntilMs = 0;               // A4：旧枪在途换弹取消
+    NextFireAllowedMs = 0;                // A4 漏项：射速钟清零，换枪首帧不被挡
+    bFireHeld = false;
+    MatchSession->SendSwitchWeapon(WeaponType);   // 28 号：服务器权威状态为准
+    UE_LOG(LogSightline, Log, TEXT("[换枪] 本地乐观 → type=%d 满匣=%d 射速=%dms"),
+           WeaponType, LocalMag, WFireMs());
+}
+
 // 自主换弹（2026-11-05 用户令·29 号）：R 键发意图——换弹钟权威在服务器（门序重构后两源共用）；
 // 本地钟同步上弦（表现层预测：换弹中 HUD/蒙太奇照旧），到期各自补满=双端锁相
 void ASightlineCharacter::OnReloadInput() {
@@ -739,8 +789,8 @@ void ASightlineCharacter::OnReloadInput() {
     if (!MatchSession.IsValid() || !MatchSession->IsInMatch()) return;   // 对局门
     if (MatchSession->IsSelfDead()) return;                              // 死亡期（尸体无手）
     if (NowMs < LocalReloadUntilMs) return;                              // 已在换弹
-    if (LocalMag >= kClientMag) return;                                  // 满匣无须换
-    LocalReloadUntilMs = NowMs + kClientReloadMs;                        // 本地钟（镜像服务器 2.5s）
+    if (LocalMag >= WMag()) return;                                  // 满匣无须换
+    LocalReloadUntilMs = NowMs + WReloadMs();                        // 本地钟（镜像服务器 2.5s）
     if (ReloadMontage) PlayAnimMontage(ReloadMontage);
     if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
     MatchSession->SendReload();                                          // 服务器上钟（弹匣真相同步）

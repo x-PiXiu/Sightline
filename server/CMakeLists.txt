@@ -12,6 +12,41 @@ endif()
 add_compile_options(-Wall -Wswitch -Werror=switch)
 
 find_package(Threads REQUIRED)
+find_package(PkgConfig QUIET)
+
+# ============ ep08 步骤 1：外部依赖（可选 · lite 默认零前置）============
+# 整洁架构：五个第三方库只挂最外层适配器；实体 / 用例 / 核心 / 全部单测零依赖，
+# 缺库环境照样 configure + build + ctest。显式打开开关时才要求库真实存在。
+# 双模式开关见 docs/episodes/ep08/设计草案.md §5.7。
+option(SIGHTLINE_ENABLE_LUA   "启用 Lua5.4 + sol2 策略适配层（步骤 4）" OFF)
+option(SIGHTLINE_ENABLE_DB    "启用 hiredis/mariadb/mongocxx 持久化（步骤 5）" OFF)
+option(SIGHTLINE_REQUIRE_DEPS "deps_smoke 缺任一依赖即判失败（装好库后开启）" OFF)
+
+set(SIGHTLINE_OPTIONAL_LIBS "")
+set(SIGHTLINE_OPTIONAL_INCS "")
+
+if(SIGHTLINE_ENABLE_LUA)
+    find_package(Lua 5.4 REQUIRED)
+    find_path(SOL2_INCLUDE_DIR "sol/sol.hpp")
+    if(NOT SOL2_INCLUDE_DIR)
+        message(FATAL_ERROR "SIGHTLINE_ENABLE_LUA=ON 但找不到 sol/sol.hpp（sol2 为 header-only，请设置 SOL2_INCLUDE_DIR）")
+    endif()
+    list(APPEND SIGHTLINE_OPTIONAL_LIBS ${LUA_LIBRARIES})
+    list(APPEND SIGHTLINE_OPTIONAL_INCS ${LUA_INCLUDE_DIR} ${SOL2_INCLUDE_DIR})
+endif()
+
+if(SIGHTLINE_ENABLE_DB)
+    if(NOT PkgConfig_FOUND)
+        message(FATAL_ERROR "SIGHTLINE_ENABLE_DB=ON 需要 pkg-config")
+    endif()
+    # pkg-config 名按发行版调整：hiredis / libmariadbcpp(或 mariadb) / libmongocxx
+    pkg_check_modules(HIREDIS    REQUIRED IMPORTED_TARGET hiredis)
+    pkg_check_modules(MARIADBCPP REQUIRED IMPORTED_TARGET libmariadbcpp)
+    pkg_check_modules(MONGOCXX   REQUIRED IMPORTED_TARGET libmongocxx)
+    list(APPEND SIGHTLINE_OPTIONAL_LIBS PkgConfig::HIREDIS PkgConfig::MARIADBCPP PkgConfig::MONGOCXX)
+endif()
+
+message(STATUS "[ep08] Lua=${SIGHTLINE_ENABLE_LUA} DB=${SIGHTLINE_ENABLE_DB} REQUIRE_DEPS=${SIGHTLINE_REQUIRE_DEPS}")
 
 # ============ 底座：第 1 期网络库（前任遗产收敛版）+ 日志 ============
 add_library(sightline_core STATIC
@@ -40,13 +75,30 @@ add_library(sightline_match STATIC
 target_include_directories(sightline_match PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # 依赖规则自检：sightline_match 不得链接/包含 net，也不得包含 lobby——组合归适配层 wireMatch
 
+# ============ ep08 步骤 3：适配器实现（首批 src/adapters/*.cpp）============
+# 只挂最外层；实体 / 用例 / 全部单测仍零外部依赖。新增适配器 .cpp 需在此显式登记。
+add_library(sightline_adapters STATIC
+    src/adapters/config_service.cpp
+)
+target_include_directories(sightline_adapters PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 # ============ 第 3 期：服务器本体（装配根） ============
 add_executable(sightline_server
     main.cpp
 )
-target_link_libraries(sightline_server PRIVATE sightline_lobby sightline_match sightline_core)
+target_link_libraries(sightline_server PRIVATE sightline_lobby sightline_match sightline_core sightline_adapters)
+# ep08 步骤 4/5 的适配器 .cpp 落地后，可选库经此处挂到最外层（当前无 .cpp，仅预置接线位）
+if(SIGHTLINE_OPTIONAL_LIBS)
+    target_link_libraries(sightline_server PRIVATE ${SIGHTLINE_OPTIONAL_LIBS})
+endif()
+if(SIGHTLINE_OPTIONAL_INCS)
+    target_include_directories(sightline_server PRIVATE ${SIGHTLINE_OPTIONAL_INCS})
+endif()
 
 # ============ 测试 ============
+# ep08：add_test 必须配 enable_testing()，否则 ctest 报 "No tests were found"
+enable_testing()
+
 add_executable(test_lobby tests/test_lobby.cpp)
 target_link_libraries(test_lobby PRIVATE sightline_lobby)
 add_test(NAME test_lobby COMMAND test_lobby)
@@ -58,3 +110,35 @@ add_test(NAME test_match COMMAND test_match)
 
 add_executable(smoke_base tests/smoke_base.cpp)
 target_link_libraries(smoke_base PRIVATE sightline_core)
+add_test(NAME smoke_base COMMAND smoke_base)
+
+# v4 wire 结构体单测（header-only；此前只在 build.sh 编译，CMake/ctest 漏注册）
+add_executable(test_wire tests/test_wire.cpp)
+target_include_directories(test_wire PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_test(NAME test_wire COMMAND test_wire)
+
+# ============ ep08 步骤 1：依赖探针（零依赖可编译，缺库不算失败）============
+add_executable(deps_smoke tests/deps_smoke.cpp)
+target_include_directories(deps_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+if(SIGHTLINE_REQUIRE_DEPS)
+    target_compile_definitions(deps_smoke PRIVATE SIGHTLINE_REQUIRE_DEPS=1)
+endif()
+if(SIGHTLINE_OPTIONAL_INCS)
+    target_include_directories(deps_smoke PRIVATE ${SIGHTLINE_OPTIONAL_INCS})
+endif()
+add_test(NAME deps_smoke COMMAND deps_smoke)
+
+# ============ ep08 步骤 2：端口 / 值对象 / 纯策略单测（零依赖）============
+add_executable(test_ports tests/test_ports.cpp)
+target_include_directories(test_ports PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_test(NAME test_ports COMMAND test_ports)
+
+# ============ ep08 步骤 3：配置体系单测（零 Lua VM / 零 DB）============
+add_executable(test_config tests/test_config.cpp)
+target_link_libraries(test_config PRIVATE sightline_adapters)
+add_test(NAME test_config COMMAND test_config)
+
+# ============ ep08 步骤 6：契约 v4.8 wire + 换枪状态机 ============
+add_executable(test_v48 tests/test_v48.cpp)
+target_link_libraries(test_v48 PRIVATE sightline_match)
+add_test(NAME test_v48 COMMAND test_v48)

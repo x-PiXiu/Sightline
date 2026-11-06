@@ -1,0 +1,3 @@
+ep08 步骤 1 占位。步骤 3/4 将承载：
+game_config.lua（纯数据表 · reload 通道）、damage.lua / bot_ai.lua（纯函数 · patch 通道）。
+脚本只写逻辑，不写数值；加载由 config_service.cpp / scripting_lua.cpp 按白名单读入内存。

@@ -52,7 +52,8 @@ struct PlayerInputMsg {
 
 /** 20 FIRE（v4.2 · 空 payload）—— 空结构体占位。空 payload 是设计核心（D5-01）：
  *  方向/位置/命中结果一概不收，判定全用服务器权威状态——客户端连"往哪打"都不让插嘴。
- *  预埋：第 7 期第二把武器加 weaponType 字段（D5-11，契约演进） */
+ *  ep08 v4.8 定案：20 号维持空包，第二把武器走 28 号换枪意图 + 服务器当前 weaponType 判定
+ *  （ep05 D5-11 预埋按此兑现，不给逐发带 type） */
 struct FireMsg {
     static std::optional<FireMsg> Parse(std::span<const std::uint8_t> b) {
         if (!b.empty()) return std::nullopt;               // 契约：空 payload，非空即拒（带方向=宣判苗头）
@@ -60,7 +61,19 @@ struct FireMsg {
     }
 };
 
-using C2SMsg = std::variant<StartMatchMsg, PlayerInputMsg, FireMsg>;   // M1 迁移集；旧消息走 raw 回落（渐进并存）
+/** 28 SWITCH_WEAPON（v4.8 · 1B）：[1B weaponType]——0=Rifle / 1=Pistol，其余值整包拒收。
+ *  20 号维持空包：服务器按当前 weaponType 判定，逐发不带 type（ep05 D5-11 预埋兑现）。 */
+struct SwitchWeaponMsg {
+    std::uint8_t weaponType = 0;
+
+    static std::optional<SwitchWeaponMsg> Parse(std::span<const std::uint8_t> b) {
+        if (b.size() != 1 || b[0] > 3) return std::nullopt;   // 2bit 容量 = 4 把枪
+        return SwitchWeaponMsg{b[0]};
+    }
+    std::string Encode() const { return std::string{static_cast<char>(weaponType)}; }
+};
+
+using C2SMsg = std::variant<StartMatchMsg, PlayerInputMsg, FireMsg, SwitchWeaponMsg>;
 
 /** 唯一 C2S switch：msgid → 选 Parse；未迁移/未知一律 nullopt（调用方回落旧路径） */
 inline std::optional<C2SMsg> DecodeC2S(std::uint16_t msgid, std::span<const std::uint8_t> payload) {
@@ -68,6 +81,7 @@ inline std::optional<C2SMsg> DecodeC2S(std::uint16_t msgid, std::span<const std:
     case 14: if (auto m = StartMatchMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
     case 19: if (auto m = PlayerInputMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
     case 20: if (auto m = FireMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
+    case 28: if (auto m = SwitchWeaponMsg::Parse(payload)) return C2SMsg{*m}; return std::nullopt;
     default: return std::nullopt;
     }
 }
@@ -134,7 +148,7 @@ struct EntityLeaveMsg {
     }
 };
 
-/** 21 FIRE_RESULT（v4.2 · 22B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]
+/** 21 FIRE_RESULT（v4.6 · 23B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]
  *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
  *  result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中。
  *  victimHp=命中后余血：第 5 期供 HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动） */
@@ -258,6 +272,75 @@ struct BotRemoveMsg {                              // 27：[4B botPid]
         if (b.size() != 4) return std::nullopt;
         BotRemoveMsg m;
         for (int i = 0; i < 4; ++i) m.botPid |= static_cast<std::uint32_t>(b[i]) << (8 * i);
+        return m;
+    }
+};
+
+// ===== 第 8 期：契约 v4.8 =====
+
+/** 17 号 flags bit3~4 = weaponType（wire 长度零增长）。
+ *  位分配：bit0 腾空 / bit1 死亡 / bit2 无敌 / bit3~4 武器类型 / bit5~7 保留。 */
+inline constexpr std::uint8_t kWeaponTypeMask = 0x18;   // bit3|bit4
+inline std::uint8_t PutWeaponType(std::uint8_t flags, std::uint8_t type) {
+    return static_cast<std::uint8_t>((flags & ~kWeaponTypeMask) | ((type & 0x03u) << 3));
+}
+inline std::uint8_t GetWeaponType(std::uint8_t flags) {
+    return static_cast<std::uint8_t>((flags & kWeaponTypeMask) >> 3);
+}
+
+/** 30 S2C_CONFIG_VERSION（v4.8 · 变长）：
+ *  [1B verLen][ver][1B N]{[1B type][1B damage][1B mag][2B reloadMs][2B fireIntervalMs]}×N
+ *  每项 7B；damage 供客户端飘字 / 预测显示，权威余血仍以 21 号 victimHp 为准（§6.1 边界 1）。
+ *  开局（15 号后）+ 每次 reload / patch 广播。 */
+struct ConfigVersionMsg {
+    struct WeaponRow {
+        std::uint8_t type = 0;
+        std::uint8_t damage = 0;
+        std::uint8_t mag = 0;
+        std::uint16_t reloadMs = 0;
+        std::uint16_t fireIntervalMs = 0;
+    };
+    std::string version;
+    std::vector<WeaponRow> weapons;
+
+    static constexpr std::size_t kRowSize = 7;
+
+    std::string Encode() const {
+        std::string s;
+        s.push_back(static_cast<char>(std::min<std::size_t>(version.size(), 255)));
+        s.append(version.data(), std::min<std::size_t>(version.size(), 255));
+        s.push_back(static_cast<char>(std::min<std::size_t>(weapons.size(), 255)));
+        for (const auto& w : weapons) {
+            s.push_back(static_cast<char>(w.type));
+            s.push_back(static_cast<char>(w.damage));
+            s.push_back(static_cast<char>(w.mag));
+            s.push_back(static_cast<char>(w.reloadMs & 0xFF));
+            s.push_back(static_cast<char>((w.reloadMs >> 8) & 0xFF));
+            s.push_back(static_cast<char>(w.fireIntervalMs & 0xFF));
+            s.push_back(static_cast<char>((w.fireIntervalMs >> 8) & 0xFF));
+        }
+        return s;
+    }
+
+    static std::optional<ConfigVersionMsg> Parse(std::span<const std::uint8_t> b) {
+        if (b.size() < 2) return std::nullopt;
+        const std::size_t verLen = b[0];
+        if (verLen + 2 > b.size()) return std::nullopt;
+        ConfigVersionMsg m;
+        m.version.assign(reinterpret_cast<const char*>(b.data() + 1), verLen);
+        const std::uint8_t n = b[1 + verLen];
+        const std::size_t body = static_cast<std::size_t>(1 + verLen) + 1;
+        if (n > 4 || body + static_cast<std::size_t>(n) * kRowSize != b.size()) return std::nullopt;
+        for (std::uint8_t i = 0; i < n; ++i) {
+            const std::size_t o = body + static_cast<std::size_t>(i) * kRowSize;
+            WeaponRow w;
+            w.type = b[o]; w.damage = b[o + 1]; w.mag = b[o + 2];
+            w.reloadMs = static_cast<std::uint16_t>(b[o + 3]) |
+                         (static_cast<std::uint16_t>(b[o + 4]) << 8);
+            w.fireIntervalMs = static_cast<std::uint16_t>(b[o + 5]) |
+                               (static_cast<std::uint16_t>(b[o + 6]) << 8);
+            m.weapons.push_back(w);
+        }
         return m;
     }
 };

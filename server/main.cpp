@@ -30,6 +30,13 @@
 #include "adapters/lobby_wiring.h"
 #include "adapters/map_geometry.h"
 #include "adapters/match_wiring.h"
+#include "adapters/config_service.h"          // ep08 步骤 3：配置适配器（4 个端口同一对象）
+#include "adapters/stdin_command_source.h"
+#include "adapters/null_persistence.h"
+#include "adapters/wire_sink.h"
+#include "adapters/bot_driver_port.h"
+#include "application/orchestrator.h"
+#include "application/policies.h"
 #include "lobby/lobby.h"
 #include "match/match_service.h"
 #include "protocol/msg_ids.h"
@@ -107,6 +114,26 @@ namespace {
         }
         return candidates.front();
     }
+
+    // ep08 步骤 3：配置表路径（§3.6 与几何合同同款候选链：env > CWD > exe 同级 > exe 上级）
+    std::string ResolveConfigPath() {
+        if (const char* env = std::getenv("SIGHTLINE_CONFIG")) return env;
+        std::vector<std::string> candidates{"assets/scripts/game_config.lua"};
+        std::array<char, 4096> buf{};
+        const ssize_t n = ::readlink("/proc/self/exe", buf.data(), buf.size() - 1);
+        if (n > 0) {
+            buf[static_cast<std::size_t>(n)] = '\0';
+            const std::string exe(buf.data());
+            const std::size_t slash = exe.find_last_of('/');
+            const std::string exeDir = (slash == std::string::npos) ? std::string(".") : exe.substr(0, slash);
+            candidates.push_back(exeDir + "/assets/scripts/game_config.lua");
+            candidates.push_back(exeDir + "/../assets/scripts/game_config.lua");
+        }
+        for (const std::string& c : candidates) {
+            if (std::ifstream f(c); f.good()) return c;
+        }
+        return candidates.front();   // 不存在 = 内建默认配置（v0-builtin），lite 裸跑
+    }
 } // namespace
 
 int main() {
@@ -159,6 +186,37 @@ int main() {
     adapters::FrameWriter writer{connections, lobby};
     std::map<int, int> fdWorker;                         // fd → worker 下标（选择计数的 main 侧账本）
 
+    // ===== ep08 步骤 3：配置 / 端口 / 编排器（组合根只做 new + 注入，不含业务节律）=====
+    adapters::ConfigService config(ResolveConfigPath());     // IConfigSource + 三张只读视图
+    writer.SetConfigVersion(&config);                         // G5：30 号只读视图注入（开局/热更广播）
+    sightline::application::BuiltinDamagePolicy damagePolicy;
+    sightline::application::BuiltinBotPolicy botPolicy;
+    adapters::NullPersistence persistence;                   // §5.7 lite 模式（full 由步骤 5 装配）
+    adapters::WireSinkAdapter wireSink(writer);              // FrameWriter → IWireSink
+    adapters::StdinCommandSource commands;                  // reload / rollback / version / help
+    adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
+    adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
+    sightline::application::ApplicationOrchestrator app{
+        sightline::application::OrchestratorDeps{
+            .now = nowMs,
+            .config = config,
+            .combat = config,
+            .commands = commands,
+            .wire = wireSink,
+            .archive = persistence,
+            .audit = persistence,
+            .board = persistence,
+            .version = config,
+            .damage = &damagePolicy,
+            .bot = &botPolicy,
+            .match = match,
+            .botDriver = botDriverPort,
+            .lobby = lobby,
+        }};
+    config.Subscribe([&app](const sightline::application::ConfigChanged& e) {
+        app.OnConfigChanged(e);                             // G4：审计 + G5：30 号广播（步骤 6）
+    });
+
     // 5.5 几何合同装载（D5-08v2：编辑器烘焙产物，构建期数据——拒绝运行时上报）。
     //     语义分层：文件存在但非法 → fail-fast（装配错误不留活口）；文件不存在 → 空遮挡表 +
     //     LOG_INFO 继续（无图环境兼容 smoke/loadbot——hitscan 无遮挡，烘焙后重启生效）
@@ -190,8 +248,11 @@ int main() {
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
-    adapters::BotDriver botDriver;                        // ep07：人机驱动（主线程单线程·零锁）
-    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟：与 Tick/人机/RTT 同源
+    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟
+    // ③ 号事件源：20 号 Fire 事件经回调进编排器，与 ①/② 在同一订阅点扇出（B1 修复）
+    matchWiring.SetFireEventSink([&app](std::vector<sightline::match::MatchEvent>&& es) {
+        app.OnFireEvents(std::move(es));
+    });
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
@@ -233,14 +294,13 @@ int main() {
             }
             }
         }
-        writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开
-        // ep07：人机 感知→决策→行动（同真人入口）——其开火产出的 21/23 事件走同一输出端口广播
-        writer.deliverMatch(botDriver.Tick(nowMs(), match, lobby));
-        auto matchEvents = match.Tick(nowMs());              // ep07：快照+死亡倒计时+重生+结束判定
-        for (const auto& e : matchEvents)
-            if (e.type == sightline::match::MatchEvent::Type::Ended)
-                lobby.SetRoomInMatch(e.roomId, false);       // 终局过桥复位（对局中拒 JOIN 解除）
-        writer.deliverMatch(matchEvents);                    // 33ms 实体快照广播（17v2，不含自机）
+        writer.deliver(lobby.SweepLoginTimeouts(nowMs()));   // 宽限超时 → KICKED(2)+断开（框架层）
+        app.OnFrame();                                       // ep08：业务帧节律归用例层编排器
+        static std::string lastNotice;                       // 命令 / 配置通知由适配器落日志，用例层零 IO
+        if (!app.Notice().empty() && app.Notice() != lastNotice) {
+            LOG_INFO("[配置] " + app.Notice());
+            lastNotice = app.Notice();
+        }
 
         // 子 reactor 状态行：首拍一行（开机自证"帧循环在跑、计数管线通"）+ 计数变化才再落行——
         // 空闲零噪音，连接进出/均分变化各有存照（逐连接明细另有 新连接/连接关闭 行，此行只管账面）
@@ -254,6 +314,7 @@ int main() {
         if (gShutdownRequested) {
             LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
             writer.deliver(lobby.ShutdownBroadcast());
+            app.Shutdown();          // ep08：停止接帧（步骤 5 的队列排水 / 线程汇合在此挂接）
             loop.quit();
         }
     };
@@ -315,6 +376,7 @@ int main() {
              (workers.empty() ? "单线程拓扑"
                               : ("主从 Reactor · IO workers=" + std::to_string(workers.size()))) +
              " · 帧队列 · 心跳 · 登录+房间+对局）");
+    LOG_INFO("[配置] " + config.StatusLine() + " · [DB] profile=lite（持久化未启用）");
     loop.loop();                                              // 主线程进入事件循环
 
     // 9. 收尾顺序（Channel 摘除必须归属线程）：先请 worker 关完连接，再停 worker，最后对象析构（无 Channel 裸对象任意线程安全）

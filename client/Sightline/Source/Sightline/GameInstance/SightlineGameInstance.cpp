@@ -513,7 +513,7 @@ void USightlineGameInstance::OnFrameReceived(uint16 MsgId, const TArray<uint8>& 
     if (MatchSession &&
         (MsgId == MSG_S2C_MATCH_START || MsgId == MSG_S2C_ENTITY_STATE || MsgId == MSG_S2C_ENTITY_LEAVE ||
          MsgId == MSG_S2C_FIRE_RESULT || MsgId == MSG_S2C_KILL || MsgId == MSG_S2C_RESPAWN ||
-         MsgId == MSG_S2C_MATCH_END))
+         MsgId == MSG_S2C_MATCH_END || MsgId == MSG_S2C_CONFIG_VERSION))   // ep08 v4.8：30 号配置版本
     {
         MatchSession->HandleFrame(MsgId, Payload);
         return;

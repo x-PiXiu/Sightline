@@ -7,6 +7,7 @@
 // M5 段：开火裁决（Fire——四道门→hitscan 求交→结算扣血；规则全在 fire_judge.h 纯决策头，
 //        用例只编排；时间以 nowMs 参数注入、几何以 SetGeometry 装配注入——域不持钟不读文件）
 #pragma once
+#include <array>
 #include <cstdint>
 #include <string>
 #include <random>
@@ -35,6 +36,7 @@ struct Entity {
     bool bHasReport = false;           // 首次上报前不入快照（位置未知的玩家不进世界）
     float lx = 0.f, ly = 0.f, lz = 0.f; // 上次上报位（增量基准——权威增量=本次上报-上次上报）
     WeaponState weapon;                // M5：开火状态（MatchStart 时满血满匣）
+    std::uint8_t weaponType = 0;       // ep08 v4.8：0=Rifle / 1=Pistol；17 号 flags bit3~4 下发
     // —— ep06 回溯：权威位时间线（服务器接收时刻·单钟 ADR-1）——
     HistorySample history[kEntityHistoryCap]; // 环形（32 槽×1/30s ≈ 1.07s 窗口 > 回溯上限 1000ms）
     std::uint8_t histCount = 0;        // 有效条数（≤kEntityHistoryCap）
@@ -59,6 +61,7 @@ struct EntitySnapshot {
     float yaw = 0.f, pitch = 0.f;
     std::uint8_t flags = 0;
     std::uint32_t ackedSeq = 0;        // v4：17 号每实体 25B→29B（契约破例 D4-01）
+    std::uint8_t weaponType = 0;       // ep08：只用于服务端组装 flags bit3~4，不进 wire 结构体
 };
 
 /** 21 号载荷源 + 领域裁定（2026-11-04 审计 C 级收编：域事件只载裁定与 wire 字段，
@@ -169,8 +172,16 @@ public:
     /** 自主换弹（2026-11-05 用户令：完整对局需可自主换弹·29 号）：换弹钟权威在服务器——客户端
      *  R 键只发意图，本端校验后上钟；到期补满仍由 ConsumeWeaponGate 惰性完成（换弹中→弹匣空→
      *  满匣一条状态机不打断）。静默布尔（无效=false，调用方落日志）——无事件无广播（远端换弹
-     *  表现 ep14） */
+     *  表现 ep14）。ep08：换弹钟取当前武器表的 reload_ms（D2）。 */
     bool Reload(std::uint32_t playerId, std::uint64_t nowMs);
+
+    // ===== ep08 v4.8：第二把武器 + 配置表接线 =====
+    /** 组合根在启动与每次配置生效时投喂一份纯值快照（零端口依赖，238 断言仍走默认表）。 */
+    void SetWeaponTable(const std::array<WeaponParams, 4>& table,
+                        std::uint8_t count, std::uint16_t maxHp);
+    /** 28 号换枪意图：旧枪在途换弹取消 + 新枪满匣 + 首发免射速（A4/D7 连带项一并复位）。 */
+    bool SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t nowMs);
+    std::uint8_t WeaponTypeOf(std::uint32_t playerId) const;
 
 private:
     std::vector<Entity> entities_;         // 在局实体（名册序；StartMatch 建，RemovePlayer 删）
@@ -188,6 +199,13 @@ private:
     bool bEnded_ = false;                  // ep07：终局置位（Fire/UpdateEntity 静默丢）
     std::uint8_t endReason_ = 0;
     std::uint64_t snapshotStopAtMs = 0;    // ep07：Ended 后保留快照 2s（结算面板背景）再停
+    // ep08：配置表副本（默认逐字段等于 ep07 常量，未注入时 238 断言行为零变化）
+    std::array<WeaponParams, 4> weaponTable_{
+        kDefaultWeaponParams,
+        WeaponParams{/*damage=*/20, /*mag=*/12, /*reloadMs=*/1800, /*fireMs=*/220},
+        WeaponParams{}, WeaponParams{}};
+    std::uint8_t weaponCount_ = 2;
+    std::uint16_t maxHp_ = 100;
     Entity* FindEntity(std::uint32_t pid);             // 内部查找（非 const 版复用）
 };
 

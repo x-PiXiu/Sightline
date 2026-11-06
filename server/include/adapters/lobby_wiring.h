@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "application/config_views.h"   // ep08：30 号只读视图端口（适配器→用例，方向向内）
 #include "lobby/lobby.h"
 #include "logger/logger.h"
 #include "match/match_service.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
@@ -29,6 +30,24 @@ class FrameWriter {
 public:
     FrameWriter(ConnTable& conns, const sightline::lobby::LobbyService& lobby)
         : conns_(conns), lobby_(lobby) {}
+
+    // ep08 G5：30 号载荷组装 = 数据格式翻译 = 适配器职责；只读视图由组合根注入。
+    void SetConfigVersion(const sightline::application::IConfigVersion* v) { configVersion_ = v; }
+
+    void BroadcastConfigVersion() {
+        if (!configVersion_) return;
+        const auto snap = configVersion_->Snapshot();
+        sightline::wire::ConfigVersionMsg msg;
+        msg.version = snap.version;
+        for (const auto& [type, w] : snap.weapons)
+            msg.weapons.push_back({static_cast<std::uint8_t>(type), w.damage, w.mag,
+                                   w.reloadMs, w.fireMs});
+        const std::string p = msg.Encode();
+        for (const auto& [fd, conn] : conns_) {
+            (void)conn;
+            send(fd, protocol::MSG_S2C_CONFIG_VERSION, p);   // 开局 / reload / patch 后全员同步
+        }
+    }
 
     void deliver(const std::vector<sightline::lobby::Event>& events) {
         using ET = sightline::lobby::EvType;
@@ -116,6 +135,7 @@ public:
                     send(fd, protocol::MSG_S2C_MATCH_START, p);
                 LOG_INFO("[出站] MATCH_START 房=" + std::to_string(e.roomId) +
                          " 名册=" + std::to_string(e.roster.size()));
+                BroadcastConfigVersion();                   // ep08：15 号后广播 30 号（开局参数同步）
                 break;
             }
             case MT::EntityLeave: {
@@ -267,6 +287,7 @@ private:
 
     ConnTable& conns_;
     const sightline::lobby::LobbyService& lobby_;
+    const sightline::application::IConfigVersion* configVersion_ = nullptr;   // ep08：可空（未注入时不发 30 号）
 };
 
 // ===== 入站：msgid → Handler 注册表（开闭原则：新消息只注册）=====

@@ -46,6 +46,26 @@ void USightlineMatchSession::SendReload() {
     Conn->Send(SightlineProtocol::MSG_C2S_RELOAD, Empty);       // 契约 29：空 payload（服务器上钟）
 }
 
+void USightlineMatchSession::SendSwitchWeapon(const int32 WeaponType) {
+    if (!Conn || !bInMatch) return;
+    const SightlineProtocol::FSwitchWeaponMsg M{static_cast<uint8>(WeaponType)};
+    Conn->Send(SightlineProtocol::MSG_C2S_SWITCH_WEAPON, M.Encode());   // 契约 28：1B type
+}
+
+FSightlineWeaponParams USightlineMatchSession::WeaponParams(const int32 WeaponType) const {
+    FSightlineWeaponParams Fallback;                    // 未收到 30 号前 = ep07 编译期默认值
+    if (WeaponType == 1) { Fallback.Damage = 20; Fallback.Mag = 12; Fallback.ReloadMs = 1800; Fallback.FireIntervalMs = 220; }
+    if (WeaponType < 0 || WeaponType >= RuntimeParams.Num()) return Fallback;
+    const FSightlineWeaponParams& P = RuntimeParams[WeaponType];
+    if (P.Mag <= 0 || P.ReloadMs <= 0 || P.FireIntervalMs <= 0 || P.Damage <= 0) return Fallback;
+    return P;
+}
+
+int32 USightlineMatchSession::RemoteWeaponTypeOf(const int32 Pid) const {
+    if (const int32* Found = RemoteWeaponType.Find(Pid)) return *Found;
+    return 0;
+}
+
 void USightlineMatchSession::SendLeaveRoom() {
     if (!Conn) return;
     TArray<uint8> Empty;
@@ -109,6 +129,27 @@ void USightlineMatchSession::ClearPredictionInput()   // ep07（❗9）：重生
 void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>& Payload) {
     if (!Registry) return;
 
+    // ep08 v4.8：30 号配置版本 → 运行时参数覆盖层（开局 15 号后 / reload / patch 都广播）
+    if (MsgId == SightlineProtocol::MSG_S2C_CONFIG_VERSION) {
+        SightlineProtocol::FConfigVersionMsg M;
+        if (!SightlineProtocol::FConfigVersionMsg::Parse(Payload, M)) return;   // 坏包整包拒收
+        RuntimeParams.Reset();
+        RuntimeParams.SetNum(4);
+        for (const SightlineProtocol::FConfigVersionMsg::FRow& R : M.Weapons) {
+            if (R.Type >= 4) continue;
+            FSightlineWeaponParams& P = RuntimeParams[R.Type];
+            P.Damage = static_cast<int32>(R.Damage);
+            P.Mag = static_cast<int32>(R.Mag);
+            P.ReloadMs = static_cast<int32>(R.ReloadMs);
+            P.FireIntervalMs = static_cast<int32>(R.FireIntervalMs);
+        }
+        ConfigVersion = M.Version;
+        UE_LOG(LogSightline, Log, TEXT("[30号] 配置 %s · %d 把枪 → 运行时参数覆盖层"),
+               *ConfigVersion, M.Weapons.Num());
+        OnConfigVersion.Broadcast(ConfigVersion);       // HUD 版本行
+        return;
+    }
+
     if (MsgId == SightlineProtocol::MSG_S2C_MATCH_START) {
         if (Payload.Num() < 4) return;
         const int32 Count = static_cast<int32>(ReadU32(Payload, 0));
@@ -170,6 +211,8 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
                                  FVector(Ent.X, Ent.Y, Ent.Z), Ent.Yaw, Ent.Pitch,
                                  (Ent.Flags & 0x01) != 0, (Ent.Flags & 0x04) != 0,   // bit2=无敌（2026-11-04 语义扩展）
                                  static_cast<int32>(Ent.AckedSeq));
+            // ep08 v4.8：bit3~4=weaponType（wire 零增长）——远端换枪表现随下一拍快照同步
+            RemoteWeaponType.Add(Pid, static_cast<int32>(SightlineProtocol::GetWeaponType(Ent.Flags)));
         }
         return;
     }

@@ -50,6 +50,25 @@ inline constexpr float         kNavBodyTopCm      = 176.f;   // ep07：身体高
 inline constexpr float         kNavInflateCm      = 34.f;    // ep07：障碍按命中体半径膨胀（贴墙不卡胶囊）
 inline constexpr float        kPi                  = 3.14159265358979323846f;
 
+// ===== ep08 步骤 2：武器参数值对象（D1 · 契约锁 EWeaponType）=====
+// 双端同值枚举：客户端 SightlineProtocol.h 必须镜像（MSG_IDS.md §6.2）。
+// 纪律：Lua/.lua 数据表只填参数、不发明 id。
+enum class EWeaponType : std::uint8_t { Rifle = 0, Pistol = 1 };
+
+struct WeaponParams {
+    std::uint8_t  damage   = 0;   // 30 号 payload 1B；权威判定仍在服务器
+    std::uint8_t  mag      = 0;
+    std::uint16_t reloadMs = 0;
+    std::uint16_t fireMs   = 0;
+};
+
+// 步骤 2 向后兼容缺省：ConsumeWeaponGate / ConsumeAmmo 新增尾参的默认值，逐字段等于现行
+// kDamagePerShot / kMagCapacity / kReloadMs / kFireMinIntervalMs —— 保证 6 处直调测试与
+// match_service.cpp 两处调用「行为零变化」（238 断言安全网）。步骤 3 起调用方改传 cfg->weapons[type]。
+inline constexpr WeaponParams kDefaultWeaponParams{
+    /*damage=*/25, /*mag=*/30, /*reloadMs=*/2500, /*fireMs=*/95
+};
+
 struct Vec3 {
     float x = 0.f, y = 0.f, z = 0.f;
 };
@@ -98,7 +117,8 @@ enum class FireGate { Ok, Reloading, MagEmpty, RateLimited, Dead };
  *  未触发先补满的边角——审计修复①）；③=空匣触发卫哨（常规触发已前移至 ConsumeAmmo 扣弹
  *  时刻——2026-11-05 死窗根除）；④射速容差 95ms<D5-14。
  *  ①"在对局中"由用例层判定（实体查找），不在此。被拒回传=21 号 v4.6 gate 字节（适配层广播）。 */
-inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
+inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs,
+                                  const WeaponParams& p = kDefaultWeaponParams) {
     // 换弹状态机（2026-11-05 自主换弹重构）：reloadUntilMs 双源（③ 弹匣空自动触发 / 29 号自主 R 键）
     // ——检查必须先于"弹匣空"分支且无条件执行（原实现嵌在 magUsed>=容量 分支内：半匣自主换弹
     // 上钟后门不看它 → 换弹中照常开火=测试实锤）
@@ -107,11 +127,11 @@ inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
         w.magUsed = 0;
         w.reloadUntilMs = 0;
     }
-    if (w.magUsed >= kMagCapacity) {                               // ③ 卫哨（2026-11-05 死窗根除后常规路径不可达：
-        w.reloadUntilMs = nowMs + kReloadMs;                       //  ConsumeAmmo 扣弹即上钟）——防御绕过 Fire
+    if (w.magUsed >= static_cast<int>(p.mag)) {                               // ③ 卫哨（2026-11-05 死窗根除后常规路径不可达：
+        w.reloadUntilMs = nowMs + p.reloadMs;                       //  ConsumeAmmo 扣弹即上钟）——防御绕过 Fire
         return FireGate::MagEmpty;                                 //  扣弹路径的空匣（直改状态/未来 bot）
     }
-    if (w.bHasFired && nowMs - w.lastFireMs < kFireMinIntervalMs)  // ④ 射速窗口（容差 95ms）
+    if (w.bHasFired && nowMs - w.lastFireMs < p.fireMs)  // ④ 射速窗口（容差 95ms）
         return FireGate::RateLimited;
     return FireGate::Ok;
 }
@@ -123,12 +143,15 @@ inline FireGate ConsumeWeaponGate(WeaponState& w, std::uint64_t nowMs) {
  *  到期补满仍走 ConsumeWeaponGate ② 惰性完成——一条状态机不打断。双端钟差=打空弹的
  *  单向时延（≤RTT）：客户端补满后首发到达 ≥ 服务器到期（本地门保证不早发），边界
  *  相撞由 v4.6 拒收回补自愈（≤1 发，客户端拒收 Warning 日志可见）。 */
-inline void ConsumeAmmo(WeaponState& w, std::uint64_t nowMs) {
+inline void ConsumeAmmo(WeaponState& w, std::uint64_t nowMs,
+                        const WeaponParams& p = kDefaultWeaponParams) {
     ++w.magUsed;
-    if (w.magUsed >= kMagCapacity) w.reloadUntilMs = nowMs + kReloadMs;   // 空匣即上钟（打空弹=换弹第一帧）
+    if (w.magUsed >= static_cast<int>(p.mag)) w.reloadUntilMs = nowMs + p.reloadMs;   // 空匣即上钟（打空弹=换弹第一帧）
 }
 
 inline float DamageApply(float hp) { return std::max(0.f, hp - kDamagePerShot); }   // 钳 0 不死（D5-02v2）
+// ep08：per-weapon 伤害入口；缺省参数保证旧调用逐字段等价（238 断言行为零变化）
+inline float DamageApply(float hp, float damage) { return std::max(0.f, hp - damage); }
 
 // ===== 解析几何（§4.1/§4.4/§4.5——全部解析解，无物理引擎 D5 叙事）=====
 /** §4.1 方向重建（合同公式，双端一致；客户端准星=相机 forward=同一 yaw/pitch——天然同源） */

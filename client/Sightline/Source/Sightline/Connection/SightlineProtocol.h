@@ -1,4 +1,4 @@
-// Sightline 协议契约（客户端镜像）—— 与 docs/protocol/MSG_IDS.md、服务端 protocol/msg_ids.h 保持一致
+// Sightline 协议契约（客户端镜像）—— 与 docs/protocol/MSG_IDS.md v4.8、服务端 protocol/msg_ids.h 保持一致
 // 帧格式：[2B len][2B msgid][payload]，小端；len = 2 + payload.Num()
 // 本头文件纯常量与纯函数，零引擎依赖——协议契约层的谦卑对象
 #pragma once
@@ -26,24 +26,82 @@ namespace SightlineProtocol
         MSG_C2S_START_MATCH   = 14, // C→S  (空 payload)　仅房主、在房中
         MSG_S2C_MATCH_START   = 15, // S→C  [4B 玩家数 n]{[4B PlayerId][1B 名长][名字][1B 出生点序号]}×n
         MSG_C2S_MOVE_REPORT   = 16, // C→S  [12B pos xyz f32][4B yaw f32][4B pitch f32][1B flags]（bit0=腾空）
-        MSG_S2C_ENTITY_STATE  = 17, // S→C v2 [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags][4B ackedSeq]}×n（29B/实体·不含自己；v4 破例 D4-01）
+        MSG_S2C_ENTITY_STATE  = 17, // S→C v4.8 [2B 数量 n]{[4B PlayerId][12B pos][4B yaw][4B pitch][1B flags][4B ackedSeq]}×n（29B/实体·含接收者自己 v4.1；flags bit3~4=weaponType）
         MSG_S2C_ENTITY_LEAVE  = 18, // S→C  [4B PlayerId]（成员离开房间/断线 → 对端销毁角色）
         // —— 第 4 期：预测与和解（与 docs/protocol/MSG_IDS.md v4 保持同步）——
         MSG_C2S_PLAYER_INPUT  = 19, // C→S  [4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B（对局期替代 16·R10）
         // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
-        MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
-        MSG_S2C_FIRE_RESULT   = 21, // S→C  [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp]=22B（房内全员广播·含射手）
+        MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）；ep08 v4.8 维持空包
+        MSG_S2C_FIRE_RESULT   = 21, // S→C v4.6 [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]=23B（房内全员广播·含射手）
         MSG_C2S_RTT_REPORT    = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
         // —— 第 7 期：死亡/重生/结算 + 人机席位（v4.4）——
         MSG_S2C_KILL           = 23, // S→C  [4B victimPid][4B killerPid][2B respawnDelayMs]=10B——房内全员广播
-        MSG_S2C_RESPAWN        = 24, // S→C  [4B pid][1B spawnIndex][2B invulnMs]=7B——服务器选点下发序号
+        MSG_S2C_RESPAWN        = 24, // S→C v4.5 [4B pid][1B spawnIndex][2B invulnMs][4B x][4B y][4B z][4B yaw]=23B——服务器权威落位
         MSG_S2C_MATCH_END      = 25, // S→C  [1B 原因][1B n]{[4B pid][2B kills][2B deaths]}×n
         MSG_C2S_BOT_ADD        = 26, // C→S  [1B 难度]——仅房主
-        MSG_C2S_RELOAD          = 29, // C→S  (空)——自主换弹（28 留 ep08 SWITCH_WEAPON·契约 v4.7）
         MSG_C2S_BOT_REMOVE     = 27, // C→S  [4B botPid]——仅房主
+        // —— 第 8 期：契约 v4.8（已实施）——
+        MSG_C2S_SWITCH_WEAPON  = 28, // C→S  [1B weaponType]（0=Rifle / 1=Pistol）
+        MSG_C2S_RELOAD         = 29, // C→S  (空)——自主换弹
+        MSG_S2C_CONFIG_VERSION = 30, // S→C  [1B verLen][ver][1B N]{[1B type][1B damage][1B mag][2B reloadMs][2B fireMs]}×N
     };
 
     constexpr int32 HeaderSize = 4;   // 2B len + 2B msgid
+
+    // 17 号 flags 位分配（v4.8）：bit0 腾空 / bit1 死亡 / bit2 无敌 / bit3~4 weaponType / bit5~7 保留
+    constexpr uint8 WeaponTypeMask = 0x18;
+    inline uint8 GetWeaponType(uint8 Flags) { return static_cast<uint8>((Flags & WeaponTypeMask) >> 3); }
+    inline uint8 PutWeaponType(uint8 Flags, uint8 Type) {
+        return static_cast<uint8>((Flags & ~WeaponTypeMask) | ((Type & 0x03u) << 3));
+    }
+
+    /** 28 C2S_SWITCH_WEAPON（1B）：只发意图，服务器按权威状态判定 */
+    struct FSwitchWeaponMsg {
+        uint8 WeaponType = 0;
+        TArray<uint8> Encode() const {
+            TArray<uint8> Out;
+            Out.Add(WeaponType);
+            return Out;
+        }
+    };
+
+    /** 30 S2C_CONFIG_VERSION（变长 · 每项 7B）：客户端运行时参数覆盖层的唯一数据源 */
+    struct FConfigVersionMsg {
+        struct FRow {
+            uint8 Type = 0;
+            uint8 Damage = 0;
+            uint8 Mag = 0;
+            uint16 ReloadMs = 0;
+            uint16 FireIntervalMs = 0;
+        };
+        FString Version;
+        TArray<FRow> Weapons;
+
+        static constexpr int32 RowSize = 7;
+
+        static bool Parse(const TArray<uint8>& P, FConfigVersionMsg& Out) {
+            if (P.Num() < 2) return false;
+            const int32 VerLen = P[0];
+            if (VerLen + 2 > P.Num()) return false;
+            FUTF8ToTCHAR Conv(reinterpret_cast<const ANSICHAR*>(P.GetData() + 1), VerLen);
+            Out.Version = FString::ConstructFromPtrSizeWithSlack(Conv.Get(), Conv.Length(), 0);
+            const int32 N = P[1 + VerLen];
+            const int32 Body = 2 + VerLen;
+            if (N > 4 || P.Num() != Body + N * RowSize) return false;   // 精确长度，格式不对整包拒收
+            Out.Weapons.Reset();
+            for (int32 i = 0; i < N; ++i) {
+                const int32 o = Body + i * RowSize;
+                FRow R;
+                R.Type = P[o];
+                R.Damage = P[o + 1];
+                R.Mag = P[o + 2];
+                R.ReloadMs = static_cast<uint16>(P[o + 3]) | (static_cast<uint16>(P[o + 4]) << 8);
+                R.FireIntervalMs = static_cast<uint16>(P[o + 5]) | (static_cast<uint16>(P[o + 6]) << 8);
+                Out.Weapons.Add(R);
+            }
+            return true;
+        }
+    };
 
     struct FFrame
     {

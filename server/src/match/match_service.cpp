@@ -32,6 +32,8 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
         Entity E;
         E.playerId = roster[i].playerId;                       // 位置先落原点——首个 19 上报覆盖
         E.spawnIx = static_cast<std::uint8_t>(i);              // ep07：重生选点回传序号（24 号）
+        E.weapon.hp = static_cast<float>(maxHp_);              // ep08：血量取配置表
+        E.weaponType = 0;                                      // ep08：开局默认 Rifle
         // ep07 开局锚定（2026-11-03 用户实锤"开局按 W 被拉出地图"）：PIE 大厅/对局同关卡重载——
         // 切图前旧世界 Character 的 19 号比新角色早到 1~2s，"首报即真值"会把旧角色站位（可能远离
         // 本局出生点上千米）写成权威位；新角色瞬移出生后被判超速钳制 → 每次和解都往旧位拉。
@@ -182,9 +184,12 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
     for (Entity& E : entities_) {
         if (!E.bDead || nowMs < E.respawnAtMs) continue;
         E.bDead = false;
-        E.weapon.hp = kMaxHp;
+        E.weapon.hp = static_cast<float>(maxHp_);             // ep08：配置表血量
         E.weapon.magUsed = 0;
         E.weapon.reloadUntilMs = 0;
+        E.weapon.lastFireMs = 0;                             // ep08 D7 连带：射速钟 / 首发标记一并复位
+        E.weapon.bHasFired = false;
+        E.weaponType = 0;                                     // ep08 D7 连带：重生回 Rifle
         E.bornAtMs = nowMs;                              // 命中候选过滤锚（❗8）
         E.invulnUntilMs = nowMs + kInvulnMs;             // 出生保护（D7-03）
         E.rebasePending = true;                          // 重生握手（❗9）
@@ -255,9 +260,10 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
         if (!Src.bHasReport) continue;                       // 未上报者不入快照（避免 (0,0,0) 幻影出生）
         const std::uint8_t flags2 = static_cast<std::uint8_t>(
             Src.flags | (Src.bDead ? 0x02 : 0x00) |
-            (nowMs < Src.invulnUntilMs ? 0x04 : 0x00));   // bit2=无敌期（2026-11-04 语义扩展·wire 不变长——
-                                                          //  客户端闪烁随本位实时同步，含"开火即破"提前结束）
-        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch, flags2, Src.ackedSeq});
+            (nowMs < Src.invulnUntilMs ? 0x04 : 0x00) |
+            ((Src.weaponType & 0x03u) << 3));             // ep08 v4.8：bit3~4=weaponType（wire 零增长）
+        E.entities.push_back({Src.playerId, Src.x, Src.y, Src.z, Src.yaw, Src.pitch,
+                              flags2, Src.ackedSeq, Src.weaponType});
     }
     out.push_back(std::move(E));
     return out;
@@ -271,7 +277,35 @@ bool MatchService::Reload(std::uint32_t playerId, std::uint64_t nowMs) {
     if (E->bDead) return false;                            // 死亡期（尸体无手）
     if (nowMs < E->weapon.reloadUntilMs) return false;     // 已在换弹（重复 R 忽略）
     if (E->weapon.magUsed == 0) return false;              // 满匣无须换
-    E->weapon.reloadUntilMs = nowMs + kReloadMs;           // 上钟（到期补满走 ConsumeWeaponGate 惰性）
+    E->weapon.reloadUntilMs = nowMs + weaponTable_[E->weaponType].reloadMs;  // ep08 D2：取当前枪配置
+    return true;
+}
+
+// ===== ep08 v4.8：配置表 / 换枪状态机 =====
+void MatchService::SetWeaponTable(const std::array<WeaponParams, 4>& table,
+                                  std::uint8_t count, std::uint16_t maxHp) {
+    weaponTable_ = table;
+    weaponCount_ = (count == 0 || count > 4) ? 2 : count;
+    maxHp_ = maxHp == 0 ? 100 : maxHp;
+}
+
+std::uint8_t MatchService::WeaponTypeOf(std::uint32_t playerId) const {
+    for (const Entity& E : entities_)
+        if (E.playerId == playerId) return E.weaponType;
+    return 0;
+}
+
+bool MatchService::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t) {
+    if (!bActive_ || bEnded_) return false;
+    if (type >= weaponCount_) return false;                 // 契约锁：只认配置表里存在的枪
+    Entity* E = FindEntity(playerId);
+    if (!E || !E->bHasReport || E->bDead) return false;
+    if (E->weaponType == type) return true;                 // 幂等：重复按同一数字键无副作用
+    E->weaponType = type;
+    E->weapon.magUsed = 0;                                 // A4：新枪满匣
+    E->weapon.reloadUntilMs = 0;                           // A4：旧枪在途换弹取消
+    E->weapon.lastFireMs = 0;                              // A4 漏项：射速钟清零，换枪首帧不被挡
+    E->weapon.bHasFired = false;
     return true;
 }
 
@@ -300,8 +334,10 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         if (E.playerId == shooterPid) { shooter = &E; break; }
     if (!shooter || !shooter->bHasReport) return out;        // ① 未上报=位置未知，判不了
 
-    // ②③④ 武器门（换弹含到期补满 / 弹匣空触发换弹 / 射速容差 95ms——fire_judge 纯函数）
-    const FireGate gate = ConsumeWeaponGate(shooter->weapon, nowMs);
+    // ep08：per-weapon 参数唯一真相源（配置表副本；未注入时逐字段等于 ep07 常量）
+    const WeaponParams wp = weaponTable_[shooter->weaponType];
+    // ②③④ 武器门（换弹含到期补满 / 弹匣空触发换弹 / 射速容差——fire_judge 纯函数）
+    const FireGate gate = ConsumeWeaponGate(shooter->weapon, nowMs, wp);
     if (gate != FireGate::Ok) {                              // 拒收回传（v4.6：bAccepted=false + gate 随 21 号广播）
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
@@ -378,7 +414,7 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     if (v.hit) {
         for (Entity& E : entities_) {
             if (E.playerId != v.victimPid) continue;
-            E.weapon.hp = DamageApply(E.weapon.hp);
+            E.weapon.hp = DamageApply(E.weapon.hp, static_cast<float>(wp.damage));
             victimHp = static_cast<std::uint8_t>(E.weapon.hp);
             victimX = E.x; victimY = E.y; victimZ = E.z;
             if (E.weapon.hp <= 0.f && !E.bDead) {                // 死亡状态机（D5-02v2 预埋兑现）
@@ -404,7 +440,7 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     }
 
     // ⑦ 扣弹 + 记时（judgeAtMs 预留：ep06 回溯只换判定时刻，本流水线其余步骤不动）
-    ConsumeAmmo(shooter->weapon, nowMs);                     // 空匣即上钟（2026-11-05 死窗根除——
+    ConsumeAmmo(shooter->weapon, nowMs, wp);                // 空匣即上钟（2026-11-05 死窗根除——
                                                              //  原 ③ 下一发才触发=比客户端钟晚整个换弹窗）
     shooter->weapon.lastFireMs = nowMs;
     shooter->weapon.bHasFired = true;

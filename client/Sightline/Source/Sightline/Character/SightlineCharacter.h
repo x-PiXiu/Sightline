@@ -218,6 +218,15 @@ private:
     void OnScoreboardPressed();                  // ep07 收官：Tab 按住显示比分板
     void OnScoreboardReleased();                 // 松开隐藏
     void OnReloadInput();                        // ep07 收官：R 自主换弹（29 号·服务器上钟）
+    void OnSwitchRifle();                        // ep08：数字键 1 → 28 号
+    void OnSwitchPistol();                       // ep08：数字键 2 → 28 号
+    void ApplyWeaponSwitch(int32 WeaponType);    // ep08 A4：新枪满匣 + 在途换弹/射速钟清零
+    UFUNCTION() void OnConfigVersionHandler(const FString& Version);   // ep08：30 号 HUD 版本行
+    // ep08：运行时参数覆盖层读取（未收到 30 号时回退编译期默认值）
+    int32 WDamage() const;
+    int32 WMag() const;
+    int32 WReloadMs() const;
+    int32 WFireMs() const;
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
@@ -258,9 +267,10 @@ private:
     FTimerHandle HitmarkerTimer;
     TWeakObjectPtr<UUserWidget> ActiveHitmarker;   // 单活跃 Hitmarker（连发 100ms<归池 150ms：重复取件=定时器覆盖泄漏）
     FTimerHandle HurtFlashTimer;
-    std::uint64_t NextFireAllowedMs = 0;         // 客户端步进 100ms（服务器 95ms 容差吸抖动）
+    std::uint64_t NextFireAllowedMs = 0;         // 客户端步进（ep08 起按 30 号 fireIntervalMs）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;
+    int32 CurrentWeaponType = 0;                 // ep08：0=Rifle / 1=Pistol（本地乐观，权威在服务器）
     float LastReportedYaw = 0.f;                 // 诊断镜像：最近一次 19 号上报的姿态——与弹余行的准星
     float LastReportedPitch = 0.f;               // 姿态并排打印，"上报值 vs 准星值"恒差一眼定案
 

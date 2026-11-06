@@ -1,0 +1,3 @@
+ep08 步骤 1 占位。步骤 3/4/5 将承载：
+config_service.cpp、scripting_lua.cpp、persistence.cpp、mysql_store.cpp、mongo_store.cpp、redis_store.cpp。
+本目录是接口适配器层（最外层），只实现 include/application/ 定义的端口。
