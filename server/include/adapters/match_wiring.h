@@ -133,7 +133,10 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;
-            if (!match_.SwitchWeapon(static_cast<std::uint32_t>(pid), msg->weaponType, Now_())) {
+            std::string why;
+            if (!match_.SwitchWeapon(static_cast<std::uint32_t>(pid), msg->weaponType, Now_(), &why)) {
+                LOG_INFO("[换枪] 拒绝 pid=" + std::to_string(pid) + " type=" +
+                         std::to_string(msg->weaponType) + " 原因=" + why);
                 LOG_INFO("[换枪] 拒绝 pid=" + std::to_string(pid) +
                          " type=" + std::to_string(msg->weaponType));
                 return;

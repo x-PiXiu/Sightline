@@ -186,7 +186,8 @@ public:
     /** 收口②：伤害策略注入（nullptr=内建 DamageApply 路径，测试桩与 Lua fallback 同口）。 */
     void SetDamagePolicy(IDamagePolicy* p) { damage_ = p; }
     /** 28 号换枪意图：旧枪在途换弹取消 + 新枪满匣 + 首发免射速（A4/D7 连带项一并复位）。 */
-    bool SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t nowMs);
+    bool SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t nowMs,
+                      std::string* why = nullptr);   // why=拒绝原因出参（日志归适配器层）
     std::uint8_t WeaponTypeOf(std::uint32_t playerId) const;
 
 private:

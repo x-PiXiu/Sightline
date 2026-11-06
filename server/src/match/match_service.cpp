@@ -112,6 +112,10 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
             return;
         }
         if (E.rebasePending) {                             // ep07：重生握手（❗9）
+            // ⚠ 开局首报同吃此门：客户端必须先到 15 号出生点（合同点）再发 19——远离出生点的
+            //   假位置在此静默拒、实体永不入快照（2026-11-07 实机验证轮实锤：live_chain_test.py
+            //   首版上报 (16.5,0) 排查一小时即此坑）。拒=正确防御（防旧包污染基准），坑在"静默"。
+            //   排查锚：快照找不到自实体 + 换枪/开火一律被门拒（原因=未激活）。
             const float dx0 = x - E.spawnX, dy0 = y - E.spawnY;
             if (dx0 * dx0 + dy0 * dy0 < 100.f * 100.f) {   // 出生点附近首条 → 重定基准放行
                 E.rebasePending = false;
@@ -297,11 +301,15 @@ std::uint8_t MatchService::WeaponTypeOf(std::uint32_t playerId) const {
     return 0;
 }
 
-bool MatchService::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t) {
-    if (!bActive_ || bEnded_) return false;
-    if (type >= weaponCount_) return false;                 // 契约锁：只认配置表里存在的枪
+bool MatchService::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t, std::string* why) {
+    // 拒绝原因做出参（用例层零日志——编排/落日志归适配器；2026-11-07 实机验证轮补外显）
+    const auto Set = [why](const char* r) { if (why) *why = r; };
+    if (!bActive_ || bEnded_) { Set("对局门"); return false; }
+    if (type >= weaponCount_) { Set("类型越界"); return false; }   // 契约锁：只认配置表里存在的枪
     Entity* E = FindEntity(playerId);
-    if (!E || !E->bHasReport || E->bDead) return false;
+    if (!E) { Set("无实体"); return false; }
+    if (!E->bHasReport) { Set("未激活(无19上报)"); return false; }
+    if (E->bDead) { Set("死亡期"); return false; }
     if (E->weaponType == type) return true;                 // 幂等：重复按同一数字键无副作用
     E->weaponType = type;
     E->weapon.magUsed = 0;                                 // A4：新枪满匣
