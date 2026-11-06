@@ -135,7 +135,6 @@ public:
     int32 ReloadMsOf(int32 WeaponType) const { return WeaponParams(WeaponType).ReloadMs; }
     int32 FireIntervalMsOf(int32 WeaponType) const { return WeaponParams(WeaponType).FireIntervalMs; }
     const FString& GetConfigVersion() const { return ConfigVersion; }
-    int32 RemoteWeaponTypeOf(int32 Pid) const;
 
     /** 离开房间（契约 10 号·空 payload）：对局结束返回大厅——连接保持，服务器移出房间后广播
      *  ROOM_LIST，GI 既有流程自动"切回大厅世界+显示大厅"（2026-11-05 结算"离开"按钮修） */
@@ -214,5 +213,4 @@ private:
     TMap<int32, FSightlineScore> ScoreMap;             // 比分板客户端缓存（23 号事件流累加；15 号新局清账）
     TArray<FSightlineWeaponParams> RuntimeParams;      // ep08：30 号 per-weapon 参数覆盖层
     FString ConfigVersion;                             // ep08：HUD 版本行（v7-a3f2c1d8）
-    TMap<int32, int32> RemoteWeaponType;               // ep08：17 号 flags bit3~4 → 远端武器表现
 };

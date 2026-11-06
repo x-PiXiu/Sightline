@@ -22,8 +22,10 @@ void USightlinePawnSpawner::HandleEntityUpdated(int32 PlayerId) {
     if (!Registry->GetEntity(PlayerId, E)) return;
     if (E.bSelf) return;                                    // 本地 Pawn 不吃网络位姿
     if (TWeakObjectPtr<APawn>* P = Live.Find(PlayerId)) {
-        if (ASightlineCharacter* C = Cast<ASightlineCharacter>(P->Get()))
+        if (ASightlineCharacter* C = Cast<ASightlineCharacter>(P->Get())) {
             C->ApplyState(E.Pos, E.Yaw, E.Pitch, E.bFalling, E.bInvuln, E.AckedSeq);   // 快照入环 + ack 时间基准（速度算段速）
+            C->SetRemoteWeaponType(E.WeaponType);       // 步骤 7：远端武器表现（17 号 bit3~4 随快照；幂等）
+        }
     }
     // 未生成的快照（SpawnAll 之前到达）——状态已在 Registry，生成时自然带最新
 }

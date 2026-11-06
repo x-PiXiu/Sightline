@@ -11,7 +11,7 @@ void USightlineEntityRegistry::ApplyMatchStart(int32 SelfPlayerId, const TArray<
     }
 }
 
-void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, bool bInvuln, int32 AckedSeq) {
+void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, float Yaw, float Pitch, bool bFalling, bool bInvuln, int32 AckedSeq, int32 WeaponType) {
     FSightlineEntityState* E = Entities.Find(PlayerId);
     if (!E) return;                                        // 未知实体（未进对局）静默忽略
     E->Pos = Pos;
@@ -20,6 +20,7 @@ void USightlineEntityRegistry::ApplyState(int32 PlayerId, const FVector& Pos, fl
     E->bFalling = bFalling;
     E->bInvuln = bInvuln;
     E->AckedSeq = FMath::Max(E->AckedSeq, AckedSeq);       // v4·R11：确认序号只进不退（乱序防御）
+    if (WeaponType >= 0) E->WeaponType = WeaponType;       // 步骤 7：-1=未携带保持旧值（默认参数向后兼容）
     OnEntityUpdated.Broadcast(PlayerId);
 }
 

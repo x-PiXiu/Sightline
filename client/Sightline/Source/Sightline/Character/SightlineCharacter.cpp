@@ -691,12 +691,15 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
     if (bSelfShot) {
         if (Result.bHit && HitSound != nullptr) UGameplayStatics::PlaySound2D(this, HitSound.Get());
     } else {
-        if (RemoteFireSound != nullptr) UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 2D 缩小版（ep14 空间化）
-        if (FireMontage) {
-            if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
-                if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner()) {
-                    if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Result.ShooterPid)))
-                        if (UAnimMontage* M = Remote->FireMontageOf()) Remote->PlayAnimMontage(M);   // 远端开火（步骤 7：远端按自己的表查）
+        // 步骤 7：远端枪声/动画都按**射手的表**查（依赖 17 号 bit3~4 → Registry → SetRemoteWeaponType 同步链）
+        if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
+            if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner()) {
+                if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Result.ShooterPid))) {
+                    if (USoundBase* S = Remote->FireSoundOf())
+                        UGameplayStatics::PlaySound2D(this, S);   // 2D 缩小版（ep14 空间化）——射手武器真声
+                    if (UAnimMontage* M = Remote->FireMontageOf()) Remote->PlayAnimMontage(M);   // 远端开火动画
+                } else if (RemoteFireSound != nullptr) {
+                    UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 射手已不在场：旧兜底
                 }
             }
         }
@@ -803,6 +806,12 @@ USoundBase* ASightlineCharacter::ReloadSoundOf() const {
     if (const USightlineWeaponDefinition* D = GetWeaponDef())
         if (D->ReloadSound != nullptr) return D->ReloadSound.Get();
     return ReloadSound.Get();
+}
+
+void ASightlineCharacter::SetRemoteWeaponType(const int32 WeaponType) {
+    if (CurrentWeaponType == WeaponType) return;          // 幂等（快照 30Hz 重复喂）
+    CurrentWeaponType = WeaponType;
+    UE_LOG(LogSightline, Log, TEXT("[远端武器] pid 表现 → type=%d（查表态·零钟副作用）"), WeaponType);
 }
 
 void ASightlineCharacter::OnSwitchRifle()  { ApplyWeaponSwitch(0); }

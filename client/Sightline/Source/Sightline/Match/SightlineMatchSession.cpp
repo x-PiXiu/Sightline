@@ -61,10 +61,6 @@ FSightlineWeaponParams USightlineMatchSession::WeaponParams(const int32 WeaponTy
     return P;
 }
 
-int32 USightlineMatchSession::RemoteWeaponTypeOf(const int32 Pid) const {
-    if (const int32* Found = RemoteWeaponType.Find(Pid)) return *Found;
-    return 0;
-}
 
 void USightlineMatchSession::SendLeaveRoom() {
     if (!Conn) return;
@@ -210,9 +206,8 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
             Registry->ApplyState(Pid,
                                  FVector(Ent.X, Ent.Y, Ent.Z), Ent.Yaw, Ent.Pitch,
                                  (Ent.Flags & 0x01) != 0, (Ent.Flags & 0x04) != 0,   // bit2=无敌（2026-11-04 语义扩展）
-                                 static_cast<int32>(Ent.AckedSeq));
-            // ep08 v4.8：bit3~4=weaponType（wire 零增长）——远端换枪表现随下一拍快照同步
-            RemoteWeaponType.Add(Pid, static_cast<int32>(SightlineProtocol::GetWeaponType(Ent.Flags)));
+                                 static_cast<int32>(Ent.AckedSeq),
+                                 static_cast<int32>(SightlineProtocol::GetWeaponType(Ent.Flags)));   // bit3~4（步骤 7：随快照入 Registry——远端武器表现唯一通道）
         }
         return;
     }

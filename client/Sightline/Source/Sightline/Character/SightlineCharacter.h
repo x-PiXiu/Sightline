@@ -83,6 +83,17 @@ public:
         return bRemoteActive ? RemoteVelocity : Super::GetVelocity();
     }
 
+    // —— ep08 步骤 7（§7.3）：动画表出口——ABP 三处改绑的数据源（换枪零改 ABP 的 C++ 半边）——
+    /** 当前武器数据资产（WeaponDefs 按 CurrentWeaponType 线性查；未配=空，调用方判空走兜底） */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    USightlineWeaponDefinition* GetWeaponDef() const;
+    /** 当前武器动画集（ABP AO/Locomotion 节点直取；查不到=空集，ABP 用默认连线） */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    FSightlineWeaponAnimSet GetWeaponAnimSet() const;
+    /** 远端武器表现同步（PawnSpawner 每拍喂 17 号 bit3~4）——只改查表态（CurrentWeaponType），
+     *  **不发 28 号、不碰弹匣/换弹/射速钟**（那是 ApplyWeaponSwitch=本地输入专责；两者勿混） */
+    void SetRemoteWeaponType(int32 WeaponType);
+
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
@@ -200,14 +211,6 @@ protected:
     /** 弹孔贴花材质（Lyra 迁移 M_Decal_Base 系；未配置=静默降级零开销） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UMaterialInterface> ImpactDecalMaterial = nullptr;
-
-    // —— ep08 步骤 7（§7.3）：动画表出口——ABP 三处改绑的数据源（换枪零改 ABP 的 C++ 半边）——
-    /** 当前武器数据资产（WeaponDefs 按 CurrentWeaponType 线性查；未配=空，调用方判空走兜底） */
-    UFUNCTION(BlueprintPure, Category = "Sightline")
-    USightlineWeaponDefinition* GetWeaponDef() const;
-    /** 当前武器动画集（ABP AO/Locomotion 节点直取；查不到=空集，ABP 用默认连线） */
-    UFUNCTION(BlueprintPure, Category = "Sightline")
-    FSightlineWeaponAnimSet GetWeaponAnimSet() const;
 
     UFUNCTION(Exec) void SrvBakeOccluders();     // 控制台烘焙入口（M5-F 步骤 6.2）
 
