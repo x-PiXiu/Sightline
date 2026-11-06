@@ -142,7 +142,7 @@ void ASightlineCharacter::BeginPlay() {
         if (MatchSession->IsInMatch())
         {
             CreateMatchUI();                         // 晚于开局入局（切图后生成）也补建对局 UI
-            if (EquipMontage) PlayAnimMontage(EquipMontage);   // ep06：出生拔枪（入场仪式感；对局门内才播）
+            if (UAnimMontage* M = EquipMontageOf()) PlayAnimMontage(M);   // ep06：出生拔枪（步骤 7：查表）
         }
         else
             MatchSession->OnMatchStarted.AddDynamic(this, &ASightlineCharacter::OnMatchStartedHandler);
@@ -287,8 +287,10 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
             // 肘部引导：目标点向身体左下偏（组件空间 y 负=左）——肘弯向身体左前下，防 IK 绕背解
             AnimInputs.LH_IK_Joint = AnimInputs.LH_IK_Target.GetTranslation() + FVector(0.f, -30.f, -40.f);
             const UAnimInstance* AI = GetMesh()->GetAnimInstance();
-            const bool bMontageBusy = AI && ((ReloadMontage && AI->Montage_IsActive(ReloadMontage)) ||
-                                             (EquipMontage && AI->Montage_IsActive(EquipMontage)));
+            UAnimMontage* RM = ReloadMontageOf();                        // 步骤 7：查表（兜底链同族）
+            UAnimMontage* EM = EquipMontageOf();
+            const bool bMontageBusy = AI && ((RM && AI->Montage_IsActive(RM)) ||
+                                             (EM && AI->Montage_IsActive(EM)));
             AnimInputs.LH_IK_Weight = bMontageBusy ? 0.f : 1.f;   // 换弹/拔枪中 IK 让位（左手要离枪做动作）
         }
         else
@@ -583,16 +585,16 @@ void ASightlineCharacter::TryFire() {
         LocalReloadUntilMs = NowMs + WReloadMs();   // 空匣即上换弹钟（镜像服务器 2.5s；Tick 到期补满）
         // ep06 表现层：换弹动作+音（打空瞬间播；钟是权威、蒙太奇只是表现层随行——
         // 时长不齐不强扭：Lyra 换弹节奏≈2.4s vs 钟 2.5s，差 0.1s 无感）
-        if (ReloadMontage) PlayAnimMontage(ReloadMontage);
-        if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
+        if (UAnimMontage* M = ReloadMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表
+        if (USoundBase* S = ReloadSoundOf()) UGameplayStatics::PlaySoundAtLocation(this, S, GetActorLocation());
     }
     UE_LOG(LogSightline, Log, TEXT("[开火] 弹余=%d 准星 yaw=%.1f pitch=%.1f | 上报 yaw=%.1f pitch=%.1f t=%.3f"),
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
            LastReportedYaw, LastReportedPitch,
            FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）；准星 vs 上报并排=朝向偏差定案
     // 打空帧不播开火蒙太奇：同帧已播换弹蒙太奇，后播会中断覆盖（2026-10-31 实锤：换弹动作"不播"）
-    if (FireMontage && LocalMag > 0) PlayAnimMontage(FireMontage);   // AM_MM_Rifle_Fire（路线 A 原包直填）
-    if (FireSound != nullptr) UGameplayStatics::PlaySoundAtLocation(this, FireSound.Get(), GetActorLocation());
+    if (UAnimMontage* M = FireMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表（表驱动替身·旧成员兜底）
+    if (USoundBase* S = FireSoundOf()) UGameplayStatics::PlaySoundAtLocation(this, S, GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
 
@@ -694,7 +696,7 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
             if (const USightlineGameInstance* GI = Cast<USightlineGameInstance>(GetGameInstance())) {
                 if (USightlinePawnSpawner* Spawner = GI->GetPawnSpawner()) {
                     if (ASightlineCharacter* Remote = Cast<ASightlineCharacter>(Spawner->GetPawnByPid(Result.ShooterPid)))
-                        Remote->PlayAnimMontage(FireMontage);   // 远端开火动画（否则枪线凭空出现）
+                        if (UAnimMontage* M = Remote->FireMontageOf()) Remote->PlayAnimMontage(M);   // 远端开火（步骤 7：远端按自己的表查）
                 }
             }
         }
@@ -764,6 +766,44 @@ int32 ASightlineCharacter::WFireMs() const {
     return MatchSession.IsValid() ? MatchSession->FireIntervalMsOf(CurrentWeaponType)
                                   : static_cast<int32>(kFallbackFireIntervalMs);
 }
+// ===== ep08 步骤 7（§7.3）：表现资产查表兜底链——WeaponDefs 查到且 AnimSet.X 有效→用表；
+//        否则回退旧直连成员（DA 未建齐/未接线时行为零变化；迁移完成后旧成员退役） =====
+USightlineWeaponDefinition* ASightlineCharacter::GetWeaponDef() const {
+    for (const TObjectPtr<USightlineWeaponDefinition>& D : WeaponDefs)
+        if (D != nullptr && D->WeaponType == CurrentWeaponType) return D.Get();
+    return nullptr;
+}
+
+FSightlineWeaponAnimSet ASightlineCharacter::GetWeaponAnimSet() const {
+    const USightlineWeaponDefinition* D = GetWeaponDef();
+    return D ? D->AnimSet : FSightlineWeaponAnimSet{};
+}
+
+UAnimMontage* ASightlineCharacter::FireMontageOf() const {
+    if (const USightlineWeaponDefinition* D = GetWeaponDef())
+        if (D->AnimSet.Fire != nullptr) return D->AnimSet.Fire.Get();   // TObjectPtr.Get()=非 const 指针
+    return FireMontage.Get();                            // 迁移期兜底：旧直连成员
+}
+UAnimMontage* ASightlineCharacter::ReloadMontageOf() const {
+    if (const USightlineWeaponDefinition* D = GetWeaponDef())
+        if (D->AnimSet.Reload != nullptr) return D->AnimSet.Reload.Get();
+    return ReloadMontage.Get();
+}
+UAnimMontage* ASightlineCharacter::EquipMontageOf() const {
+    if (const USightlineWeaponDefinition* D = GetWeaponDef())
+        if (D->AnimSet.Equip != nullptr) return D->AnimSet.Equip.Get();
+    return EquipMontage.Get();
+}
+USoundBase* ASightlineCharacter::FireSoundOf() const {
+    if (const USightlineWeaponDefinition* D = GetWeaponDef())
+        if (D->FireSound != nullptr) return D->FireSound.Get();
+    return FireSound.Get();
+}
+USoundBase* ASightlineCharacter::ReloadSoundOf() const {
+    if (const USightlineWeaponDefinition* D = GetWeaponDef())
+        if (D->ReloadSound != nullptr) return D->ReloadSound.Get();
+    return ReloadSound.Get();
+}
 
 void ASightlineCharacter::OnSwitchRifle()  { ApplyWeaponSwitch(0); }
 void ASightlineCharacter::OnSwitchPistol() { ApplyWeaponSwitch(1); }
@@ -791,8 +831,8 @@ void ASightlineCharacter::OnReloadInput() {
     if (NowMs < LocalReloadUntilMs) return;                              // 已在换弹
     if (LocalMag >= WMag()) return;                                  // 满匣无须换
     LocalReloadUntilMs = NowMs + WReloadMs();                        // 本地钟（镜像服务器 2.5s）
-    if (ReloadMontage) PlayAnimMontage(ReloadMontage);
-    if (ReloadSound) UGameplayStatics::PlaySoundAtLocation(this, ReloadSound.Get(), GetActorLocation());
+    if (UAnimMontage* M = ReloadMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表
+    if (USoundBase* S = ReloadSoundOf()) UGameplayStatics::PlaySoundAtLocation(this, S, GetActorLocation());
     MatchSession->SendReload();                                          // 服务器上钟（弹匣真相同步）
 }
 
@@ -818,7 +858,7 @@ void ASightlineCharacter::WarmupFireChain() {
         }, 0.15f, false);
     }
     // ② 枪声/命中音 0 音量各一声（MetaSound 首播运行时编译）——本地角色这两支是硬引用，热的是 DSP 编译
-    if (FireSound) UGameplayStatics::PlaySound2D(this, FireSound.Get(), 0.f);
+    if (USoundBase* S = FireSoundOf()) UGameplayStatics::PlaySound2D(this, S, 0.f);   // 步骤 7：查表（预热）
     if (HitSound)  UGameplayStatics::PlaySound2D(this, HitSound.Get(), 0.f);
     // ③ 弹孔：脚下地板真生成一个（ADecalActor/DecalComponent 首次创建）→ 立刻 Reset 清场（不留脚印弹孔）
     if (ImpactDecalMaterial)

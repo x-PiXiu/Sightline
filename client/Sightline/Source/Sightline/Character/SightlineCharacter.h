@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "Camera/SightlineCameraComponent.h"
 #include "Match/SightlineMatchSession.h"
+#include "Game/SightlineWeaponDef.h"       // ep08 步骤 7：动画表（FWeaponAnimSet 按值返回需完整类型）
 #include "SightlineCharacter.generated.h"
 
 class UInputMappingContext;
@@ -16,6 +17,7 @@ class UAnimMontage;
 class UAnimInstance;
 class UNiagaraComponent;
 class USoundBase;
+class USightlineWeaponDefinition;          // ep08 步骤 7：武器动画表 DA（完整类型经 include 提供）
 class UUserWidget;
 class USightlineObjectPoolSubsystem;
 struct FInputActionValue;
@@ -199,6 +201,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
     TObjectPtr<UMaterialInterface> ImpactDecalMaterial = nullptr;
 
+    // —— ep08 步骤 7（§7.3）：动画表出口——ABP 三处改绑的数据源（换枪零改 ABP 的 C++ 半边）——
+    /** 当前武器数据资产（WeaponDefs 按 CurrentWeaponType 线性查；未配=空，调用方判空走兜底） */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    USightlineWeaponDefinition* GetWeaponDef() const;
+    /** 当前武器动画集（ABP AO/Locomotion 节点直取；查不到=空集，ABP 用默认连线） */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    FSightlineWeaponAnimSet GetWeaponAnimSet() const;
+
     UFUNCTION(Exec) void SrvBakeOccluders();     // 控制台烘焙入口（M5-F 步骤 6.2）
 
 private:
@@ -227,6 +237,13 @@ private:
     int32 WMag() const;
     int32 WReloadMs() const;
     int32 WFireMs() const;
+    // —— ep08 步骤 7：表现资产查表兜底链（§7.3）——WeaponDefs 查到且 AnimSet.X 有效→用表；
+    //   否则回退旧直连成员（DA 未建齐/未接线时行为零变化；迁移完成后旧成员退役）
+    UAnimMontage* FireMontageOf() const;      // 返回非 const：PlayAnimMontage(Montage*) 会写蒙太奇状态
+    UAnimMontage* ReloadMontageOf() const;
+    UAnimMontage* EquipMontageOf() const;
+    USoundBase*   FireSoundOf() const;
+    USoundBase*   ReloadSoundOf() const;
     void CreateMatchUI();                        // D5-16：开局建准星+红闪常驻件
     void ShowHitmarker();                        // Hitmarker 池 Acquire→显示→0.25s 隐藏（池根因修复后回归）
     void ReleaseHitmarker(UUserWidget* Marker);
@@ -271,6 +288,11 @@ private:
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;
     int32 CurrentWeaponType = 0;                 // ep08：0=Rifle / 1=Pistol（本地乐观，权威在服务器）
+
+    // —— ep08 步骤 7：武器动画表（§7.3 表 ≥2 行 Rifle/Pistol；BP Character Class Defaults 填 DA 引用）——
+    /** 武器数据资产表（按 WeaponType 查——换枪=换这里引用的 DA，Character/ABP 零改动） */
+    UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
+    TArray<TObjectPtr<USightlineWeaponDefinition>> WeaponDefs;
     float LastReportedYaw = 0.f;                 // 诊断镜像：最近一次 19 号上报的姿态——与弹余行的准星
     float LastReportedPitch = 0.f;               // 姿态并排打印，"上报值 vs 准星值"恒差一眼定案
 
