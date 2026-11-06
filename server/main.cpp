@@ -259,7 +259,7 @@ int main(int argc, char** argv) {
     adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
     // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
-    // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 才建，此前 LuaBotPolicy 内部走内建=行为零变化。
+    // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。
     botDriver.SetBotTuning(&config);
 #if SIGHTLINE_HAS_LUA
     auto luaRt = adapters::LuaRuntime::Create(
@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
         match.SetDamagePolicy(luaDmg.get());
         botDriver.SetBotPolicy(luaBot.get());
         patchChan = luaRt.get();       // patch 命令通道（§10.2.6 唯一新增注入位）
-        LOG_INFO("[Lua] 策略层已接（damage=lua·bot=lua(步8生效)·patch=可用）");
+        LOG_INFO("[Lua] 策略层已接（damage=lua·bot=lua·patch=可用）");
     } else {
         match.SetDamagePolicy(&damagePolicy);
         botDriver.SetBotPolicy(&botPolicy);

@@ -72,6 +72,13 @@ struct BotIntent {
 };
 
 namespace detail {
+// FSM 语义常量（非调参旋钮——行为定义本身；bot_ai.lua 经桥注入同值，改动需双改+对拍）
+constexpr float kFireConeDeg = 6.f;      // 开火误差锥（对准判据）
+constexpr float kCoverWindowMs = 1500.f; // 受击撤退窗
+constexpr float kRetreatDistCm = 400.f;  // 背向撤退步长
+constexpr float kJitterPeriodMs = 700.f; // 瞄准慢抖动周期
+constexpr float kArriveRadiusCm = 100.f; // Search 到达半径
+
 inline float YawTo(float fromX, float fromY, float toX, float toY) {
     return std::atan2(toY - fromY, toX - fromX) * 180.f / 3.14159265358979323846f;
 }
@@ -105,7 +112,7 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
     //      敌人一追就永远可见=无限后撤/推拉振荡。改=受击事件触发一个 1500ms 撤退窗，窗满无条件
     //      转 Engage/Search；重入需新的伤害事件。D7-07 L2 的"找掩护"语义保留为短反应窗）——
     if (w.visible && w.self.hp < t.hpCoverBelow && w.self.hp < m.lastHpSeen && nowMs >= m.nextCoverOkMs) {
-        m.nextCoverOkMs = nowMs + 1500;              // 撤退窗开启（1.5s）
+        m.nextCoverOkMs = nowMs + static_cast<std::uint64_t>(detail::kCoverWindowMs);              // 撤退窗开启（1.5s）
         state = BotState::TakeCover;
     }
     if (w.visible) m.lastHpSeen = w.self.hp;         // 可见时记账（不可见期间的伤害无法归因）
@@ -137,11 +144,11 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
         const float engagedS = float(nowMs - m.firstSeenMs) / 1000.f;
         m.aimErrDeg = std::max(t.errEndDeg, t.errStartDeg - t.errDecayDegPerS * engagedS);
         const float baseYaw = detail::YawTo(w.self.x, w.self.y, e.x, e.y);
-        const float noiseSign = (nowMs / 700) % 2 == 0 ? 1.f : -1.f;   // 慢抖动（非逐帧噪声）
+        const float noiseSign = (nowMs / static_cast<std::uint64_t>(detail::kJitterPeriodMs)) % 2 == 0 ? 1.f : -1.f;   // 慢抖动（非逐帧噪声）
         out.aimYawDeg = baseYaw + m.aimErrDeg * noiseSign;
         // 开火条件：对准（误差锥内）+ 射程内
         const float aimDelta = std::fabs(detail::NormDeg(out.aimYawDeg - w.self.yaw));
-        out.bFire = aimDelta <= 6.f && dist <= t.engageRangeCm && !w.self.reloading;
+        out.bFire = aimDelta <= detail::kFireConeDeg && dist <= t.engageRangeCm && !w.self.reloading;
         // 走位：超出交战距离 → 追近（沿视线方向直进——寻路由 driver 栅格兜底）
         if (dist > t.engageRangeCm) {
             out.hasMove = true;
@@ -160,7 +167,7 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
         out.moveTarget = m.lastKnown;
         out.aimYawDeg = detail::YawTo(w.self.x, w.self.y, m.lastKnown.x, m.lastKnown.y);
         const float dx = w.self.x - m.lastKnown.x, dy = w.self.y - m.lastKnown.y;
-        if (dx * dx + dy * dy < 100.f * 100.f) {          // 到达最后已知位仍未见 → 回巡逻
+        if (dx * dx + dy * dy < detail::kArriveRadiusCm * detail::kArriveRadiusCm) {          // 到达最后已知位仍未见 → 回巡逻
             state = BotState::Patrol;
             m.hasLastKnown = false;
         }
@@ -178,7 +185,7 @@ inline BotIntent Decide(const BotWorldView& w, BotState& state, BotMemory& m, st
         const float len = std::sqrt(ex * ex + ey * ey);
         if (len > 1e-3f) {
             out.hasMove = true;
-            out.moveTarget = Vec2{w.self.x - ex / len * 400.f, w.self.y - ey / len * 400.f};
+            out.moveTarget = Vec2{w.self.x - ex / len * detail::kRetreatDistCm, w.self.y - ey / len * detail::kRetreatDistCm};
         }
         out.aimYawDeg = detail::YawTo(w.self.x, w.self.y,
                                       w.visible ? w.visible->x : w.self.x + ex,

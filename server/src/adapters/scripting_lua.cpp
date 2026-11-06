@@ -397,6 +397,12 @@ mc::BotIntent LuaBotPolicy::Decide(const mc::BotWorldView& w, mc::BotState& stat
         tune["hp_cover_below"] = static_cast<double>(t.hpCoverBelow);
         tune["move_speed_cm_s"] = static_cast<double>(t.moveSpeedCmS);
         tune["fire_interval_ms"] = static_cast<double>(t.fireIntervalMs);
+        // FSM 语义常量同路注入（§4.6：值唯一真相源=bot_brain.h detail 常量——脚本零 local 常量）
+        tune["fire_cone_deg"] = static_cast<double>(mc::detail::kFireConeDeg);
+        tune["cover_window_ms"] = static_cast<double>(mc::detail::kCoverWindowMs);
+        tune["retreat_dist_cm"] = static_cast<double>(mc::detail::kRetreatDistCm);
+        tune["jitter_period_ms"] = static_cast<double>(mc::detail::kJitterPeriodMs);
+        tune["arrive_radius_cm"] = static_cast<double>(mc::detail::kArriveRadiusCm);
 
         auto r = f(view, stT, memT, static_cast<double>(nowMs), tune);
         if (!r.valid()) {

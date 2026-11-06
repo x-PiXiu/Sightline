@@ -216,7 +216,157 @@ int main() {
         CHECK(!i2.bFire);
     }
 
+    // ---- 9) 步骤 8 · §4.7 第一层：bot_ai.lua 等价性对拍（真脚本 vs BuiltinBotPolicy） ----
+    // 门 1 的 bot 半边（切默认前的一次性门禁）：八条固定转移 + 200 步确定性 fuzz——
+    // 同输入双实现逐字段一致（epsilon）；Fallbacks()==0 证明全程真走 Lua（防"双双兜底=假等价"）。
+    {
+        fs::path real;
+        for (const char* c : {"assets/scripts/bot_ai.lua", "../assets/scripts/bot_ai.lua"}) {
+            if (fs::exists(c)) { real = c; break; }
+        }
+        CHECK(!real.empty());
+        WriteFile(dir / "bot_ai.lua", ReadFile(real));
+        auto rt2 = adapters::LuaRuntime::Create({dir.string()});
+        CHECK(rt2 != nullptr);
+        CHECK(rt2->Ref("bot_ai") >= 0);
+        adapters::LuaBotPolicy luaPol(rt2);
+        mc::BuiltinBotPolicy builtin;
+        const mc::BotTuning t{};
+
+        std::string diff;
+        const auto close = [](double a, double b) { return std::fabs(a - b) < 1e-3; };
+        const auto compare = [&](const mc::BotIntent& ia, const mc::BotIntent& ib,
+                                 const mc::BotState& sa, const mc::BotState& sb,
+                                 const mc::BotMemory& ra, const mc::BotMemory& rb,
+                                 const char* tag) {
+            diff.clear();
+            if (ia.hasMove != ib.hasMove) diff += " hasMove";
+            if (!close(ia.moveTarget.x, ib.moveTarget.x) || !close(ia.moveTarget.y, ib.moveTarget.y)) diff += " move";
+            if (!close(ia.aimYawDeg, ib.aimYawDeg)) diff += " aim";
+            if (ia.bFire != ib.bFire) diff += " fire";
+            if (sa != sb) diff += " state";
+            if (ra.firstSeenMs != rb.firstSeenMs) diff += " firstSeen";
+            if (ra.lastSeenMs != rb.lastSeenMs) diff += " lastSeen";
+            if (!close(ra.lastKnown.x, rb.lastKnown.x) || !close(ra.lastKnown.y, rb.lastKnown.y)) diff += " lk";
+            if (ra.hasLastKnown != rb.hasLastKnown) diff += " hasLk";
+            if (!close(ra.aimErrDeg, rb.aimErrDeg)) diff += " err";
+            if (ra.nextCoverOkMs != rb.nextCoverOkMs) diff += " coverOk";
+            if (!close(ra.lastHpSeen, rb.lastHpSeen)) diff += " hpSeen";
+            if (!diff.empty()) std::printf("对拍分歧[%s]:%s\n", tag, diff.c_str());
+        };
+        // -> int：CHECK 宏内含 return 1，会把 lambda 返回类型推成 int——
+        // 显式声明，否则空 diff 走到末尾=UB（GCC 发 ud2 → SIGILL，实测）。
+        const auto run_case = [&](const char* tag, mc::BotWorldView w, mc::BotState st,
+                                  mc::BotMemory mem, std::uint64_t now) -> int {
+            mc::BotState sa = st, sb = st;
+            mc::BotMemory ma = mem, mb = mem;
+            const auto ia = builtin.Decide(w, sa, ma, now, t);
+            const auto ib = luaPol.Decide(w, sb, mb, now, t);
+            compare(ia, ib, sa, sb, ma, mb, tag);
+            CHECK(diff.empty());
+            return 0;
+        };
+
+        // 八条固定状态转移
+        CHECK(run_case("patrol-idle", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f; return w;
+        }(), mc::BotState::Patrol, mc::BotMemory{}, 1000) == 0);
+        CHECK(run_case("first-sight-far", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.yaw = 0.f; w.visible = mc::SeenEnemy{7u, -2000.f, 500.f, 2100.f}; return w;
+        }(), mc::BotState::Patrol, mc::BotMemory{}, 2000) == 0);
+        CHECK(run_case("engage-fire", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.yaw = 0.f; w.visible = mc::SeenEnemy{7u, 500.f, 0.f, 500.f}; return w;
+        }(), mc::BotState::Engage, [] {
+            mc::BotMemory m; m.firstSeenMs = 1500; m.lastSeenMs = 1500;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 4.f; m.lastHpSeen = 100.f; return m;
+        }(), 1600) == 0);
+        CHECK(run_case("engage-decayed", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.yaw = 0.f; w.visible = mc::SeenEnemy{7u, 500.f, 0.f, 500.f}; return w;
+        }(), mc::BotState::Engage, [] {
+            mc::BotMemory m; m.firstSeenMs = 1000; m.lastSeenMs = 5500;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 1.5f; m.lastHpSeen = 100.f; return m;
+        }(), 6000) == 0);
+        CHECK(run_case("lose-sight", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.x = 400.f; w.self.y = 0.f; w.self.yaw = 90.f; return w;
+        }(), mc::BotState::Engage, [] {
+            mc::BotMemory m; m.firstSeenMs = 1000; m.lastSeenMs = 1000;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 4.f; m.lastHpSeen = 100.f; return m;
+        }(), 1100) == 0);
+        CHECK(run_case("search-arrive", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.x = 470.f; w.self.y = 0.f; w.self.yaw = 180.f; return w;
+        }(), mc::BotState::Search, [] {
+            mc::BotMemory m; m.firstSeenMs = 1000; m.lastSeenMs = 1000;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 4.f; m.lastHpSeen = 100.f; return m;
+        }(), 1200) == 0);
+        CHECK(run_case("cover-drop", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.hp = 20.f; w.self.yaw = 0.f; w.visible = mc::SeenEnemy{7u, 500.f, 0.f, 500.f}; return w;
+        }(), mc::BotState::Engage, [] {
+            mc::BotMemory m; m.firstSeenMs = 1000; m.lastSeenMs = 1000;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 4.f; m.lastHpSeen = 100.f; return m;
+        }(), 1100) == 0);
+        CHECK(run_case("cover-expired", [] {
+            mc::BotWorldView w; w.patrolTarget = {300.f, -200.f}; w.hpMax = 100.f;
+            w.self.hp = 20.f; w.self.yaw = 0.f; w.visible = mc::SeenEnemy{7u, 500.f, 0.f, 500.f}; return w;
+        }(), mc::BotState::TakeCover, [] {
+            mc::BotMemory m; m.firstSeenMs = 1000; m.lastSeenMs = 1000;
+            m.lastKnown = mc::Vec2{500.f, 0.f}; m.hasLastKnown = true;
+            m.aimErrDeg = 4.f; m.nextCoverOkMs = 900; m.lastHpSeen = 100.f; return m;
+        }(), 1100) == 0);
+
+        // 200 步确定性 fuzz（LCG）：随机位置/可见性/血量/换弹，30Hz 步进——状态跨步连续演进
+        {
+            std::uint32_t seed = 0xB0CA1;
+            const auto rnd = [&seed](float lo, float hi) {
+                seed = seed * 1664525u + 1013904223u;
+                const float u = static_cast<float>(seed >> 8) / 16777216.f;
+                return lo + (hi - lo) * u;
+            };
+            mc::BotWorldView w; w.hpMax = 100.f; w.patrolTarget = {500.f, 300.f};
+            mc::BotState s1 = mc::BotState::Patrol, s2 = s1;
+            mc::BotMemory m1, m2 = m1;
+            std::uint64_t now = 1000;
+            for (int k = 0; k < 200; ++k) {
+                w.self.x = rnd(-3000.f, 3000.f);
+                w.self.y = rnd(-3000.f, 3000.f);
+                w.self.yaw = rnd(-180.f, 180.f);
+                w.self.hp = rnd(1.f, 100.f);
+                w.self.reloading = (k % 13) == 0;
+                if (rnd(0.f, 1.f) < 0.6f) {
+                    const float ex = w.self.x + rnd(-2500.f, 2500.f);
+                    const float ey = w.self.y + rnd(-2500.f, 2500.f);
+                    const float dx = ex - w.self.x, dy = ey - w.self.y;
+                    w.visible = mc::SeenEnemy{9u, ex, ey, std::sqrt(dx * dx + dy * dy)};
+                } else {
+                    w.visible = std::nullopt;
+                }
+                if (rnd(0.f, 1.f) < 0.3f) {
+                    w.lastKnown = mc::Vec3{w.self.x + rnd(-1500.f, 1500.f), 0.f,
+                                           w.self.y + rnd(-1500.f, 1500.f)};
+                } else {
+                    w.lastKnown = std::nullopt;
+                }
+                now += 33;
+                const auto ia = builtin.Decide(w, s1, m1, now, t);
+                const auto ib = luaPol.Decide(w, s2, m2, now, t);
+                compare(ia, ib, s1, s2, m1, m2, "fuzz");
+                CHECK(diff.empty());
+            }
+        }
+        CHECK(rt2->Fallbacks() == 0);   // 全程真走 Lua（双双兜底=假等价的防线）
+    }
+
     fs::remove_all(dir);
-    std::printf("全部通过：%d 项断言 OK（ep08 步骤 4 Lua 策略对拍/门禁·验收门 1/2/3/5/6）\n", g_checked);
+    std::printf("全部通过：%d 项断言 OK（ep08 步骤 4+8 Lua 策略对拍/门禁·验收门 1/2/3/5/6+bot 等价）\n", g_checked);
     return 0;
 }

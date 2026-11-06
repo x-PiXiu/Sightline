@@ -89,7 +89,7 @@ private:
     sightline::match::BuiltinDamagePolicy builtin_;
 };
 
-// 决策策略：同签名换实现；ref=-1（bot_ai.lua 到步 8 才建）→ 直走内建（E2）。
+// 决策策略：同签名换实现；ref=-1（bot_ai.lua 缺失）→ 直走内建（E2）；步 8 起默认走 Lua。
 class LuaBotPolicy final : public sightline::match::IBotPolicy {
 public:
     explicit LuaBotPolicy(std::shared_ptr<LuaRuntime> rt);
