@@ -1,0 +1,2 @@
+vendored sol2 v3.3.1（header-only·版本锁死——设计 §4 步骤 1；上游 https://github.com/ThePhD/sol2）
+只保留 include/sol + LICENSE，构建以 third_party/sol2/include 为准。

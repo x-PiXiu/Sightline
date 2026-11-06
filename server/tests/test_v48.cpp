@@ -152,6 +152,52 @@ int main() {
     CHECK(mc::DamageApply(20.f, 50.f) == 0.f);
     CHECK(mc::DamageApply(100.f) == 75.f);             // 旧入口行为零变化
 
-    std::printf("全部通过：%d 项断言 OK（ep08 步骤 6 契约 v4.8 / 换枪状态机）\n", g_checked);
+    // ---- 7) 热重载三语义（§3.5 · 步骤 3 验收门：改表不重编，行为按类生效）----
+    {
+        // 语义① 数值类=下一发即时生效（伤害 25→50，SetConfig 后第二发按新值扣）
+        mc::MatchService m;
+        m.StartMatch(1, {{1, "a", 0}, {2, "b", 0}});
+        m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
+        m.UpdateEntity(2, 500.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
+        auto ev = m.Fire(1, 1000);
+        CHECK(!ev.empty() && ev[0].fire.bHit && ev[0].fire.victimHp == 75);   // 100-25
+        mc::GameConfig c;                                       // 默认 rifle damage=25
+        c.weapons[0].damage = 50;
+        m.SetConfig(c);                                         // 模拟 reload 后新表
+        ev = m.Fire(1, 1100);                                   // ≥95ms 射速门
+        CHECK(!ev.empty() && ev[0].fire.bHit && ev[0].fire.victimHp == 25);   // 75-50=25 即时生效
+    }
+    {
+        // 语义② 倒计时类=在途不动（换弹钟已上，热改 reloadMs 不改写已存到期时刻）
+        mc::MatchService m;
+        m.StartMatch(1, {{1, "a", 0}});
+        m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
+        CHECK(m.Fire(1, 1500).size() == 1);                     // 打一发（满匣 R 被拒——magUsed=0 门）
+        CHECK(m.Reload(1, 2000));                               // 半匣上钟：到期 = 2000+2500 = 4500
+        mc::GameConfig c;
+        c.weapons[0].reloadMs = 9999;
+        m.SetConfig(c);                                         // 热改换弹时长
+        CHECK(m.Entities()[0].weapon.reloadUntilMs == 4500);    // ★在途钟不被新值改写（绝对时刻）
+        auto ev = m.Fire(1, 4600);                              // 老钟到期 → 补满 → 接受
+        CHECK(!ev.empty() && ev[0].fire.bAccepted);
+    }
+    {
+        // 语义③ 容量收缩=自愈（magUsed 28 > 新匣 25 → 下一发 MagEmpty 触发自动换弹 → 补到新容量）
+        mc::MatchService m;
+        m.StartMatch(1, {{1, "a", 0}});
+        m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
+        for (int i = 0; i < 28; ++i) (void)m.Fire(1, 1000 + i * 100);   // 打 28 发（<30 不上钟）
+        CHECK(m.Entities()[0].weapon.magUsed == 28);
+        mc::GameConfig c;
+        c.weapons[0].mag = 25;
+        m.SetConfig(c);                                         // 收缩：28 > 25
+        auto rej = m.Fire(1, 3900);                             // 下一发：magUsed ≥ 新匣 → MagEmpty
+        CHECK(!rej.empty() && !rej[0].fire.bAccepted);          // 触发自动换弹（自愈入口·该发被拒）
+        auto ok = m.Fire(1, 3900 + 2500 + 10);                  // 默认 reloadMs 到期 → 补满续射
+        CHECK(!ok.empty() && ok[0].fire.bAccepted);
+        CHECK(m.Entities()[0].weapon.magUsed == 1);             // 补满（0 用）后又消耗 1 发=新容量语义
+    }
+
+    std::printf("全部通过：%d 项断言 OK（ep08 步骤 6 契约 v4.8 / 换枪状态机 / 热重载三语义）\n", g_checked);
     return 0;
 }
