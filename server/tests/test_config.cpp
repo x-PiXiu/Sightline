@@ -125,6 +125,10 @@ int main() {
         CHECK(a->arg == "手枪过强 25→50");
         CHECK(adapters::StdinCommandSource::Parse("reload")->arg.empty());
         CHECK(adapters::StdinCommandSource::Parse("rollback")->kind == C::Kind::Rollback);
+        // 步骤 4：patch <name> 解析（arg=脚本名·源码由运行时自读 scriptDir）
+        const auto pc = adapters::StdinCommandSource::Parse("patch damage");
+        CHECK(pc && pc->kind == C::Kind::Patch && pc->arg == "damage");
+        CHECK(adapters::StdinCommandSource::Parse("patch")->arg.empty());   // 缺名=空 arg（Dispatch 会拒收）
         CHECK(adapters::StdinCommandSource::Parse("version")->kind == C::Kind::Version);
         CHECK(adapters::StdinCommandSource::Parse("help")->kind == C::Kind::Help);
         CHECK(!adapters::StdinCommandSource::Parse("   ").has_value());
