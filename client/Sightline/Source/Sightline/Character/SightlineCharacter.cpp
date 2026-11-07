@@ -649,6 +649,7 @@ void ASightlineCharacter::OnRespawn(int32 Pid, int32 SpawnIndex, int32 InvulnMs,
         if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
             MoveComp->SetMovementMode(MOVE_Walking);             // OnKill 定身的镜像
         CurrentWeaponType = 0;                                   // ep08：服务器重生回 Rifle（D7 连带复位）
+        ApplyWeaponMesh();                                       // ep08 补口：模型链同复位（漏=步枪动画挂手枪模型·实锤 2026-11-07）
         NextFireAllowedMs = 0;                                   // ep08：射速钟清零，重生首帧不被挡
         bFireHeld = false;
         LocalMag = WMag();                                       // 服务器重生满匣（Tick 里 magUsed=0）——
@@ -826,6 +827,7 @@ void ASightlineCharacter::ApplyWeaponMesh() {
     if (D->WeaponMesh != nullptr && Sk->GetSkeletalMeshAsset() != D->WeaponMesh.Get())
     {
         Sk->SetSkeletalMesh(D->WeaponMesh.Get());
+        Sk->SetRelativeTransform(D->MeshRelativeTransform);   // 每枪挂点校正（Rifle=BP 现值·Pistol=试调值）
         UE_LOG(LogSightline, Log, TEXT("[换枪模型] → %s"), *D->WeaponMesh->GetName());
     }
     const FName Socket = D->LeftHandSocketName;

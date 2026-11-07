@@ -481,6 +481,7 @@ int main(int argc, char** argv) {
                               : ("主从 Reactor · IO workers=" + std::to_string(workers.size()))) +
              " · 帧队列 · 心跳 · 登录+房间+对局）");
     LOG_INFO("[配置] " + config.StatusLine() + " · " + dbBanner);
+    LOG_INFO("[瞄准合同] 判定眼位=(20,8,63)——与客户端 FPP Offset 对齐（双端合同·fire_judge.h kEye*）");
     loop.loop();                                              // 主线程进入事件循环
 
     // 9. 收尾顺序（Channel 摘除必须归属线程）：先请 worker 关完连接，再停 worker，最后对象析构（无 Channel 裸对象任意线程安全）

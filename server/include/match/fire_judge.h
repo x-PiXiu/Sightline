@@ -15,6 +15,9 @@
 namespace sightline::match {
 
 // ===== 合同常量（D5-07：数值表化=ep08/ep07 演进，本期住这里）=====
+// ——以下五件=兜底默认值（30 号未到达/无配置时的安全回退）——
+// ⚠ 运营真源=assets/scripts/game_config.lua（weapons/rules 段·热重载生效）；
+//   改手感请改 lua，这里的值只在"客户端没收到 30 号"时兜底（ep08 步骤 6 定案）
 inline constexpr float        kDamagePerShot      = 25.f;    // 命中扣血（100 血 4 枪见底）
 inline constexpr float        kMaxHp              = 100.f;
 inline constexpr int          kMagCapacity        = 30;      // 弹匣（D5-07）
@@ -25,6 +28,8 @@ inline constexpr float        kMaxRangeUu         = 1000000.f; // 10km=数值护
 // 服务器眼位必须与客户端 FPP 相机偏移（SightlineCameraComponent FirstPersonOffset=(8,8,62)，胶囊系）逐分量镜像；
 // ⚠ 改相机偏移（BP 或代码）必须同步本组常量——这是双端瞄准合同，不是自由参数。
 // TPP 模式不重合=TPP 固有视差（行业共识，PUBG 同款），TPP 下的弹着点以服务器射线为准。
+// ——眼位镜像合同（⚠ 双端合同·归 C++ 不归 lua：服务器热调眼位客户端相机不会跟=漂移不自知）——
+// 改这里必须同时改客户端 SightlineCameraComponent 的 First Person Offset（启动横幅外显对账）
 inline constexpr float        kEyeForwardOffset   = 20.f;    // 胶囊系前向分量（BP FirstPersonOffset X=20）
 inline constexpr float        kEyeRightOffset     = 8.f;     // 胶囊系右向分量（BP Y=+8 的镜像）
 inline constexpr float        kEyeHeight          = 63.f;    // 胶囊系高度分量（BP Z=63）

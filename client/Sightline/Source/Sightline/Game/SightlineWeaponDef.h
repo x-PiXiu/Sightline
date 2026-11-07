@@ -81,4 +81,10 @@ public:
 	/** 左手 IK 插槽名（DA 可覆盖——手枪无护木→填 None 让 IK 自动让位） */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
 	FName LeftHandSocketName = TEXT("HandGuard_L");
+
+	/** 网格相对变换校正（换 mesh 后应用到 WeaponMeshComp——每枪原点约定不同；
+	 *  Rifle=照抄 BP 角色里枪组件当前的 Relative Transform，保证切回不变样；
+	 *  Pistol=以此起步 PIE 试调到"枪在手里"。恒等变换=不动） */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
+	FTransform MeshRelativeTransform = FTransform::Identity;
 };
