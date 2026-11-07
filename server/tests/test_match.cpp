@@ -897,7 +897,8 @@ int main() {
             am.StartMatch(rid, rs);
             am.UpdateEntity(901, 1500, 300, 90, 0, 0, 0, 1, 1000);   // 远离锚点 (442,-474) 的"旧包"
             CHECK(am.EntityById(901) && !am.EntityById(901)->bHasReport);   // 被握手过滤：未激活
-            const auto* emptySnap = find(am.Tick(1100), MatchEvent::Type::Snapshot);
+            const auto tickEvs = am.Tick(1100);   // 具名接收——Tick 返回临时 vector，指针跨语句
+            const auto* emptySnap = find(tickEvs, MatchEvent::Type::Snapshot);   // 使用即悬空（ASan 实锤 2026-11-08）
             CHECK(emptySnap != nullptr && emptySnap->entities.empty());   // 未激活不入快照（快照为空）
             am.UpdateEntity(901, 460, -490, 90, 0, 0, 0, 2, 1200);   // 锚点附近首条 → 放行
             const auto* h901 = am.EntityById(901);
