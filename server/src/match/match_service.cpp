@@ -354,9 +354,15 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         ev.roomId = roomId_;
         // v4.8.1：gate=换弹中 → 带服务器换弹钟剩余毫秒（客户端对齐本地钟根治双钟漂移——
         //  客户端补满后连发全吃服务器换弹尾·2026-11-07 服务器日志 13 连拒实锤）
-        const auto remaining = static_cast<std::uint16_t>(
-            gate == FireGate::Reloading ? std::min<std::uint64_t>(65535, shooter->weapon.reloadUntilMs - nowMs) : 0);
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate), 0, 0, 0, 0, remaining};
+        // ⚠ 指定初始化器（2026-11-07 教训）：逐位聚合初始化曾把 remaining 错落进 victimHp 位
+        //  （字段追加在尾部·9 值错位）→ 回包剩余恒 0·客户端对齐失效——按名初始化永不错位
+        ev.fire = FireResultData{
+            .shooterPid = shooterPid, .bHit = false, .bAccepted = false,
+            .gate = static_cast<std::uint8_t>(gate),
+            .reloadRemainingMs = static_cast<std::uint16_t>(
+                gate == FireGate::Reloading
+                    ? std::min<std::uint64_t>(65535, shooter->weapon.reloadUntilMs - nowMs)
+                    : 0)};
         out.push_back(std::move(ev));
         return out;
     }
@@ -367,7 +373,8 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(FireGate::Dead), 0, 0, 0, 0};
+        ev.fire = FireResultData{.shooterPid = shooterPid, .bAccepted = false,
+                                 .gate = static_cast<std::uint8_t>(FireGate::Dead)};
         out.push_back(std::move(ev));
         return out;
     }
@@ -472,8 +479,11 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
     MatchEvent ev;
     ev.type = MatchEvent::Type::FireResult;
     ev.roomId = roomId_;
-    ev.fire = FireResultData{shooterPid, v.hit, true, static_cast<std::uint8_t>(gate),
-                             v.victimPid, v.hitX, v.hitY, v.hitZ, victimHp};
+    ev.fire = FireResultData{.shooterPid = shooterPid, .bHit = v.hit, .bAccepted = true,
+                             .gate = static_cast<std::uint8_t>(gate),
+                             .victimPid = v.victimPid,
+                             .hitX = v.hitX, .hitY = v.hitY, .hitZ = v.hitZ,
+                             .victimHp = victimHp};   // v4.8.1：按名初始化（reloadRemainingMs 默认 0·Ok 恒 0）
     // ⑧.5 判定链诊断快照（2026-11-04 审计 C 级收编：诊断出域事件——适配层判定行专用，永不入 21 号 wire）
     ev.fireDiag = FireDiagnostics{
         o.x, o.y, o.z, d.x, d.y, d.z,
