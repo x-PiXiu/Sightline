@@ -229,6 +229,7 @@ int main(int argc, char** argv) {
     std::unique_ptr<sightline::application::IPersistencePorts> persistence;
     adapters::RealPersistence* realP = nullptr;
     std::unique_ptr<adapters::AuditWal> liteWal;             // lite：审计→WAL（§5.7.2）
+    std::string dbBanner = "[DB] profile=lite（持久化未启用）";   // 真实态（L475 配置横幅引用——曾硬编码 lite 误导）
 #if SIGHTLINE_HAS_DB
     if (dbProfile == "full") {
         adapters::RealPersistenceConfig rpc;
@@ -243,6 +244,7 @@ int main(int argc, char** argv) {
         realP = rp.get();
         LOG_INFO("[DB] profile=full · " + realP->HealthLine() +
                  (replayed ? " · WAL回放=" + std::to_string(replayed) : ""));
+        dbBanner = "[DB] profile=full（三库持久化·健康见上横幅）";
         persistence = std::move(rp);
     } else
 #endif
@@ -472,7 +474,7 @@ int main(int argc, char** argv) {
              (workers.empty() ? "单线程拓扑"
                               : ("主从 Reactor · IO workers=" + std::to_string(workers.size()))) +
              " · 帧队列 · 心跳 · 登录+房间+对局）");
-    LOG_INFO("[配置] " + config.StatusLine() + " · [DB] profile=lite（持久化未启用）");
+    LOG_INFO("[配置] " + config.StatusLine() + " · " + dbBanner);
     loop.loop();                                              // 主线程进入事件循环
 
     // 9. 收尾顺序（Channel 摘除必须归属线程）：先请 worker 关完连接，再停 worker，最后对象析构（无 Channel 裸对象任意线程安全）
