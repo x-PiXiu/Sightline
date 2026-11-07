@@ -280,9 +280,11 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
         // ep06 表现层：左手 IK 供给（动画定风格，IK 修末端——消除素材姿势与枪的毫米级偏差穿模）。
         // 坐标系：socket 世界变换 → 角色 mesh 组件空间（TwoBoneIK Target Space=Component 直喂）——
         // 枪挂在手 socket 下，socket 的 RTS_Component 是相对枪组件的，必须乘枪→角色的层级差。
-        if (WeaponMeshComp && GetMesh())
+        if (WeaponMeshComp && GetMesh() && bLeftHandSocketOk)   // ep08：新枪无左手插槽（手枪）→ 不喂 IK 目标
         {
-            const FTransform SocketWorld = WeaponMeshComp->GetSocketTransform(LeftHandSocketName, RTS_World);
+            const USightlineWeaponDefinition* WD = GetWeaponDef();
+            const FName IkSocket = WD ? WD->LeftHandSocketName : LeftHandSocketName;
+            const FTransform SocketWorld = WeaponMeshComp->GetSocketTransform(IkSocket, RTS_World);
             AnimInputs.LH_IK_Target = SocketWorld * GetMesh()->GetComponentTransform().Inverse();
             // 肘部引导：目标点向身体左下偏（组件空间 y 负=左）——肘弯向身体左前下，防 IK 绕背解
             AnimInputs.LH_IK_Joint = AnimInputs.LH_IK_Target.GetTranslation() + FVector(0.f, -30.f, -40.f);
@@ -291,7 +293,7 @@ void ASightlineCharacter::Tick(float DeltaSeconds) {
             UAnimMontage* EM = EquipMontageOf();
             const bool bMontageBusy = AI && ((RM && AI->Montage_IsActive(RM)) ||
                                              (EM && AI->Montage_IsActive(EM)));
-            AnimInputs.LH_IK_Weight = bMontageBusy ? 0.f : 1.f;   // 换弹/拔枪中 IK 让位（左手要离枪做动作）
+            AnimInputs.LH_IK_Weight = (bMontageBusy || !bLeftHandSocketOk) ? 0.f : 1.f;   // 换弹中/手枪无护木→IK 让位
         }
         else
         {
@@ -811,7 +813,23 @@ USoundBase* ASightlineCharacter::ReloadSoundOf() const {
 void ASightlineCharacter::SetRemoteWeaponType(const int32 WeaponType) {
     if (CurrentWeaponType == WeaponType) return;          // 幂等（快照 30Hz 重复喂）
     CurrentWeaponType = WeaponType;
+    ApplyWeaponMesh();                                    // ep08 补口：远端枪模型随表换
     UE_LOG(LogSightline, Log, TEXT("[远端武器] pid 表现 → type=%d（查表态·零钟副作用）"), WeaponType);
+}
+
+// ep08 补口：换枪换枪模型——DA.WeaponMesh → WeaponMeshComp.SetSkeletalMesh；
+// 空槽=不动（兜底旧网格）；换完按新网格判定左手插槽存在性（手枪无护木→IK 让位）
+void ASightlineCharacter::ApplyWeaponMesh() {
+    const USightlineWeaponDefinition* D = GetWeaponDef();
+    USkeletalMeshComponent* Sk = Cast<USkeletalMeshComponent>(WeaponMeshComp);   // ep05 起声明为 SceneComponent（面板绕坑）——换网格需 skeletal 级 API
+    if (!D || !Sk) return;
+    if (D->WeaponMesh != nullptr && Sk->GetSkeletalMeshAsset() != D->WeaponMesh.Get())
+    {
+        Sk->SetSkeletalMesh(D->WeaponMesh.Get());
+        UE_LOG(LogSightline, Log, TEXT("[换枪模型] → %s"), *D->WeaponMesh->GetName());
+    }
+    const FName Socket = D->LeftHandSocketName;
+    bLeftHandSocketOk = Socket.IsNone() ? false : Sk->DoesSocketExist(Socket);
 }
 
 void ASightlineCharacter::OnSwitchRifle()  { ApplyWeaponSwitch(0); }
@@ -827,6 +845,7 @@ void ASightlineCharacter::ApplyWeaponSwitch(const int32 WeaponType) {
     NextFireAllowedMs = 0;                // A4 漏项：射速钟清零，换枪首帧不被挡
     bFireHeld = false;
     MatchSession->SendSwitchWeapon(WeaponType);   // 28 号：服务器权威状态为准
+    ApplyWeaponMesh();                            // ep08 补口：本地枪模型随表换
     UE_LOG(LogSightline, Log, TEXT("[换枪] 本地乐观 → type=%d 满匣=%d 射速=%dms"),
            WeaponType, LocalMag, WFireMs());
 }

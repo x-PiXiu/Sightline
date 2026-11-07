@@ -249,6 +249,9 @@ private:
     int32 WFireMs() const;
     // —— ep08 步骤 7：表现资产查表兜底链（§7.3）——WeaponDefs 查到且 AnimSet.X 有效→用表；
     //   否则回退旧直连成员（DA 未建齐/未接线时行为零变化；迁移完成后旧成员退役）
+    // —— ep08 补口：换枪换枪模型（本地 ApplyWeaponSwitch/远端 SetRemoteWeaponType 双端同调）——
+    void ApplyWeaponMesh();                      // DA.WeaponMesh → WeaponMeshComp（空=不动=兜底）
+    bool bLeftHandSocketOk = true;               // 新枪网格无左手插槽（手枪无护木）→ IK 自动让位
     UAnimMontage* FireMontageOf() const;      // 返回非 const：PlayAnimMontage(Montage*) 会写蒙太奇状态
     UAnimMontage* ReloadMontageOf() const;
     UAnimMontage* EquipMontageOf() const;

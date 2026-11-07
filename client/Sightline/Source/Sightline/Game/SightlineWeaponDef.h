@@ -72,4 +72,13 @@ public:
 	/** 换弹音 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Audio")
 	TObjectPtr<USoundBase> ReloadSound = nullptr;
+
+	// ---- 枪模型（ep08 补口：换枪=换 Character 上枪网格组件的 SkeletalMesh；空=不换=兜底）----
+	/** 枪骨骼网格（Rifle=SK_Rifle / Pistol=SK_Pistol；Character 的 WeaponMeshComp 运行时切） */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
+	TObjectPtr<USkeletalMesh> WeaponMesh = nullptr;
+
+	/** 左手 IK 插槽名（DA 可覆盖——手枪无护木→填 None 让 IK 自动让位） */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
+	FName LeftHandSocketName = TEXT("HandGuard_L");
 };
