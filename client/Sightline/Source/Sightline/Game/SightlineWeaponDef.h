@@ -27,9 +27,11 @@ struct FSightlineWeaponAnimSet
 {
 	GENERATED_BODY()
 
-	/** AO 姿势蒙太奇（ABP AO 节点消费——握枪姿势；空=ABP 直连接线兜底） */
+	/** AO 姿势混合空间（ABP 的 BlendSpace Player 动态采样——AO_MM_* 是 AimOffset=UBlendSpace 子类，
+	 *  与 LocomotionBS 同型通吃；AimOffset 筛选器节点按资产类型化不可接引脚，故换 Player 方案）。
+	 *  空=ABP 直连接线兜底 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimSet")
-	TObjectPtr<UAnimMontage> IdleAO = nullptr;
+	TObjectPtr<UBlendSpace> IdleAO = nullptr;
 
 	/** 移动混合空间（ABP Locomotion 消费；可空=回退基姿势——§7.3 明文） */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimSet")

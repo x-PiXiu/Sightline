@@ -90,6 +90,13 @@ public:
     /** 当前武器动画集（ABP AO/Locomotion 节点直取；查不到=空集，ABP 用默认连线） */
     UFUNCTION(BlueprintPure, Category = "Sightline")
     FSightlineWeaponAnimSet GetWeaponAnimSet() const;
+    /** ABP 节点 Details 绑定专用（AnimGraph 节点属性绑定要求匹配的单类型返回）：
+     *  AO 玩家的 Space 绑它——空=Player 输出空→Apply Additive 直通基姿势（手枪留空槽即此效果） */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    UBlendSpace* GetIdleAOAsset() const { return GetWeaponAnimSet().IdleAO.Get(); }
+    /** Locomotion 玩家的 Space 绑它 */
+    UFUNCTION(BlueprintPure, Category = "Sightline")
+    UBlendSpace* GetLocomotionBSAsset() const { return GetWeaponAnimSet().LocomotionBS.Get(); }
     /** 远端武器表现同步（PawnSpawner 每拍喂 17 号 bit3~4）——只改查表态（CurrentWeaponType），
      *  **不发 28 号、不碰弹匣/换弹/射速钟**（那是 ApplyWeaponSwitch=本地输入专责；两者勿混） */
     void SetRemoteWeaponType(int32 WeaponType);
