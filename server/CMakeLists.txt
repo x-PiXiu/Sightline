@@ -18,8 +18,25 @@ find_package(PkgConfig QUIET)
 # 整洁架构：五个第三方库只挂最外层适配器；实体 / 用例 / 核心 / 全部单测零依赖，
 # 缺库环境照样 configure + build + ctest。显式打开开关时才要求库真实存在。
 # 双模式开关见 docs/episodes/ep08/设计草案.md §5.7。
-option(SIGHTLINE_ENABLE_LUA   "启用 Lua5.4 + sol2 策略适配层（步骤 4）" OFF)
-option(SIGHTLINE_ENABLE_DB    "启用 hiredis/mariadb/mongocxx 持久化（步骤 5）" OFF)
+# —— 依赖探测（决定未显式指定时的默认值）——
+# 设计（2026-11-07）：本仓库公开可克隆——裸机缺库保持零依赖可编（lite 模式 ctest 照绿）；
+# 库齐环境（开发机/演示机/CLion）自动全开，不填 option 即得完整构建。显式 -D 永远优先。
+include(FindPkgConfig OPTIONAL)
+set(SIGHTLINE_DEPS_DB_FOUND OFF)
+if(PkgConfig_FOUND)
+    pkg_check_modules(HIREDIS_QUIET QUIET hiredis)
+    pkg_check_modules(MONGOC_QUIET  QUIET libmongoc-1.0)
+    find_path(MYSQL_INC_QUIET NAMES mysql/mysql.h)
+    find_library(MYSQL_LIB_QUIET NAMES mysqlclient)
+    if(HIREDIS_QUIET_FOUND AND MONGOC_QUIET_FOUND AND MYSQL_INC_QUIET AND MYSQL_LIB_QUIET)
+        set(SIGHTLINE_DEPS_DB_FOUND ON)
+    endif()
+endif()
+find_package(Lua 5.4 QUIET)
+set(SIGHTLINE_DEPS_LUA_FOUND ${LUA_FOUND})   # sol2=vendored 恒在，只探 lua5.4
+
+option(SIGHTLINE_ENABLE_LUA   "启用 Lua5.4 + sol2 策略适配层（默认=探测到 lua5.4 即开）" ${SIGHTLINE_DEPS_LUA_FOUND})
+option(SIGHTLINE_ENABLE_DB    "启用 hiredis/libmysqlclient/libmongoc 持久化（默认=三库探测齐即开）" ${SIGHTLINE_DEPS_DB_FOUND})
 option(SIGHTLINE_REQUIRE_DEPS "deps_smoke 缺任一依赖即判失败（装好库后开启）" OFF)
 
 set(SIGHTLINE_OPTIONAL_LIBS "")
@@ -91,6 +108,8 @@ add_library(sightline_adapters STATIC
     src/adapters/audit_wal.cpp            # 零依赖（lite 审计 WAL 也用）——无条件入编
 )
 target_include_directories(sightline_adapters PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# 适配器依赖底座（Logger）——build.sh 手工链接掩掉了这层；CMake 按库边界必须显式声明
+target_link_libraries(sightline_adapters PUBLIC sightline_core)
 # 步骤 5：三库翻译单元（文件级 #if SIGHTLINE_HAS_DB 守卫——宏由本开关统一给）
 if(SIGHTLINE_ENABLE_DB)
     target_sources(sightline_adapters PRIVATE
