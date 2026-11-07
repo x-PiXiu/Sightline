@@ -33,6 +33,16 @@ public:
         });
     }
 
+    // 多源入队口（ep08 步骤 9：TCP 命令口等）——A1 纪律：非主线程只入队，Drain 归主循环
+    void Enqueue(const std::string& line) {
+        auto st = st_;
+        if (auto c = Parse(line)) {
+            std::lock_guard<std::mutex> lk(st->mx);
+            st->q.push_back(*c);
+        }
+    }
+
+
     ~StdinCommandSource() override {
         st_->stop.store(true);
         if (th_.joinable()) th_.detach();

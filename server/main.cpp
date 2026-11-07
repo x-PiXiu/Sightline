@@ -38,6 +38,7 @@
 #define SIGHTLINE_HAS_LUA 0
 #endif          // ep08 步骤 3：配置适配器（4 个端口同一对象）
 #include "adapters/stdin_command_source.h"
+#include "adapters/tcp_command_source.h"   // ep08：运维命令 TCP 口（与日志流分离）
 #include "adapters/null_persistence.h"
 #include "adapters/wire_sink.h"
 #include "adapters/bot_driver_port.h"
@@ -257,6 +258,11 @@ int main(int argc, char** argv) {
     }
     adapters::WireSinkAdapter wireSink(writer);              // FrameWriter → IWireSink
     adapters::StdinCommandSource commands;                  // reload / rollback / version / help
+    // ep08 步骤 9：运维命令 TCP 口（与日志流分离——前台刷屏不再淹没 stdin）；
+    //   env SIGHTLINE_CMD_PORT 可改/置 0 关闭。stdin 与 TCP 双源同队列（A1：非主线程只入队）。
+    adapters::TcpCommandListener cmdPort(commands,
+        static_cast<unsigned>(EnvOr("SIGHTLINE_CMD_PORT", "18889").empty()
+                                  ? 18889 : std::atoi(EnvOr("SIGHTLINE_CMD_PORT", "18889").c_str())));
     adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
     adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。

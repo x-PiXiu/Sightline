@@ -1,0 +1,85 @@
+// tcp_command_source.h —— ep08 步骤 9 前置：运维命令 TCP 口（与 stdout 日志流分离）
+// 动机：前台 Run 窗口心跳日志刷屏，stdin 输入被日志淹没——命令从独立端口进：
+//   nc 127.0.0.1 <port> 敲命令（reload/rollback/version/patch），新终端/远程皆可。
+// A1 纪律：读线程只入队（复用 StdinCommandSource 的锁队列），消费归编排器主循环。
+// header-only（POSIX 阻塞式·独立线程·进程退出即亡）；port=0 表示关闭。
+#pragma once
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <string>
+#include <thread>
+
+#include "adapters/stdin_command_source.h"
+#include "logger/logger.h"
+
+namespace adapters {
+
+class TcpCommandListener {
+public:
+    TcpCommandListener(StdinCommandSource& sink, unsigned port) {
+        if (port == 0) return;                                  // 0=显式关闭
+        fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (fd_ < 0) { LOG_WARNING("[命令口] socket 创建失败——stdin 仍可用"); return; }
+        int on = 1;
+        ::setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        addr.sin_port = htons(static_cast<uint16_t>(port));
+        if (::bind(fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0 ||
+            ::listen(fd_, 4) < 0) {
+            LOG_WARNING("[命令口] 监听 :" + std::to_string(port) +
+                        " 失败（端口占用？）——stdin 仍可用");
+            ::close(fd_);
+            fd_ = -1;
+            return;
+        }
+        th_ = std::thread([this, port, &sink] {
+            LOG_INFO("[命令口] 就绪 ::" + std::to_string(port) +
+                     " —— nc 127.0.0.1 " + std::to_string(port) +
+                     " 后敲命令（reload [note] / rollback / version / patch <name> / help）");
+            while (!stop_.load()) {
+                const int c = ::accept(fd_, nullptr, nullptr);
+                if (c < 0) break;
+                std::thread([c, &sink] { Serve(c, sink); }).detach();
+            }
+        });
+    }
+
+    ~TcpCommandListener() {
+        stop_.store(true);
+        if (fd_ >= 0) {
+            ::shutdown(fd_, SHUT_RDWR);
+            ::close(fd_);
+        }
+        if (th_.joinable()) th_.detach();
+    }
+
+private:
+    static void Serve(int c, StdinCommandSource& sink) {
+        std::string buf;
+        char tmp[512];
+        ssize_t n;
+        while ((n = ::recv(c, tmp, sizeof(tmp), 0)) > 0) {
+            buf.append(tmp, static_cast<size_t>(n));
+            size_t p;
+            while ((p = buf.find('\n')) != std::string::npos) {
+                std::string line = buf.substr(0, p);
+                buf.erase(0, p + 1);
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                if (!line.empty()) sink.Enqueue(line);
+            }
+        }
+        ::close(c);
+    }
+
+    int fd_ = -1;
+    std::atomic<bool> stop_{false};
+    std::thread th_;
+};
+
+} // namespace adapters
