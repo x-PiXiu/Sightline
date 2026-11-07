@@ -15,7 +15,7 @@
 | 第 4 期 · 预测 · 和解 · 插值 | [BV1X3nY6iEfE](https://www.bilibili.com/video/BV1X3nY6iEfE/) | `ep04` | 三部曲 + 主从 Reactor + 压测 | 3 万同时在线全绿；单测 125 断言 |
 | 第 5 期 · hitscan 与服务器权威命中 | [BV1PHxN69EFf](https://www.bilibili.com/video/BV1PHxN69EFf/) | `ep05` | 20 号空包 + 四道门 + 解析求交 + 贴花管理器 | 全链 RTT 45ms（判定 1ms）；单测 160 断言 |
 | 第 6 期 · 延迟补偿回溯 | [BV1u8x46ZE7R](https://www.bilibili.com/video/BV1u8x46ZE7R/) | `ep06` | 历史环 32 槽 + judgeAt=now−rtt + 22 号上报 + 幽灵三色 | 回溯关 21.4%→开 39.7%（滑块 300ms）；单测 97 断言 |
-| 第 7 期 · 死亡与结算 | 已定时 | `ep07` | 服务器权威死亡/重生/结算 + 人机三件套 + 比分板 + 死窗根除（扣弹即上钟） | 一局完整对局 ≈85s；死窗 38/147 发→0；单测 238 断言 |
+| 第 7 期 · 死亡与结算 | [BV16C4h6tEZe](https://www.bilibili.com/video/BV16C4h6tEZe/) | `ep07` | 服务器权威死亡/重生/结算 + 人机三件套 + 比分板 + 死窗根除（扣弹即上钟） | 一局完整对局 ≈85s；死窗 38/147 发→0；单测 238 断言 |
 
 每期代码快照 = 对应 tag，可 `git checkout epNN` 复现当期状态。
 
@@ -25,23 +25,70 @@
 - **协议**：TCP `[2B len][2B msgid][payload]` 小端；契约登记在 `docs/protocol/MSG_IDS.md`（msgid 只增不改），第 4 期起 variant 编解码（每条消息一个专用解析器，格式不对整条拒收）。
 - **客户端** `client/`：UE5.7，C++ 为主，蓝图只做表现层；客户端预测 + 服务器权威对账（ε=5cm 三分支）+ 远端插值（滑窗 + 25ms 渲染延迟 + 三层滤波）。表现层素材来自 Epic 官方 Lyra（不入库，见 `client/README.md`）。
 
-## 构建与测试
+## 快速开始
+
+### 1. 依赖安装（Ubuntu 22.04 / WSL 实测）
 
 ```bash
-# 服务端（Linux / WSL）
-cd server && cmake -B build && cmake --build build -j
+# 编译工具链 + 协议/存储/Lua 开发库（探测式构建：装齐即自动启用 Lua 策略层与三库持久化）
+sudo apt update
+sudo apt install -y build-essential cmake pkg-config git \
+    liblua5.4-dev libhiredis-dev libmariadb-dev libmongoc-1.0-dev
 
-# 单元测试（125 项断言）
-./build/test_lobby    # 45 断言 · LobbyService 纯逻辑
-./build/test_match    # 54 断言 · MatchService + 对账桥
-g++ -std=c++2b -I include tests/test_wire.cpp -o test_wire && ./test_wire   # 26 断言 · 协议字节级布局
-
-# 压测（见 server/scripts/loadbot/）
-cd server/build && ulimit -n 65535 && SIGHTLINE_PORT=18889 ./sightline_server
-cd server/scripts/loadbot && ./loadbot_linux -port 18889 -n 30000 -matchN 4 -ramp 600 -mramp 100 -hold 15
+# 运行时三件套（full 模式用；不装也能跑——lite 模式零依赖启动，见下）
+sudo apt install -y mysql-server redis-server          # MongoDB 建议官方源装 mongodb-org（apt 默认源无）
 ```
 
-客户端为 UE 工程，`.uproject` 与 Content 资产按 `client/README.md` 说明获取 Lyra 素材后构建。
+### 2. 构建
+
+```bash
+git clone https://github.com/x-PiXiu/Sightline.git
+cd Sightline/server
+cmake -B build && cmake --build build -j$(nproc)
+# 未装 Lua/DB 开发库也能 configure+build（对应功能自动关闭）；
+# 显式控制：-DSIGHTLINE_ENABLE_LUA=ON / -DSIGHTLINE_ENABLE_DB=ON
+```
+
+### 3. 启动（双模式）
+
+```bash
+# lite 模式（默认·零依赖裸跑——无任何数据库即可完整开局）
+./build/sightline_server
+
+# full 模式（三库持久化：MySQL 战绩+审计链 / Redis 热榜 / MongoDB 战报文档）
+sudo systemctl start mysql redis-server mongod          # 或使用宝塔/Docker 托管实例
+mysql -h127.0.0.1 -uroot -p < assets/db/init.sql        # 建库建表（幂等，可重复执行）
+export SIGHTLINE_MYSQL_DSN='127.0.0.1:3306:sightline:sightline:sightline'
+export SIGHTLINE_REDIS_URI='127.0.0.1:6379:<你的Redis密码>'
+export SIGHTLINE_MONGO_URI='mongodb://127.0.0.1:27017'
+./build/sightline_server --db-profile=full
+# 启动横幅：[DB] profile=full · MySQL ✓ · Mongo ✓ · Redis ✓ —— 任一库缺失自动降级，对局照常
+```
+
+### 4. 运维命令口（与日志流分离）
+
+```bash
+nc 127.0.0.1 18889        # 连上后敲：version / reload [note] / rollback / patch damage / help
+```
+
+### 5. 单元测试（8 组 · 587 项断言）
+
+```bash
+cd server && ./build.sh all          # 一键构建+跑全部测试（脚本自动探测 Lua/DB 库）
+./build/test_lobby    # 45 断言 · LobbyService
+./build/test_match    # 238 断言 · MatchService 全规则
+./build/test_wire     # 26 断言 · 协议字节级布局
+./build/test_ports    # 42 断言 · 端口与纯策略
+./build/test_config   # 48 断言 · 配置热重载
+./build/test_lua_policy  # 91 断言 · Lua 沙箱/热修/等价性对拍（需 Lua）
+./build/test_persistence # 28 断言 · 持久化/WAL
+./build/test_v48      # 69 断言 · 契约 v4.8（换枪/热重载三语义）
+SIGHTLINE_DB_SMOKE=1 /tmp/test_db_integration   # 真库集成冒烟（可选·需三库在跑）
+```
+
+### 6. 客户端
+
+UE5.7 工程（`client/`），`.uproject` 与 Lyra 素材获取见 `client/README.md`。
 
 ## 压测（loadbot v2 · 2026-10-23）
 
