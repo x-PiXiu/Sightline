@@ -82,9 +82,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
 	FName LeftHandSocketName = TEXT("HandGuard_L");
 
-	/** 网格相对变换校正（换 mesh 后应用到 WeaponMeshComp——每枪原点约定不同；
-	 *  Rifle=照抄 BP 角色里枪组件当前的 Relative Transform，保证切回不变样；
-	 *  Pistol=以此起步 PIE 试调到"枪在手里"。恒等变换=不动） */
+	/** 网格相对变换校正（换 mesh 后应用到 WeaponMeshComp——每枪原点约定不同）。
+	 *  ⚠ 缩放 0（默认）=未配置→**不覆盖** BP 组件现值（防抹掉 BP 里校好的 -90° Yaw——2026-11-07
+	 *  实锤：恒等变换曾无条件重置组件变换→所有枪枪口回到素材原生 +Y）。启用=缩放非 0 按值覆盖；
+	 *  配置纪律：**换枪链上每把 DA 都要配**（Rifle=照抄 BP 组件现值，Pistol=校正值）——
+	 *  漏配的那把会在往返切枪时保留上一把的校正值=又歪 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "WeaponDef|Visual")
-	FTransform MeshRelativeTransform = FTransform::Identity;
+	FTransform MeshRelativeTransform = FTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
 };

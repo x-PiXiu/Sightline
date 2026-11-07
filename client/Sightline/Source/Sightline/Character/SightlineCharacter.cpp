@@ -594,8 +594,12 @@ void ASightlineCharacter::TryFire() {
            LocalMag, GetBaseAimRotation().Yaw, GetBaseAimRotation().Pitch,
            LastReportedYaw, LastReportedPitch,
            FPlatformTime::Seconds());   // KPI 采集锚 T0（与判定回包同钟，差=全链 RTT）；准星 vs 上报并排=朝向偏差定案
-    // 打空帧不播开火蒙太奇：同帧已播换弹蒙太奇，后播会中断覆盖（2026-10-31 实锤：换弹动作"不播"）
-    if (UAnimMontage* M = FireMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表（表驱动替身·旧成员兜底）
+    // 打空帧不播开火蒙太奇：同帧已播换弹蒙太奇，后播会中断覆盖（2026-10-31 实锤：换弹动作"不播"；
+    // 步骤 7 查表化时该防线曾丢失——PlayAnimMontage(开火) 覆盖刚播的换弹蒙太奇=自动换弹无动画，2026-11-07 实锤）
+    if (LocalMag > 0)
+    {
+        if (UAnimMontage* M = FireMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表（表驱动替身·旧成员兜底）
+    }
     if (USoundBase* S = FireSoundOf()) UGameplayStatics::PlaySoundAtLocation(this, S, GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
 }
@@ -832,7 +836,11 @@ void ASightlineCharacter::ApplyWeaponMesh() {
     if (D->WeaponMesh != nullptr && Sk->GetSkeletalMeshAsset() != D->WeaponMesh.Get())
     {
         Sk->SetSkeletalMesh(D->WeaponMesh.Get());
-        Sk->SetRelativeTransform(D->MeshRelativeTransform);   // 每枪挂点校正（Rifle=BP 现值·Pistol=试调值）
+        // v4.8.1 补丁（2026-11-07 实锤"所有枪枪口指向 +Y"）：MeshRelativeTransform 缩放 0=未配置
+        //  → **不覆盖** BP 组件现值（恒等变换曾无条件重置→抹掉 BP 里校好的 -90° Yaw）；
+        //  配置纪律：换枪链上每把 DA 都要配（Rifle=BP 现值·Pistol=校正值）——漏配的往返切枪会保留他人校正值
+        if (D->MeshRelativeTransform.GetScale3D() != FVector::ZeroVector)
+            Sk->SetRelativeTransform(D->MeshRelativeTransform);
         UE_LOG(LogSightline, Log, TEXT("[换枪模型] → %s"), *D->WeaponMesh->GetName());
     }
     const FName Socket = D->LeftHandSocketName;
