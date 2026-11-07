@@ -16,6 +16,7 @@ class UInputAction;
 class UAnimMontage;
 class UAnimInstance;
 class UNiagaraComponent;
+class UNiagaraSystem;
 class USoundBase;
 class USightlineWeaponDefinition;          // ep08 步骤 7：武器动画表 DA（完整类型经 include 提供）
 class UUserWidget;
@@ -214,6 +215,11 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Sightline|Fire")
     TObjectPtr<UNiagaraComponent> MuzzleFXComp = nullptr;
 
+    /** 远端枪口火光单发脉冲（21 号"其余"分支调）：**世界坐标 Spawn** 本地已热的 Niagara 资产
+     *  到本实例枪口 Muzzle 插槽（不依赖远端 BP 挂组件——远端 Pawn 无组件也出火光）。
+     *  System=调用方传本地火光资产；User.Trigger 上升沿单发，寿命型系统自亡；缺失静默降级 */
+    void PlayMuzzleFlashOnce(UNiagaraSystem* System);
+
     // —— M5 弹孔贴花（2026-10-28 用户令：21 号 hitPoint 已带落点，C++ 补朝向与渲染）——
     /** 弹孔贴花材质（Lyra 迁移 M_Decal_Base 系；未配置=静默降级零开销） */
     UPROPERTY(EditDefaultsOnly, Category = "Sightline|Fire")
@@ -300,6 +306,8 @@ private:
     std::uint64_t NextFireAllowedMs = 0;         // 客户端步进（ep08 起按 30 号 fireIntervalMs）
     int32 LocalMag = 30;                         // 本地弹匣（不上 UI——D5-04；漂了不纠偏，换弹自动对齐）
     std::uint64_t LocalReloadUntilMs = 0;
+    std::uint64_t LocalEquipUntilMs = 0;         // ep08：换枪拔枪窗（600ms 内不叠开火蒙太奇——Equip 被
+                                                 //  100ms 一发的 FireMontage 顶掉=掏枪动画不可见实锤）
     int32 CurrentWeaponType = 0;                 // ep08：0=Rifle / 1=Pistol（本地乐观，权威在服务器）
 
     // —— ep08 步骤 7：武器动画表（§7.3 表 ≥2 行 Rifle/Pistol；BP Character Class Defaults 填 DA 引用）——

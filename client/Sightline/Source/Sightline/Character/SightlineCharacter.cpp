@@ -7,6 +7,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerStart.h"
+#include "NiagaraFunctionLibrary.h"
 #include "GameInstance/SightlineGameInstance.h"
 #include "InputAction.h"
 #include "InputCoreTypes.h"
@@ -598,7 +599,12 @@ void ASightlineCharacter::TryFire() {
     // 步骤 7 查表化时该防线曾丢失——PlayAnimMontage(开火) 覆盖刚播的换弹蒙太奇=自动换弹无动画，2026-11-07 实锤）
     if (LocalMag > 0)
     {
-        if (UAnimMontage* M = FireMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表（表驱动替身·旧成员兜底）
+        // 换枪拔枪窗（600ms）内不叠开火蒙太奇——Equip 被顶掉根因同款（2026-11-07）；只锁动画不锁判定
+        const uint64 NowEquipMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+        if (NowEquipMs >= LocalEquipUntilMs)
+        {
+            if (UAnimMontage* M = FireMontageOf()) PlayAnimMontage(M);   // 步骤 7：查表（表驱动替身·旧成员兜底）
+        }
     }
     if (USoundBase* S = FireSoundOf()) UGameplayStatics::PlaySoundAtLocation(this, S, GetActorLocation());
     if (MatchSession.IsValid()) MatchSession->SendFireRequest();   // D5-01：空 payload，方向都不带
@@ -710,6 +716,8 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
                     if (USoundBase* S = Remote->FireSoundOf())
                         UGameplayStatics::PlaySound2D(this, S);   // 2D 缩小版（ep14 空间化）——射手武器真声
                     if (UAnimMontage* M = Remote->FireMontageOf()) Remote->PlayAnimMontage(M);   // 远端开火动画
+                    Remote->PlayMuzzleFlashOnce(                          // ep08 补口：远端枪口火光（此前从未接入）
+                        MuzzleFXComp ? MuzzleFXComp->GetAsset() : nullptr);
                 } else if (RemoteFireSound != nullptr) {
                     UGameplayStatics::PlaySound2D(this, RemoteFireSound.Get());   // 射手已不在场：旧兜底
                 }
@@ -824,6 +832,8 @@ void ASightlineCharacter::SetRemoteWeaponType(const int32 WeaponType) {
     if (CurrentWeaponType == WeaponType) return;          // 幂等（快照 30Hz 重复喂）
     CurrentWeaponType = WeaponType;
     ApplyWeaponMesh();                                    // ep08 补口：远端枪模型随表换
+    if (UAnimMontage* M = EquipMontageOf())               // ep08 补口：远端拔枪动作（3P 可见——换枪表现闭环）
+        PlayAnimMontage(M);
     UE_LOG(LogSightline, Log, TEXT("[远端武器] pid 表现 → type=%d（查表态·零钟副作用）"), WeaponType);
 }
 
@@ -861,6 +871,13 @@ void ASightlineCharacter::ApplyWeaponSwitch(const int32 WeaponType) {
     bFireHeld = false;
     MatchSession->SendSwitchWeapon(WeaponType);   // 28 号：服务器权威状态为准
     ApplyWeaponMesh();                            // ep08 补口：本地枪模型随表换
+    if (UAnimMontage* M = EquipMontageOf())       // ep08 补口：换枪拔枪动作（ep06 出生版扩展到换枪——
+    {                                             //  DA AnimSet.Equip 查表·空则回退旧成员；纯表现层零协议）
+        PlayAnimMontage(M);
+        // ep08 补丁（掏枪动画"无效"实锤）：换枪后 600ms 内不再叠开火蒙太奇——同 Group 蒙太奇互斥，
+        //  100ms 一发的 FireMontage 曾把刚播的 Equip 顶掉=掏枪动作不可见；只锁动画不锁判定（开火照常）
+        LocalEquipUntilMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0) + 600;
+    }
     UE_LOG(LogSightline, Log, TEXT("[换枪] 本地乐观 → type=%d 满匣=%d 射速=%dms"),
            WeaponType, LocalMag, WFireMs());
 }
@@ -916,6 +933,27 @@ void ASightlineCharacter::WarmupFireChain() {
             Mgr->Reset();
         }
     UE_LOG(LogSightline, Log, TEXT("[预热] 开火链资产已热（火光/枪声/命中音/弹孔）——首枪零 hitch"));
+}
+
+// 远端枪口火光单发脉冲（2026-11-07 补口·实勘修订）：远端 Pawn 的 BP **没有火光 Niagara 组件**
+// （组件挂在本地角色 BP——MuzzleFXComp 仅本地自动发现）→ 原"Activate 远端组件"方案恒静默。
+// 改=**世界坐标 Spawn**：本实例枪网格 Muzzle 插槽位姿 + 调用方传来的本地已热 Niagara 资产——
+// Trigger 上升沿单发（与本地 TryFire 同语义），寿命型系统自亡；资产缺失=静默降级
+void ASightlineCharacter::PlayMuzzleFlashOnce(UNiagaraSystem* System) {
+    if (!System) return;
+    FVector Loc = GetActorLocation();
+    FRotator Rot = GetBaseAimRotation();
+    if (USkeletalMeshComponent* Sk = Cast<USkeletalMeshComponent>(WeaponMeshComp))
+    {
+        const FTransform MuzzleXf = Sk->GetSocketTransform(FName("Muzzle"), RTS_World);
+        Loc = MuzzleXf.GetLocation();
+        Rot = MuzzleXf.Rotator();
+    }
+    if (UNiagaraComponent* NC = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, System, Loc, Rot))
+    {
+        NC->SetVariableBool(FName("User.Trigger"), true);
+        NC->SetVariableVec3(FName("User.Direction"), Rot.Vector());
+    }
 }
 
 void ASightlineCharacter::CreateMatchUI() {

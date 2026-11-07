@@ -13,7 +13,7 @@ return {
                    hp_cover_below = 30, move_speed_cm_s = 400,
                    fire_interval_ms = 400 },
     -- ★ 武器数值唯一真相源（key = 契约锁 EWeaponType 的字符串别名）
-    weapons    = { rifle  = { damage = 25, mag = 30, reload_ms = 2500, fire_ms = 95 },
+    weapons    = { rifle  = { damage = 27, mag = 30, reload_ms = 2500, fire_ms = 95 },
                    pistol = { damage = 20, mag = 12, reload_ms = 1800, fire_ms = 220 } },
     formula    = { headshot_multiplier = 2.0, falloff_start_cm = 3000,
                    falloff_factor = 0.8 },
