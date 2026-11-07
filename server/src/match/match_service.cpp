@@ -352,7 +352,11 @@ std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64
         MatchEvent ev;
         ev.type = MatchEvent::Type::FireResult;
         ev.roomId = roomId_;
-        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate), 0, 0, 0, 0};
+        // v4.8.1：gate=换弹中 → 带服务器换弹钟剩余毫秒（客户端对齐本地钟根治双钟漂移——
+        //  客户端补满后连发全吃服务器换弹尾·2026-11-07 服务器日志 13 连拒实锤）
+        const auto remaining = static_cast<std::uint16_t>(
+            gate == FireGate::Reloading ? std::min<std::uint64_t>(65535, shooter->weapon.reloadUntilMs - nowMs) : 0);
+        ev.fire = FireResultData{shooterPid, false, false, static_cast<std::uint8_t>(gate), 0, 0, 0, 0, remaining};
         out.push_back(std::move(ev));
         return out;
     }

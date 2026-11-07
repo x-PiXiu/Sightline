@@ -76,6 +76,9 @@ struct FireResultData {
     std::uint32_t victimPid = 0;
     float hitX = 0.f, hitY = 0.f, hitZ = 0.f;  // 未命中=射线终点（墙面或 Lmax 端点，tracer 停墙）
     std::uint8_t victimHp = 0;                 // 命中后余血（ep07 接血条/死亡判定，契约一次定稿）
+    std::uint16_t reloadRemainingMs = 0;       // v4.8.1：gate=1（换弹中）时=服务器换弹钟剩余——客户端
+                                               //  据以对齐本地钟（双钟漂移根治：客户端补满后连发
+                                               //  全吃服务器换弹尾·实测 13 连拒）；其余 gate 恒 0
 };
 
 /** 判定链诊断快照（2026-10-28 用户令"判定链全参数可读" + 2026-11-03 miss 最近候选 +

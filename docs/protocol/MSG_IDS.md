@@ -53,7 +53,7 @@
 | msgid | 名称 | 方向 | payload 结构 | 说明 |
 |-------|------|------|--------------|------|
 | 20 | MSG_C2S_FIRE | C → S | 空 payload | 开火请求。**空 payload 是设计核心（D5-01）**：方向/位置/命中结果一概不收——判定全用服务器权威状态（pos/yaw/pitch 来自 19 号上报的权威推算），客户端连"往哪打"都不让插嘴。**v4.8 定案：20 号继续保持空包**——第二把武器走 28 号换枪意图 + 服务器当前 `weaponType` 判定，不给逐发带 type（ep05 D5-11 预埋按此兑现） |
-| 21 | MSG_S2C_FIRE_RESULT | S → C | **v4.6**：`[4B shooterPid][1B result][4B victimPid][12B hitPoint f32×3][1B victimHp][1B gate]`（**23B**） | **房内全员广播**：射手出 Hitmarker、其余画 tracer（终点=hitPoint）、受击者红闪——一条消息三方共用。result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中（hitPoint=命中面交点）。**victimHp=命中后余血**：第 5 期供 Debug HUD 血量行，第 7 期接血条与死亡判定。**v4.6 追加 `gate`**（2026-11-05 弹匣漂移根治）：0=正常判定 / 1=换弹 / 2=空匣 / 3=射速 / 4=死亡，被拒射击回传射手本人撤销本地预测扣弹，双端换弹钟锁相。**v4.8 纪律：21 号一个字节不动**——伤害数值显示改由 30 号下发，权威余血仍以 21 号为准 |
+| 21 | MSG_S2C_FIRE_RESULT | S → C | **v4.8.1**：`[4B shooterPid][1B result][4B victimPid][12B hitPoint f32×3][1B victimHp][1B gate][2B reloadRemainingMs u16 le]`（**25B**） | **房内全员广播**：射手出 Hitmarker、其余画 tracer（终点=hitPoint）、受击者红闪——一条消息三方共用。result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中（hitPoint=命中面交点）。**victimHp=命中后余血**：第 5 期供 Debug HUD 血量行，第 7 期接血条与死亡判定。**v4.6 追加 `gate`**（2026-11-05 弹匣漂移根治）：0=正常判定 / 1=换弹 / 2=空匣 / 3=射速 / 4=死亡，被拒射击回传射手本人撤销本地预测扣弹，双端换弹钟锁相。**v4.8 纪律：21 号一个字节不动**——伤害数值显示改由 30 号下发，权威余血仍以 21 号为准。**v4.8.1 追加 `reloadRemainingMs`**（2026-11-07 连拒根治）：gate=1（换弹中）时=服务器换弹钟剩余毫秒，客户端据以**对齐本地钟**（本地钟降级为预测·服务器权威）——双钟漂移（客户端补满后全自动连发全吃服务器换弹尾·服务器日志 13 连拒 1.6s 实锤）一个回包自愈；其余 gate/Ok 恒 0 |
 | 22 | MSG_C2S_RTT_REPORT | C → S | `[2B rttMs][2B upKB/s][2B downKB/s]`（6B · 1Hz） | ep06 回溯量源：客户端心跳自测 RTT 上报，服务器钳 1000ms 用于判定回溯（judgeAt=now−rtt）；上下行带宽计数=ep12 数据层消费。旧客户端不报 → 服务器 rtt=0 → 不回溯=向后兼容 |
 
 ### 第 7 期（死亡 / 重生 / 结算 + 人机席位 + 自主换弹 · v4.4~v4.7）
@@ -94,6 +94,7 @@
 | 位置 | 原登记 / 注释 | 实际 | 处理 |
 |---|---|---|---|
 | 21 号 | 本表 v4.2 写 22B | **23B**（v4.6 +1B `gate`），`messages.h:150` | 本表已改；双端枚举注释同步 |
+| 21 号 | 本表 v4.6 写 23B | **25B**（v4.8.1 +2B `reloadRemainingMs`），`messages.h:155` | 本表已改；双端枚举注释同步（2026-11-07 连拒根治） |
 | 24 号 | `msg_ids.h:36` / `SightlineProtocol.h:39` 写 7B | **23B**（v4.5 +16B 坐标 / 朝向），`messages.h:193` | 双端注释同步；本表按 23B 登记 |
 | 17 号 | `msg_ids.h:27` 写 25B 结构且「不含接收者自己」；`SightlineProtocol.h:29` 写「29B/实体·不含自己」 | **29B / 实体，含接收者自己**（v4 + v4.1），`messages.h:86` | 双端注释同步；本表补 flags 位分配 |
 
@@ -131,3 +132,4 @@
 | 2026-11-06 | **v4.8 登记**：新增 28（`C2S_SWITCH_WEAPON`）/ 30（`S2C_CONFIG_VERSION`，变长、含 per-weapon `damage`）；17 号 flags 补 bit3~4=`weaponType`（wire 零增长）；20 号维持空包、21 号一个字节不动；补 `EWeaponType` 契约锁与 flags 位分配表 | ep08 · 设计草案 §6 |
 | 2026-11-06 | **v4.8 实施落地（wire 字节与登记一致）**：双端枚举 28/30 补齐且书写顺序归位；服务端 `messages.h` 新增 `SwitchWeaponMsg` / `ConfigVersionMsg` + flags 助手，`FrameWriter` 在 15 号后与配置变更时广播 30 号，`MatchWiring` 注册 28 号处理器，`MatchService` 接 per-weapon 参数与换枪状态机；客户端协议头镜像解析、路由白名单扩 30、`MatchSession` 运行时参数覆盖层、`SightlineCharacter` 飘字/射速/弹匣/换弹改读覆盖层 + 数字键 1/2。`tests/test_v48.cpp` 59 项断言全绿；UE 侧编译待编辑器验证 | ep08 · 步骤 6 |
 | 2026-11-06 | **排期裁决（P1）**：规则 9 / 12 的「完整合法性校验与踢人」由 ep08 **顺延 ep09（防作弊期）**；ep08 仅预埋 `IBanStore` 端口。**纯排期，契约字节与消息号零变化** | 用户拍板 · ep08 设计草案 §14 |
+| 2026-11-07 | **v4.8.1 登记**：21 号 23B→**25B**（+2B `reloadRemainingMs` u16 le）——gate=1（换弹中）时携带服务器换弹钟剩余毫秒，客户端据以对齐本地钟（本地钟降级为预测、服务器权威）。**动因（2026-11-07 连拒实锤）**：ep07 修复的"拒收回补自愈≤1 发"假设在按住全自动下被击穿——客户端本地钟（打空瞬间上弦）先于服务器钟（打空弹到达上弦·晚 RTT/2）到期，补满后连发全吃服务器换弹尾，服务器日志 13 连拒 1.6s。双端 messages/MatchSession/Character 同步；服务端 8 组回归+客户端冷编译 Succeeded | ep08 · 双钟漂移连拒根治（用户日志+服务器日志对齐实锤） |

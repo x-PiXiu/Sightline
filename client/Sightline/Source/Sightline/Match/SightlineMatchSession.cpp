@@ -291,6 +291,7 @@ void USightlineMatchSession::HandleFrame(const uint16 MsgId, const TArray<uint8>
         Out.HitPoint = FVector(R.HitX, R.HitY, R.HitZ);
         Out.VictimHp = static_cast<int32>(R.VictimHp);
         Out.Gate = static_cast<int32>(R.Gate);              // 门类型（0=正常；非0=被拒→射手撤销预测扣弹）
+        Out.ReloadRemainingMs = static_cast<int32>(R.ReloadRemainingMs);  // v4.8.1：gate=1 换弹钟剩余（钟对齐源）
         OnFireResult.Broadcast(Out);
         return;
     }

@@ -32,7 +32,7 @@ namespace SightlineProtocol
         MSG_C2S_PLAYER_INPUT  = 19, // C→S  [4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B（对局期替代 16·R10）
         // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
         MSG_C2S_FIRE          = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）；ep08 v4.8 维持空包
-        MSG_S2C_FIRE_RESULT   = 21, // S→C v4.6 [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]=23B（房内全员广播·含射手）
+        MSG_S2C_FIRE_RESULT   = 21, // S→C v4.8.1 [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate][2B reloadRemainingMs]=25B（房内全员广播·含射手）
         MSG_C2S_RTT_REPORT    = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
         // —— 第 7 期：死亡/重生/结算 + 人机席位（v4.4）——
         MSG_S2C_KILL           = 23, // S→C  [4B victimPid][4B killerPid][2B respawnDelayMs]=10B——房内全员广播
@@ -232,9 +232,11 @@ namespace SightlineProtocol
         }
     };
 
-    /** 21 FIRE_RESULT（v4.6·23B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]
+    /** 21 FIRE_RESULT（v4.8.1·25B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate][2B reloadRemainingMs]
      *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
-     *  gate 非 0=被武器门拒（2026-11-05 弹匣漂移根治：回传射手撤销本地预测扣弹——双端弹匣/换弹钟锁相） */
+     *  gate 非 0=被武器门拒（2026-11-05 弹匣漂移根治：回传射手撤销本地预测扣弹——双端弹匣/换弹钟锁相）
+     *  reloadRemainingMs（v4.8.1）：gate=1（换弹中）时=服务器换弹钟剩余毫秒——客户端对齐本地钟，
+     *  双钟漂移（客户端补满后连发全吃服务器换弹尾·2026-11-07 实测 13 连拒）一个回包自愈 */
     struct FFireResult
     {
         uint32 ShooterPid = 0;
@@ -243,8 +245,9 @@ namespace SightlineProtocol
         float HitX = 0.f, HitY = 0.f, HitZ = 0.f;   // 命中面/射线终点（tracer 停墙）
         uint8 VictimHp = 0;       // 命中后余血（HUD 血量行；ep07 接血条）
         uint8 Gate = 0;           // 0=正常判定 / 非0=被武器门拒（1 换弹 2 弹匣 3 射速 4 死亡）
+        uint16 ReloadRemainingMs = 0;  // gate=1 时的换弹钟剩余（其余恒 0）
 
-        static constexpr int32 Size = 23;
+        static constexpr int32 Size = 25;
 
         static bool Parse(const TArray<uint8>& Payload, FFireResult& Out)
         {
@@ -257,6 +260,7 @@ namespace SightlineProtocol
             Out.HitZ       = ReadF32(Payload, 17);
             Out.VictimHp   = Payload[21];
             Out.Gate       = Payload[22];
+            Out.ReloadRemainingMs = static_cast<uint16>(Payload[23]) | (static_cast<uint16>(Payload[24]) << 8);
             return true;
         }
     };

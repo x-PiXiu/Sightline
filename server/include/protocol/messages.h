@@ -148,10 +148,13 @@ struct EntityLeaveMsg {
     }
 };
 
-/** 21 FIRE_RESULT（v4.6 · 23B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]
+/** 21 FIRE_RESULT（v4.8.1 · 25B）：[4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate][2B reloadRemainingMs]
  *  房内全员广播（含射手自己）——一条消息三方共用：射手 Hitmarker / 其余 tracer / 受击者红闪。
  *  result：0=未命中（victimPid/victimHp=0 填充，hitPoint=射线终点）/ 1=命中。
- *  victimHp=命中后余血：第 5 期供 HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动） */
+ *  victimHp=命中后余血：第 5 期供 HUD 血量行，第 7 期接血条与死亡判定（契约一次定稿零改动）
+ *  reloadRemainingMs（v4.8.1，2026-11-07 连拒根治）：gate=1（换弹中）时=服务器换弹钟剩余毫秒，
+ *  客户端据以对齐本地钟——双钟漂移（客户端补满后连发全吃服务器换弹尾·实测 13 连拒）一个回包自愈；
+ *  其余 gate/Ok 恒 0 */
 struct FireResultMsg {                             // v4.6：+1B gate（2026-11-05 弹匣漂移根治——被拒射击
                                                    //  回传射手本人撤销本地预测扣弹，双端换弹钟锁相）
     std::uint32_t shooterPid = 0;
@@ -160,8 +163,9 @@ struct FireResultMsg {                             // v4.6：+1B gate（2026-11-
     float hitX = 0.f, hitY = 0.f, hitZ = 0.f;
     std::uint8_t victimHp = 0;
     std::uint8_t gate = 0;                         // 0=正常判定 / 非0=被武器门拒（1 换弹 2 弹匣 3 射速 4 死亡）
+    std::uint16_t reloadRemainingMs = 0;           // v4.8.1：gate=1 时的换弹钟剩余（其余恒 0）
 
-    static constexpr std::size_t kSize = 23;
+    static constexpr std::size_t kSize = 25;
 
     std::string Encode() const {
         std::string s(kSize, '\0');
@@ -178,6 +182,8 @@ struct FireResultMsg {                             // v4.6：+1B gate（2026-11-
         wrF(9, hitX); wrF(13, hitY); wrF(17, hitZ);
         s[21] = static_cast<char>(victimHp);
         s[22] = static_cast<char>(gate);
+        s[23] = static_cast<char>(reloadRemainingMs & 0xFF);
+        s[24] = static_cast<char>((reloadRemainingMs >> 8) & 0xFF);
         return s;
     }
 };

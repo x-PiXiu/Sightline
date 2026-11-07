@@ -211,7 +211,7 @@ public:
                     // 客户端撤销本地预测扣弹=双端弹匣/换弹钟锁相（"死窗"族灭绝）。广播全员无害：
                     // 他人客户端按"非自机+gate 过滤"；人机的拒绝在驱动器已就地丢弃不进此路径。
                     const sightline::wire::FireResultMsg m{
-                        F.shooterPid, 0, 0, 0.f, 0.f, 0.f, 0, F.gate};
+                        F.shooterPid, 0, 0, 0.f, 0.f, 0.f, 0, F.gate, F.reloadRemainingMs};
                     const std::string p = m.Encode();
                     for (int fd : lobby_.RoomMemberFds(e.roomId))
                         send(fd, protocol::MSG_S2C_FIRE_RESULT, p);
@@ -243,7 +243,7 @@ public:
                 // 受击者红闪）——一条消息三方共用（D5-02v2；翻译唯一落点纪律同 15/17/18）
                 const sightline::wire::FireResultMsg m{
                     F.shooterPid, F.bHit ? std::uint8_t{1} : std::uint8_t{0},
-                    F.victimPid, F.hitX, F.hitY, F.hitZ, F.victimHp};
+                    F.victimPid, F.hitX, F.hitY, F.hitZ, F.victimHp, 0, F.reloadRemainingMs};
                 const std::string p = m.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))
                     send(fd, protocol::MSG_S2C_FIRE_RESULT, p);

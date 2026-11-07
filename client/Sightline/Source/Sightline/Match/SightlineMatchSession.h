@@ -49,6 +49,8 @@ struct FSightlineFireResult {
     UPROPERTY(BlueprintReadOnly) int32 VictimHp = 0;                       // 命中后余血（HUD 血量行）
     UPROPERTY(BlueprintReadOnly) int32 Gate = 0;                           // 0=正常判定 / 非0=被武器门拒
                                                                            // （2026-11-05 弹匣漂移根治：射手撤销预测扣弹）
+    UPROPERTY(BlueprintReadOnly) int32 ReloadRemainingMs = 0;              // v4.8.1：gate=1 时=服务器换弹钟剩余
+                                                                           // （客户端据以对齐本地钟·漂移一个回包自愈）
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFireResult, const FSightlineFireResult&, Result);
 

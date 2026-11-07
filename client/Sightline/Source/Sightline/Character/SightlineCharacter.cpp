@@ -677,11 +677,16 @@ void ASightlineCharacter::OnFireResult(const FSightlineFireResult& Result) {
         // 被武器门拒（2026-11-05 弹匣漂移根治）：撤销本地预测扣弹=双端弹匣/换弹钟锁相——
         // "死窗"族灭绝（服务端空匣/换弹期间客户端不再有幻影弹药空放）。无弹孔/无伤害数字。
         LocalMag = FMath::Min(LocalMag + 1, WMag());
+        // v4.8.1（2026-11-07 连拒根治）：gate=1 → 本地钟对齐服务器剩余（双钟漂移一个回包自愈）——
+        //  实测漂移=客户端补满后连发全吃服务器换弹尾（13 连拒 1.6s）——本地钟只做预测、权威在服务器
+        const uint64 NowMs = static_cast<uint64>(FPlatformTime::Seconds() * 1000.0);
+        if (Result.Gate == 1 && Result.ReloadRemainingMs > 0)
+            LocalReloadUntilMs = NowMs + static_cast<uint64>(Result.ReloadRemainingMs);
         // 拒收回补外显（2026-11-05 死窗校验增补："降级可以但必须喊一声"——本轮死窗 1 发零头
         // 悬案即因静默不可观测）。健康对局应几乎不出现；连续出现=双端武器状态失锁，先查弹余/换弹钟。
         UE_LOG(LogSightline, Warning,
-               TEXT("[开火] 被武器门拒 gate=%d（1=换弹中 2=弹匣空 3=射速 4=死亡/终局）弹余回补→%d"),
-               Result.Gate, LocalMag);
+               TEXT("[开火] 被武器门拒 gate=%d（1=换弹中 2=弹匣空 3=射速 4=死亡/终局）剩余=%dms 弹余回补→%d"),
+               Result.Gate, Result.ReloadRemainingMs, LocalMag);
         return;
     }
     if (!Result.bHit) SpawnImpactDecal(Result.HitPoint, Result.ShooterPid);   // 未命中=墙面弹孔（命中人体不出——血效 ep14）

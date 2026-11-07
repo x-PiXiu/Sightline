@@ -29,7 +29,7 @@ namespace protocol {
     MSG_C2S_PLAYER_INPUT    = 19, // [v4] 位置上报 v2：[4B seq][12B pos][4B yaw][4B pitch][1B flags]=25B——对局期替代 16（R10）
         // —— 第 5 期：开火与命中（与 docs/protocol/MSG_IDS.md v4.2 保持同步）——
         MSG_C2S_FIRE            = 20, // C→S  (空 payload)——判定全用服务器权威状态，方向都不收（D5-01）
-        MSG_S2C_FIRE_RESULT     = 21, // S→C v4.6 [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate]=23B——房内全员广播（含射手）
+        MSG_S2C_FIRE_RESULT     = 21, // S→C v4.8.1 [4B shooterPid][1B result][4B victimPid][12B hitPoint][1B victimHp][1B gate][2B reloadRemainingMs]=25B——房内全员广播（含射手）
         MSG_C2S_RTT_REPORT      = 22, // C→S  [2B rttMs][2B upKB/s][2B downKB/s]=6B·1Hz——ep06 回溯量源+带宽计数预埋（ep12 消费）
         // —— 第 7 期：死亡/重生/结算 + 人机席位（v4.4）——
         MSG_S2C_KILL            = 23, // S→C  [4B victimPid][4B killerPid][2B respawnDelayMs]=10B——房内全员广播（击杀播报+比分源）
