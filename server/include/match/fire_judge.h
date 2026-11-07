@@ -25,7 +25,7 @@ inline constexpr std::uint64_t kReloadMs          = 2500;    // 打空自动换�
 inline constexpr std::uint64_t kFireMinIntervalMs = 95;      // 服务器阈值 < 客户端步进 100ms（D5-14 容差吸抖动）
 inline constexpr float        kMaxRangeUu         = 1000000.f; // 10km=数值护栏（float 精度安全上限）——实际无距离限制（用户裁决 2026-10-27：去除射程限制），任何对局地图不可能触及
 // —— FPP 相机镜像合同（2026-10-29 用户令：准星=判定射线——弹孔/命中与准星重合）——
-// 服务器眼位必须与客户端 FPP 相机偏移（SightlineCameraComponent FirstPersonOffset=(8,8,62)，胶囊系）逐分量镜像；
+ // 服务器眼位必须与客户端 FPP 相机偏移（SightlineCameraComponent FirstPersonOffset=(20,8,63)，胶囊系）逐分量镜像；
 // ⚠ 改相机偏移（BP 或代码）必须同步本组常量——这是双端瞄准合同，不是自由参数。
 // TPP 模式不重合=TPP 固有视差（行业共识，PUBG 同款），TPP 下的弹着点以服务器射线为准。
 // ——眼位镜像合同（⚠ 双端合同·归 C++ 不归 lua：服务器热调眼位客户端相机不会跟=漂移不自知）——
