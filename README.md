@@ -16,6 +16,7 @@
 | 第 5 期 · hitscan 与服务器权威命中 | [BV1PHxN69EFf](https://www.bilibili.com/video/BV1PHxN69EFf/) | `ep05` | 20 号空包 + 四道门 + 解析求交 + 贴花管理器 | 全链 RTT 45ms（判定 1ms）；单测 160 断言 |
 | 第 6 期 · 延迟补偿回溯 | [BV1u8x46ZE7R](https://www.bilibili.com/video/BV1u8x46ZE7R/) | `ep06` | 历史环 32 槽 + judgeAt=now−rtt + 22 号上报 + 幽灵三色 | 回溯关 21.4%→开 39.7%（滑块 300ms）；单测 97 断言 |
 | 第 7 期 · 死亡与结算 | [BV16C4h6tEZe](https://www.bilibili.com/video/BV16C4h6tEZe/) | `ep07` | 服务器权威死亡/重生/结算 + 人机三件套 + 比分板 + 死窗根除（扣弹即上钟） | 一局完整对局 ≈85s；死窗 38/147 发→0；单测 238 断言 |
+| 第 8 期 · 不停服调平衡 | 待发布 | `ep08` | 配置热重载 + Lua 公式/决策热修 + 三库数据层（MySQL/Mongo/Redis·故障降级）+ 动画表驱动换枪 + bot_ai 切 Lua + 双模式部署 | 单测 587 断言；双模式对拍逐字节一致；Lumen 根除 Frame 83→17.3ms |
 
 每期代码快照 = 对应 tag，可 `git checkout epNN` 复现当期状态。
 
