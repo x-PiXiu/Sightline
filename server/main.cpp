@@ -400,6 +400,7 @@ int main(int argc, char** argv) {
         static std::string lastNotice;                       // 命令 / 配置通知由适配器落日志，用例层零 IO
         if (!app.Notice().empty() && app.Notice() != lastNotice) {
             LOG_INFO("[配置] " + app.Notice());
+            cmdPort.Broadcast(app.Notice());                 // ep08：回执回写命令口（nc 窗口命令与响应同窗）
             lastNotice = app.Notice();
         }
 

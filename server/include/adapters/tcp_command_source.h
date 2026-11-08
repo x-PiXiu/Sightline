@@ -10,8 +10,11 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <algorithm>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "adapters/stdin_command_source.h"
 #include "logger/logger.h"
@@ -20,7 +23,7 @@ namespace adapters {
 
 class TcpCommandListener {
 public:
-    TcpCommandListener(StdinCommandSource& sink, unsigned port) {
+    TcpCommandListener(StdinCommandSource& sink, unsigned port) : sink_(sink) {
         if (port == 0) return;                                  // 0=显式关闭
         fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
         if (fd_ < 0) { LOG_WARNING("[命令口] socket 创建失败——stdin 仍可用"); return; }
@@ -45,7 +48,7 @@ public:
             while (!stop_.load()) {
                 const int c = ::accept(fd_, nullptr, nullptr);
                 if (c < 0) break;
-                std::thread([c, &sink] { Serve(c, sink); }).detach();
+                std::thread([c, this] { Serve(c, *this); }).detach();
             }
         });
     }
@@ -59,8 +62,24 @@ public:
         if (th_.joinable()) th_.detach();
     }
 
+    /** 命令回执回写（2026-11-08 拍摄观感修正）：编排器处理的响应此前只落服务器日志——
+     *  nc 窗口敲完命令无回显=观感"没反应"。主循环 Notice 变化时调 Broadcast，
+     *  回执发到所有活跃命令连接（命令与响应同窗） */
+    void Broadcast(const std::string& text) {
+        std::lock_guard<std::mutex> lk(clisMx_);
+        for (int c : clis_) {
+            std::string out = text + "\n";
+            ssize_t ignored = ::send(c, out.data(), out.size(), MSG_NOSIGNAL);
+            (void)ignored;
+        }
+    }
+
 private:
-    static void Serve(int c, StdinCommandSource& sink) {
+    static void Serve(int c, TcpCommandListener& self) {
+        {
+            std::lock_guard<std::mutex> lk(self.clisMx_);
+            self.clis_.push_back(c);
+        }
         std::string buf;
         char tmp[512];
         ssize_t n;
@@ -71,8 +90,12 @@ private:
                 std::string line = buf.substr(0, p);
                 buf.erase(0, p + 1);
                 if (!line.empty() && line.back() == '\r') line.pop_back();
-                if (!line.empty()) sink.Enqueue(line);
+                if (!line.empty()) self.sink_.Enqueue(line);
             }
+        }
+        {
+            std::lock_guard<std::mutex> lk(self.clisMx_);
+            self.clis_.erase(std::remove(self.clis_.begin(), self.clis_.end(), c), self.clis_.end());
         }
         ::close(c);
     }
@@ -80,6 +103,9 @@ private:
     int fd_ = -1;
     std::atomic<bool> stop_{false};
     std::thread th_;
+    std::mutex clisMx_;
+    std::vector<int> clis_;
+    StdinCommandSource& sink_;
 };
 
 } // namespace adapters
