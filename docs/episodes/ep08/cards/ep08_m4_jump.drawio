@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="指针一跳：全旧或全新" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 内存帧 4 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="换上去 · 指针一跳" style="text;fontSize=30;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="cfg4" value="cfg_ ──▶  [ v2 表 ]（伤害 15）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=28;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="220" width="900" height="70" as="geometry"/></mxCell>
+        <mxCell id="flash" value="⚡ 跳变瞬间：任何一帧，要么全旧 —— 要么全新" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="320" width="900" height="44" as="geometry"/></mxCell>
+        <mxCell id="w4" value="weaponTable_ = 伤害 15（下一发判定读到新值）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="400" width="900" height="70" as="geometry"/></mxCell>
+        <mxCell id="h4b" value="v1 没死 —— 归档进快照环（rollback 的底气）" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1030" y="210" width="820" height="40" as="geometry"/></mxCell>
+        <mxCell id="rg4" value="[ v2 ]   [ v1 ]   [ 空 ]   [ 空 ]" style="rounded=1;whiteSpace=wrap;fillColor=#fff9e6;strokeColor=#d6b656;fontSize=28;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="270" width="820" height="74" as="geometry"/></mxCell>
+        <mxCell id="rb4" value="rollback = 指针从环里拨回上一版（一键回滚）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="390" width="820" height="70" as="geometry"/></mxCell>
+        <mxCell id="net4" value="同一跳变同时广播 30 号 → 客户端 RuntimeParams 刷新 → 飘字 25→15" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="540" width="1780" height="80" as="geometry"/></mxCell>
+        <mxCell id="bn" value="原子切换 —— 没有「改到一半」的中间态" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="700" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：reload 回包 v1→v2 · evidence/srv_cmdport.log · 对应口播 S2-03" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="850" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

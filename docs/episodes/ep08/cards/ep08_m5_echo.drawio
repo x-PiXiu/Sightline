@@ -1,0 +1,20 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="一次跳变，两台机器" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 内存帧 5 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="内存跳变的回声 · 30 号跨进程" style="text;fontSize=30;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="srv5" value="服务器内存&#10;&#10;cfg_ ──▶ [ v2 表 ]（伤害 15）&#10;weaponTable_ = 15" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="240" width="740" height="200" as="geometry"/></mxCell>
+        <mxCell id="msg5" value="" style="edgeStyle=none;strokeColor=#1f6feb;strokeWidth=6;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="830" y="340" as="sourcePoint"/><mxPoint x="1140" y="340" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="msgt" value="30 号 · 配置 v2 · 武器[0] 伤害=15" style="text;fontSize=22;fontStyle=1;fontColor=#1f6feb;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="845" y="300" width="320" height="36" as="geometry"/></mxCell>
+        <mxCell id="cli5" value="客户端内存&#10;&#10;RuntimeParams：武器[0] 伤害 25 → 15&#10;HUD 飘字：25 → 15" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#999999;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1150" y="240" width="700" height="200" as="geometry"/></mxCell>
+        <mxCell id="note5" value="服务器内存里的一次指针跳变，变成您屏幕上掉血的变化——&#10;改表不是黑盒：每一跳都有回声，回声可对账（日志 → MySQL → HUD 版本号）" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="520" width="1780" height="130" as="geometry"/></mxCell>
+        <mxCell id="bn" value="您看到的掉血变了 —— 就是这次跳变的回声" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="730" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：30 号广播+HUD 版本行 · 对应口播 S2-03" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="880" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="旁建 + 验：旧表一根毛不动" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 内存帧 3 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="reload 执行中 · 旁建 + 验" style="text;fontSize=30;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="cmd3" value="> reload 削步枪" style="rounded=1;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=26;sketch=1;curveFitting=1;jiggle=2;fontColor=#e8e8e8;" vertex="1" parent="1"><mxGeometry x="70" y="220" width="500" height="66" as="geometry"/></mxCell>
+        <mxCell id="v1b" value="[ v1 表 ]&#10;伤害 25 —— 照常服务，一根毛没动" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="340" width="780" height="130" as="geometry"/></mxCell>
+        <mxCell id="v2b" value="[ v2 表 ]（旁边新建）&#10;伤害 15 ← 正在校验：格式 + 数值范围" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="920" y="340" width="780" height="130" as="geometry"/></mxCell>
+        <mxCell id="ok3" value="" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=4;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1310" y="300" as="sourcePoint"/><mxPoint x="1310" y="336" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="okt" value="校验 ✓" style="text;fontSize=26;fontStyle=1;fontColor=#1f6b30;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1330" y="296" width="200" height="34" as="geometry"/></mxCell>
+        <mxCell id="bad3" value="验不过？→ v2 当场销毁，v1 原样继续跑——坏数据进不了门" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="520" width="1630" height="90" as="geometry"/></mxCell>
+        <mxCell id="bn" value="新表在旁边建好验过，才轮到换 —— 旧的全程无感" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="700" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：坏表拒收回执 evidence/srv_cmdport.log · 对应口播 S2-02" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="850" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

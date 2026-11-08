@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="换引用不换进程" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 内存帧 6 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="逻辑热修 · 换引用不换进程" style="text;fontSize=30;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="p1" value="patch 前：refDamage ──▶ [ 闭包 A（旧公式） ]" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="220" width="830" height="70" as="geometry"/></mxCell>
+        <mxCell id="p2" value="patch 后：refDamage ──▶ [ 闭包 A′（新公式） ]&#10;闭包 A 没人再引用 → ♻ 垃圾回收自己收走" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="330" width="830" height="120" as="geometry"/></mxCell>
+        <mxCell id="p3" value="Lua VM 不重启——换的只是 registry 里的一个引用&#10;下一发伤害判定取到的就是新函数" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="490" width="830" height="100" as="geometry"/></mxCell>
+        <mxCell id="h6b" value="反例：改崩了怎么办" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="960" y="210" width="780" height="40" as="geometry"/></mxCell>
+        <mxCell id="x1" value="新脚本编译 + 出口校验（返回值域）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="960" y="264" width="780" height="64" as="geometry"/></mxCell>
+        <mxCell id="x2" value="校验 ✗ → A′ 出栈即弃，refDamage 纹丝没动" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="960" y="356" width="780" height="64" as="geometry"/></mxCell>
+        <mxCell id="x3" value="判定继续调 A —— 旧公式照跑，服务器不塌" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="960" y="448" width="780" height="64" as="geometry"/></mxCell>
+        <mxCell id="bn" value="改崩了，引用根本没拨 —— 旧的照跑" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="660" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="沙箱：摘 os/io · 32MB 上限 · 返回值域校验 · 实测 evidence/srv_cmdport.log · 对应口播 S2-04/05" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="810" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,26 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="读新的、验合格、换上去" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 7 / 7" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="lead" value="热更新 = 三个动作 —— 每一步都有保险" style="text;fontSize=30;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="148" width="1780" height="46" as="geometry"/></mxCell>
+        <mxCell id="s1" value="① 读新的&#10;&#10;把配置/脚本文件&#10;重新加载进内存" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=27;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="230" width="540" height="250" as="geometry"/></mxCell>
+        <mxCell id="s2" value="② 验合格&#10;&#10;格式 + 数值范围校验&#10;坏数据进不了门" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=27;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="690" y="230" width="540" height="250" as="geometry"/></mxCell>
+        <mxCell id="s3" value="③ 换上去&#10;&#10;原子切换&#10;下一帧起全读新值" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=27;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1310" y="230" width="540" height="250" as="geometry"/></mxCell>
+        <mxCell id="a1" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=5;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="615" y="355" as="sourcePoint"/><mxPoint x="685" y="355" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="a2" value="" style="edgeStyle=none;strokeColor=#666666;strokeWidth=5;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1235" y="355" as="sourcePoint"/><mxPoint x="1305" y="355" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="f1" value="保险：读失败 → 旧表原样保留" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="500" width="540" height="66" as="geometry"/></mxCell>
+        <mxCell id="f2" value="保险：校验不过 → 拒收，旧版继续跑" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="690" y="500" width="540" height="66" as="geometry"/></mxCell>
+        <mxCell id="f3" value="保险：瞬间完成 —— 没有「改到一半」的中间态" style="rounded=1;whiteSpace=wrap;fillColor=#f8fbff;strokeColor=#6c8ebf;fontSize=22;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1310" y="500" width="540" height="66" as="geometry"/></mxCell>
+        <mxCell id="tl" value="两层对象，两条命令" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="618" width="1780" height="40" as="geometry"/></mxCell>
+        <mxCell id="d1" value="数据（武器数值/规则/人机参数）&#10;→ reload 换表 · 下一发生效&#10;比喻：换弹匣" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="674" width="860" height="150" as="geometry"/></mxCell>
+        <mxCell id="d2" value="逻辑（伤害公式 / 人机决策函数）&#10;→ patch 换引用 · 旧闭包交垃圾回收&#10;比喻：换零件（机器不停）" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=25;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="980" y="674" width="870" height="150" as="geometry"/></mxCell>
+        <mxCell id="bn" value="改崩了？自动回退上一版 —— 笼子里的计算，出不去" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=32;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="866" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="沙箱：摘除 os/io · 32MB 内存上限 · 返回值域校验 · 实测 evidence/srv_cmdport.log" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1000" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
