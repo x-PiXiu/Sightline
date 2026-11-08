@@ -1,0 +1,25 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="改数值像改音量" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 1 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="改文件 ≠ 生效" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="820" height="44" as="geometry"/></mxCell>
+        <mxCell id="h2" value="一条命令 = 生效" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1030" y="150" width="820" height="44" as="geometry"/></mxCell>
+        <mxCell id="e1" value="game_config.lua&#10;rifle = { damage = 25, ... }&#10;→ 改成 damage = 15&#10;（磁盘已变，内存没变）" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="210" width="820" height="170" as="geometry"/></mxCell>
+        <mxCell id="x1" value="服务器内存里的武器表：还是 25" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="400" width="820" height="90" as="geometry"/></mxCell>
+        <mxCell id="c1" value="> reload 削步枪" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="210" width="820" height="60" as="geometry"/></mxCell>
+        <mxCell id="c2" value="武器表：25 → 15　（下一发就按新表判）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="290" width="820" height="90" as="geometry"/></mxCell>
+        <mxCell id="c3" value="[配置] reload 成功 v2-680722bc" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="400" width="820" height="60" as="geometry"/></mxCell>
+        <mxCell id="m1" value="同一条命中判定链路，读的只是内存表——&#10;磁盘和内存之间，隔着一个命令" style="text;fontSize=24;fontColor=#666666;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="520" width="1780" height="70" as="geometry"/></mxCell>
+        <mxCell id="w1" value="rollback 一键回上一版" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="620" width="560" height="90" as="geometry"/></mxCell>
+        <mxCell id="w2" value="改坏了？自动拒收保留旧表" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="680" y="620" width="560" height="90" as="geometry"/></mxCell>
+        <mxCell id="w3" value="审计链落 MySQL（谁改的/改了啥）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1290" y="620" width="560" height="90" as="geometry"/></mxCell>
+        <mxCell id="bn" value="改数值像改音量——不用停服，下一发生效" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="760" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：reload 回包毫秒级 · 证据 docs/episodes/ep08/evidence/ · 契约 v4.8" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="910" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

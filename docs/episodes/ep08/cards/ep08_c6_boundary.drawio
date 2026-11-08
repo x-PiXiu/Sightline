@@ -1,0 +1,27 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="一堵墙，先量再拆" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 6 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="压测发现一堵墙" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="b1" value="100 房" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="130" y="300" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="b2" value="250 房" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="420" y="300" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="b3" value="500 房" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="710" y="300" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="b4" value="1000 房" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1000" y="300" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="b5" value="2000 房" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1290" y="300" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="s1" value="0.1 帧/s" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="130" y="440" width="240" height="36" as="geometry"/></mxCell>
+        <mxCell id="s2" value="0.1 帧/s" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="420" y="440" width="240" height="36" as="geometry"/></mxCell>
+        <mxCell id="s3" value="0.1 帧/s" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="710" y="440" width="240" height="36" as="geometry"/></mxCell>
+        <mxCell id="s4" value="0.1 帧/s" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1000" y="440" width="240" height="36" as="geometry"/></mxCell>
+        <mxCell id="s5" value="0.1 帧/s" style="text;fontSize=26;fontStyle=1;fontColor=#c8161d;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1290" y="440" width="240" height="36" as="geometry"/></mxCell>
+        <mxCell id="ref" value="应≈30 帧/s（单房实测）" style="text;fontSize=22;fontColor=#666666;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="130" y="500" width="1400" height="36" as="geometry"/></mxCell>
+        <mxCell id="why" value="根因：对局服务是「常驻单局」设计——第 N 次 StartMatch 会重置对局。&#10;多房压测下，快照只属于最后一个房——其余全部饿死。&#10;这不是性能极限，是架构边界。" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="560" width="1780" height="150" as="geometry"/></mxCell>
+        <mxCell id="bn" value="先量化，再拆除——第 9 期拆的就是这堵墙" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="750" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="压测：100~2000 房梯度 · 快照速率 p50=0.1（应≈30）· 证据 docs/episodes/ep08/evidence/" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="900" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

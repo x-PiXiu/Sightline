@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="数据分流，各回各家" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 3 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="a1" value="战绩 + 配置审计链&#10;要稳、要查、要对账" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="180" width="560" height="240" as="geometry"/></mxCell>
+        <mxCell id="a1t" value="MySQL · 行存储" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=1;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="560" height="1" as="geometry"/></mxCell>
+        <mxCell id="a1l" value="MySQL 行存储" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="128" width="560" height="44" as="geometry"/></mxCell>
+        <mxCell id="b1" value="一局一文档战报&#10;名册 + 击杀时间线" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="680" y="180" width="560" height="240" as="geometry"/></mxCell>
+        <mxCell id="b1l" value="MongoDB 文档" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="680" y="128" width="560" height="44" as="geometry"/></mxCell>
+        <mxCell id="c1" value="击杀热榜投影&#10;要快、丢了能重建" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1290" y="180" width="560" height="240" as="geometry"/></mxCell>
+        <mxCell id="c1l" value="Redis 热榜" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1290" y="128" width="560" height="44" as="geometry"/></mxCell>
+        <mxCell id="lab" value="按数据特性选型——不按名气选型" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="460" width="1780" height="50" as="geometry"/></mxCell>
+        <mxCell id="wal" value="审计 WAL：任一库故障期间，审计数据先落本地文件；恢复后回放补写&#10;——&#34;审计一条不丢&#34;与&#34;对局零中断&#34;同时成立" style="rounded=1;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="540" width="1780" height="130" as="geometry"/></mxCell>
+        <mxCell id="dual" value="lite / full 双模式：无库裸跑与三库满配，同一份业务代码——协议输出逐字节一致（对拍实测）" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="700" width="1780" height="90" as="geometry"/></mxCell>
+        <mxCell id="bn" value="库是外包的内存——挂了不影响打架，账一条不丢" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="830" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：杀 redis/mongo/mysql 对局照跑 · WAL 回放 2 条补写 · 证据 docs/episodes/ep08/evidence/" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="970" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

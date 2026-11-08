@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="公式也能换零件" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 2 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="改数值不够呢？" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="820" height="44" as="geometry"/></mxCell>
+        <mxCell id="h2" value="整个函数都能换" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1030" y="150" width="820" height="44" as="geometry"/></mxCell>
+        <mxCell id="o1" value="damage.lua（旧逻辑）&#10;local dmg = base&#10;if ctx.dist > 3000 then&#10;  dmg = dmg * 0.8 end&#10;return math.max(0, hp - dmg)" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="210" width="820" height="190" as="geometry"/></mxCell>
+        <mxCell id="p1" value="" style="edgeStyle=none;strokeColor=#c8161d;strokeWidth=4;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="480" y="420" as="sourcePoint"/><mxPoint x="480" y="470" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="cmd1" value="> patch damage" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="480" width="820" height="60" as="geometry"/></mxCell>
+        <mxCell id="n1" value="damage.lua（新逻辑）&#10;local dmg = base * 0.5&#10;return math.max(0, hp - dmg)" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=20;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="210" width="820" height="190" as="geometry"/></mxCell>
+        <mxCell id="p2" value="" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=4;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1440" y="420" as="sourcePoint"/><mxPoint x="1440" y="470" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="r1" value="Lua 引擎：换上新的函数引用&#10;上一版闭包交给 GC——不重启" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="490" width="1780" height="90" as="geometry"/></mxCell>
+        <mxCell id="s1" value="坏脚本？pcall 拦截 → 自动回退内建公式" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="610" width="860" height="90" as="geometry"/></mxCell>
+        <mxCell id="s2" value="人机决策 bot_ai.lua 同款热修" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1030" y="610" width="820" height="90" as="geometry"/></mxCell>
+        <mxCell id="bn" value="数值用 reload，逻辑用 patch——都不用停服" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="750" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="沙箱：摘除 os/io · 32MB 内存上限 · 返回值校验 · 实测 evidence/srv_cmdport.log" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="900" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

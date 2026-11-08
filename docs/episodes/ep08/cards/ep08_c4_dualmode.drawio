@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="一份代码，两种穿法" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 4 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="lite：无库裸跑" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="250" y="150" width="600" height="44" as="geometry"/></mxCell>
+        <mxCell id="h2" value="full：三库满配" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=center;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1100" y="150" width="600" height="44" as="geometry"/></mxCell>
+        <mxCell id="l1" value="无 MySQL / Redis / MongoDB&#10;审计落本地 WAL 文件" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="230" width="700" height="130" as="geometry"/></mxCell>
+        <mxCell id="r1" value="三库全挂——审计落 WAL、恢复补写&#10;任一库挂——降级计数、对局照跑" style="rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1050" y="230" width="780" height="130" as="geometry"/></mxCell>
+        <mxCell id="same" value="同一份业务代码　同一套协议　同一条命中判定链" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=28;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="400" width="1730" height="90" as="geometry"/></mxCell>
+        <mxCell id="q" value="怎么证明两种模式行为一致？" style="text;fontSize=28;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="100" y="530" width="1730" height="50" as="geometry"/></mxCell>
+        <mxCell id="diff" value="$ wire_ab_test.sh&#10;══ diff（空 = 对拍通过）══&#10;IDENTICAL ✓" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=22;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="610" width="1730" height="150" as="geometry"/></mxCell>
+        <mxCell id="bn" value="库是外包的内存——挂了不影响打架，账一条不丢" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="800" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="对拍实测：同输入序列 17/21/30 号逐字节一致 · 证据 docs/episodes/ep08/evidence/ · 契约 v4.8" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="950" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

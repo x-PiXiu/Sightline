@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="cards" id="cards">
+    <mxGraphModel dx="1500" dy="900" grid="0" page="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="rounded=0;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="1920" height="1080" as="geometry"/></mxCell>
+        <mxCell id="title" value="命令与响应，同窗闭环" style="text;fontSize=44;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="52" width="1400" height="60" as="geometry"/></mxCell>
+        <mxCell id="stamp" value="第 8 期 · 思路卡 5 / 6" style="text;fontSize=20;fontColor=#999999;align=right;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="1500" y="60" width="350" height="40" as="geometry"/></mxCell>
+        <mxCell id="h1" value="运维命令口：与日志流分离" style="text;fontSize=26;fontStyle=1;fontColor=#333333;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="1780" height="44" as="geometry"/></mxCell>
+        <mxCell id="w1" value="CLion / 服务器日志窗口&#10;（心跳刷屏——观感嘈杂）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="230" width="800" height="150" as="geometry"/></mxCell>
+        <mxCell id="w2" value="nc 127.0.0.1 18889&#10;（命令窗口——干净输入）" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=24;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="1050" y="230" width="800" height="150" as="geometry"/></mxCell>
+        <mxCell id="f1" value="" style="edgeStyle=none;strokeColor=#82b366;strokeWidth=4;endArrow=block;endFill=1;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1450" y="305" as="sourcePoint"/><mxPoint x="1450" y="420" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="hub" value="命令入队 → 编排器逐条处理 → 回执广播回命令窗口" style="rounded=1;whiteSpace=wrap;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="430" width="1730" height="90" as="geometry"/></mxCell>
+        <mxCell id="out" value="> version            → version: v1-680722bc&#10;> reload 削步枪      → reload 成功 v2-680722bc&#10;> rollback           → 内存回退上一版" style="rounded=0;whiteSpace=wrap;fillColor=#2b2b2b;strokeColor=#555555;fontSize=22;fontColor=#e8e8e8;fontFamily=Courier New;align=left;spacing=8;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="550" width="1730" height="170" as="geometry"/></mxCell>
+        <mxCell id="adm" value="这些能力通常是运营平台做的——这里做进了服务器本体" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=26;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="100" y="760" width="1730" height="90" as="geometry"/></mxCell>
+        <mxCell id="bn" value="命令与响应同窗——拍摄时这就是闭环画面" style="rounded=0;whiteSpace=wrap;fillColor=#f7f4ee;strokeColor=#c8161d;strokeWidth=2;fontSize=34;fontStyle=1;align=center;spacing=12;sketch=1;curveFitting=1;jiggle=2;" vertex="1" parent="1"><mxGeometry x="70" y="890" width="1780" height="100" as="geometry"/></mxCell>
+        <mxCell id="ft" value="实测：nc 敲 version/reload → 同窗回显 · 证据 docs/episodes/ep08/evidence/srv_cmdport.log" style="text;fontSize=22;fontColor=#999999;align=left;whiteSpace=wrap;" vertex="1" parent="1"><mxGeometry x="70" y="1030" width="1780" height="36" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
