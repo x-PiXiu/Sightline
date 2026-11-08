@@ -1,0 +1,18 @@
+src/logger/logger.cpp:281[Logger] Logger instance created
+[34m[2026-11-07 02:02:05.260] [DEBUG] [130634139088384] [main.cpp:190] [自检] 日志级别=DEBUG，本行可见即 debug 通路正常[0m
+[32m[2026-11-07 02:02:05.262] [INFO ] [130634104170176] [main.cpp:83] [Worker] worker-0 EventLoop 就绪（线程已绑定，开始收帧）[0m
+[32m[2026-11-07 02:02:05.262] [INFO ] [130634095777472] [main.cpp:83] [Worker] worker-1 EventLoop 就绪（线程已绑定，开始收帧）[0m
+[32m[2026-11-07 02:02:05.320] [INFO ] [130634087384768] [mysql_store.cpp:67] [MySQL] 已连接 127.0.0.1:3306/sightline[0m
+[32m[2026-11-07 02:02:05.321] [INFO ] [130634087384768] [redis_store.cpp:52] [Redis] 已连接 127.0.0.1:6379（已认证）[0m
+[32m[2026-11-07 02:02:05.326] [INFO ] [130634087384768] [mongo_store.cpp:49] [Mongo] 已连接 mongodb://127.0.0.1:27017（sightline.war_reports）[0m
+[32m[2026-11-07 02:02:05.370] [INFO ] [130634139088384] [persistence.cpp:357] [DB] WAL 回放完成 2 条→MySQL[0m
+[32m[2026-11-07 02:02:05.374] [INFO ] [130634139088384] [main.cpp:244] [DB] profile=full · MySQL ✓ · Mongo ✓ · Redis ✓ · 丢弃=0 溢写=0 WAL=0行 · WAL回放=2[0m
+[32m[2026-11-07 02:02:05.380] [INFO ] [130634139088384] [scripting_lua.cpp:141] [Lua] 已加载 damage → ref=4[0m
+[33m[2026-11-07 02:02:05.381] [WARN ] [130634139088384] [scripting_lua.cpp:116] [Lua] 脚本缺失或为空: assets/scripts/bot_ai.lua（走内建兜底）[0m
+[32m[2026-11-07 02:02:05.381] [INFO ] [130634139088384] [main.cpp:276] [Lua] 策略层已接（damage=lua·bot=lua(步8生效)·patch=可用）[0m
+[32m[2026-11-07 02:02:05.388] [INFO ] [130634139088384] [main.cpp:320] [几何合同] 装载 path=assets/maps/NewMap.json 盒=6 球=0 命中体 r=34.000000 h=88.000000[0m
+[32m[2026-11-07 02:02:05.389] [INFO ] [130634139088384] [event_loop.cpp:517] [TIMER_INIT] ✅ 初始超时设置成功: 100ms[0m
+[32m[2026-11-07 02:02:05.389] [INFO ] [130634139088384] [socket.cpp:156] Socket listening with backlog=65535 (actual may be limited by net.core.somaxconn)[0m
+[32m[2026-11-07 02:02:05.389] [INFO ] [130634139088384] [main.cpp:471] Sightline 服务器启动，监听 :18888（主从 Reactor · IO workers=2 · 帧队列 · 心跳 · 登录+房间+对局）[0m
+[32m[2026-11-07 02:02:05.389] [INFO ] [130634139088384] [main.cpp:475] [配置] version=v1-daed43ca path=assets/scripts/game_config.lua 快照=1/4 digest=daed43ca · [DB] profile=lite（持久化未启用）[0m
+[32m[2026-11-07 02:02:05.489] [INFO ] [130634139088384] [main.cpp:404] [Worker 状态] worker-0 在线=0 worker-1 在线=0 总在线=0[0m

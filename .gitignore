@@ -3,6 +3,8 @@ build/
 cmake-build-*/
 logs/
 *.log
+# 例外：episodes 验收证据数据（压测/ASan/TSan 日志——终审引用的原生证据，非运行日志）
+!docs/episodes/**/evidence/*.log
 server/loadbot/loadbot
 server/sightline_server
 server/sightline_server_asan

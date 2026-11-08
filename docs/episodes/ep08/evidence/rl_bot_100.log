@@ -1,0 +1,22 @@
+  ⚠ 服务器 ep04=单局架构（MatchService::StartMatch 会 entities_.clear()）：
+    多房同时开局时，后房清掉前房实体（实测 ack=0/快照饿死）——多局=第 7 期的活。
+    建议 matchN=4（1 房全流程）；当前 400 仅最后一房有效。
+[loadbot v2] dsts=[127.0.0.1:18897 127.0.0.2:18897] lobby=0 match=400(100房×4) ramp=400/s mramp=100/s hold=12s hz=30
+  [t+5s] conn 400/0 · login 400/0 · mstart 400/0 · input 29903 · snap 560
+  [t+10s] conn 400/0 · login 400/0 · mstart 400/0 · input 89905 · snap 1164
+  [t+15s] conn 400/0 · login 400/0 · mstart 400/0 · input 140092 · snap 1772
+  [phase1] 对局开局完成 @16.6s  matchStart ok/fail=400/0
+[loadbot v2] 总耗时 16.6s
+  conn   ok/fail        400/0
+  login  ok/fail        400/0
+  room   create/join    100/300 (fail 0/0)
+  match  start ok/fail  400/0
+  match  done ok/fail   0/400
+  input  sent           143600 (11967/s 全场)
+  snap   frames         1956
+  snap   starved        36
+  snap   rate/s p50/p99/min = 0.1 / 0.2 / 0.0（应≈30）
+  ack    lag p50/p99/max    = 359 / 359 / 359（输入条数）
+  lobby closed-mid      0
+  ERR x400  ack-lag=359 inputs (sent=359 ack=0)
+  ERR x36  snap-starved(0 frames)

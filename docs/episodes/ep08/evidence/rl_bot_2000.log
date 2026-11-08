@@ -1,0 +1,38 @@
+  ⚠ 服务器 ep04=单局架构（MatchService::StartMatch 会 entities_.clear()）：
+    多房同时开局时，后房清掉前房实体（实测 ack=0/快照饿死）——多局=第 7 期的活。
+    建议 matchN=4（1 房全流程）；当前 8000 仅最后一房有效。
+[loadbot v2] dsts=[127.0.0.1:18897 127.0.0.2:18897] lobby=0 match=8000(2000房×4) ramp=400/s mramp=100/s hold=12s hz=30
+  [t+5s] conn 476/0 · login 473/0 · mstart 440/0 · input 30015 · snap 563
+  [t+10s] conn 956/0 · login 954/0 · mstart 916/0 · input 131455 · snap 1167
+  [t+15s] conn 1437/0 · login 1435/0 · mstart 1399/0 · input 295123 · snap 1771
+  [t+20s] conn 1919/0 · login 1915/0 · mstart 1880/0 · input 467846 · snap 2379
+  [t+25s] conn 2403/0 · login 2402/0 · mstart 2364/0 · input 640867 · snap 2987
+  [t+30s] conn 2886/0 · login 2883/0 · mstart 2848/0 · input 814303 · snap 3591
+  [t+35s] conn 3370/0 · login 3363/0 · mstart 3332/0 · input 987790 · snap 4196
+  [t+40s] conn 3852/0 · login 3847/0 · mstart 3816/0 · input 1161276 · snap 4804
+  [t+45s] conn 4336/0 · login 4335/0 · mstart 4296/0 · input 1334721 · snap 5412
+  [t+50s] conn 4820/0 · login 4814/0 · mstart 4780/0 · input 1508347 · snap 6015
+  [t+55s] conn 5303/0 · login 5299/0 · mstart 5264/0 · input 1681897 · snap 6620
+  [t+60s] conn 5786/0 · login 5780/0 · mstart 5748/0 · input 1855511 · snap 7228
+  [t+65s] conn 6268/0 · login 6267/0 · mstart 6231/0 · input 2028809 · snap 7834
+  [t+70s] conn 6750/0 · login 6746/0 · mstart 6712/0 · input 2202119 · snap 8439
+  [t+75s] conn 7233/0 · login 7229/0 · mstart 7196/0 · input 2375301 · snap 9044
+  [t+80s] conn 7716/0 · login 7710/0 · mstart 7676/0 · input 2548522 · snap 9651
+  [t+85s] conn 8000/0 · login 8000/0 · mstart 8000/0 · input 2717882 · snap 10256
+  [t+90s] conn 8000/0 · login 8000/0 · mstart 8000/0 · input 2831085 · snap 10860
+  [t+95s] conn 8000/0 · login 8000/0 · mstart 8000/0 · input 2871844 · snap 11468
+  [phase1] 对局开局完成 @95.3s  matchStart ok/fail=8000/0
+[loadbot v2] 总耗时 95.3s
+  conn   ok/fail        8000/0
+  login  ok/fail        8000/0
+  room   create/join    2000/6000 (fail 0/0)
+  match  start ok/fail  8000/0
+  match  done ok/fail   0/8000
+  input  sent           2872000 (239333/s 全场)
+  snap   frames         11508
+  snap   starved        1392
+  snap   rate/s p50/p99/min = 0.1 / 0.2 / 0.0（应≈30）
+  ack    lag p50/p99/max    = 359 / 359 / 359（输入条数）
+  lobby closed-mid      0
+  ERR x8000  ack-lag=359 inputs (sent=359 ack=0)
+  ERR x1392  snap-starved(0 frames)
