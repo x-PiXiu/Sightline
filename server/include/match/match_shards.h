@@ -206,10 +206,13 @@ public:
         return true;
     }
 
-    /** 控制面投递（按 roomId 分 shard）——容量超限=系统异常级，横幅+计数 */
+    static constexpr std::size_t kCmdQCap = 128;   // 草案 §4.4：控制面上界（超限=系统异常级）
+
+    /** 控制面投递（按 roomId 分 shard）——容量超限=系统异常级，横幅+计数（F5 补丁） */
     bool RouteCommand(ShardCommand c) {
         auto& sh = shards_[c.roomId % shards_.size()];
         std::lock_guard lk(sh.qMutex);
+        if (sh.cmdQ.size() >= kCmdQCap) { ++sh.dropCount; return false; }
         sh.cmdQ.push_back(std::move(c));
         return true;
     }
@@ -369,6 +372,7 @@ private:
     bool RouteCommandTo(std::size_t idx, ShardCommand c) {
         auto& sh = shards_[idx];
         std::lock_guard lk(sh.qMutex);
+        if (sh.cmdQ.size() >= kCmdQCap) { ++sh.dropCount; return false; }
         sh.cmdQ.push_back(std::move(c));
         return true;
     }
