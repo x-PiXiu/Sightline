@@ -116,6 +116,7 @@ int LuaRuntime::LoadFunction(const std::string& name) {
         LOG_WARNING("[Lua] 脚本缺失或为空: " + path + "（走内建兜底）");
         return -1;
     }
+    lastSource_[name] = src;                            // ep09 G5：加载初值=回退恢复点
     const std::string chunk = "@" + path;
     if (luaL_loadbuffer(L, src.data(), src.size(), chunk.c_str()) != LUA_OK) {
         const char* e = lua_tostring(L, -1);
@@ -258,6 +259,7 @@ app::PatchResult LuaRuntime::Patch(std::string_view name, std::string_view sourc
         const int old = *slot;
         *slot = cand;
         if (old != -1) luaL_unref(L, LUA_REGISTRYINDEX, old);
+        lastSource_[n] = src;                           // ep09 G5：成功 patch 更新恢复点
     }
     LOG_INFO("[Lua] patch 生效 " + n + "（引用已换·旧闭包交 GC）");
     return {true, n + " patch 生效"};
@@ -442,6 +444,11 @@ mc::BotIntent LuaBotPolicy::Decide(const mc::BotWorldView& w, mc::BotState& stat
         LOG_WARNING("[Lua] bot_ai 异常→内建兜底");
         return builtin_.Decide(w, state, mem, nowMs, t);
     }
+}
+
+std::string LuaRuntime::LastGoodSource(std::string_view name) const {
+    const auto it = lastSource_.find(std::string(name));
+    return it == lastSource_.end() ? std::string() : it->second;
 }
 
 } // namespace adapters

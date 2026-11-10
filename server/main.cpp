@@ -269,18 +269,47 @@ int main(int argc, char** argv) {
     // v1 SerialDispatcher 形态：主线程顺序 TickAll；worker 池在步骤 3 接管同一结构。
     // geometry 持有在此（ShardDeps 延迟注入——开房发生在 wiring 运行期，晚于下方装载段）
     std::optional<sightline::match::MapGeometry> mapGeo;
+    // ===== ep09 步骤 4：LuaVmFactory——per-shard VM（lua_State 非线程安全 → 每 worker 独立实例）=====
+#if SIGHTLINE_HAS_LUA
+    std::vector<std::shared_ptr<adapters::LuaRuntime>> luaByShard;
+    std::vector<std::unique_ptr<adapters::LuaDamagePolicy>> luaDmgByShard;
+    std::vector<std::unique_ptr<adapters::LuaBotPolicy>> luaBotByShard;
+    const std::size_t kShardN = sightline::match::MatchShards::kDefaultShardCount;
+    for (std::size_t i = 0; i < kShardN; ++i) {
+        auto rt = adapters::LuaRuntime::Create(
+            adapters::LuaRuntimeConfig{ResolveScriptDir(), 32u * 1024 * 1024});
+        if (!rt) break;                                   // E2：状态起不来 → 停止扩容（部分回退内建）
+        luaDmgByShard.push_back(std::make_unique<adapters::LuaDamagePolicy>(rt, &config));
+        luaBotByShard.push_back(std::make_unique<adapters::LuaBotPolicy>(rt));
+        luaByShard.push_back(std::move(rt));
+    }
+    const bool luaFull = luaByShard.size() == kShardN;
+    // patch 通道：全 shard 就绪才装（聚合器要求 N/VM 一致——部分失败=聚合拒收+横幅）
+    std::vector<sightline::application::IPatchChannel*> patchChannels;
+    if (luaFull)
+        for (auto& rt : luaByShard) patchChannels.push_back(rt.get());
+#endif
     // ep09 步骤 3：SIGHTLINE_WORKERS=1 → PinnedWorker 分桶（4 worker 错相 8ms）；默认 Serial 保底
     const bool useWorkers = EnvOr("SIGHTLINE_WORKERS", "0") == "1";
+    sightline::match::ShardDeps shardDeps;             // 逐字段赋值（非 designated——C++20 顺序约束规避）
+    shardDeps.geometry = nullptr;                      // 启动期装载段 SetSharedGeometry（见下）
+    shardDeps.damage = nullptr;                        // 策略注入段 SetSharedDamage（HAS_LUA 分支后定案）
+    shardDeps.currentConfig = [&config] {
+        return sightline::application::ComposeGameConfig(config, config, config, config);
+    };                                                 // 组装单源=ComposeGameConfig（防双源漂移）
+    shardDeps.locate = [&lobby](std::uint32_t pid, std::uint32_t& roomId, std::uint32_t& epoch) {
+        return lobby.LocateFromSnapshot(pid, roomId, epoch);
+    };                                                 // ep09 G1/G3：快照路由源（零锁读）
+#if SIGHTLINE_HAS_LUA
+    shardDeps.damageFor = [&luaDmgByShard, &damagePolicy](std::size_t idx) -> sightline::match::IDamagePolicy* {
+        return idx < luaDmgByShard.size()
+                   ? static_cast<sightline::match::IDamagePolicy*>(luaDmgByShard[idx].get())
+                   : static_cast<sightline::match::IDamagePolicy*>(&damagePolicy);   // 部分失败回退内建
+    };
+    shardDeps.patches = patchChannels;                 // ep09 G5：per-shard patch 通道（全齐才非空）
+#endif
     sightline::match::MatchShards shards{
-        sightline::match::ShardDeps{
-            .geometry = nullptr,             // 启动期装载段 SetSharedGeometry（见下）
-            .damage   = nullptr,             // 策略注入段 SetSharedDamage（HAS_LUA 分支后定案）
-            .currentConfig = [&config] {
-                return sightline::application::ComposeGameConfig(config, config, config, config);
-            },                               // 组装单源=ComposeGameConfig（防与 ApplyConfig 双源漂移）
-            .locate = [&lobby](std::uint32_t pid, std::uint32_t& roomId, std::uint32_t& epoch) {
-                return lobby.LocateFromSnapshot(pid, roomId, epoch);
-            }},                              // ep09 G1/G3：快照路由源（lobby 原子快照·零锁读）
+        std::move(shardDeps),
         sightline::match::MatchShards::kDefaultShardCount,
         useWorkers ? sightline::match::MatchShards::Mode::Worker
                    : sightline::match::MatchShards::Mode::Serial};
@@ -298,25 +327,17 @@ int main(int argc, char** argv) {
     // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。
     botDriver.SetBotTuning(&config);
 #if SIGHTLINE_HAS_LUA
-    auto luaRt = adapters::LuaRuntime::Create(
-        adapters::LuaRuntimeConfig{ResolveScriptDir(), 32u * 1024 * 1024});
-    std::unique_ptr<adapters::LuaDamagePolicy> luaDmg;
-    std::unique_ptr<adapters::LuaBotPolicy> luaBot;
-    adapters::LuaRuntime* patchChan = nullptr;
-    if (luaRt) {                       // E2：状态都起不来 → 整体落回内建（服务照起）
-        luaDmg = std::make_unique<adapters::LuaDamagePolicy>(luaRt, &config);
-        luaBot = std::make_unique<adapters::LuaBotPolicy>(luaRt);
-        shards.SetSharedDamage(luaDmg.get());
-        botDriver.SetBotPolicy(luaBot.get());
-        patchChan = luaRt.get();       // patch 命令通道（§10.2.6 唯一新增注入位）
-        LOG_INFO("[Lua] 策略层已接（damage=lua·bot=lua·patch=可用）");
-    } else {
-        shards.SetSharedDamage(&damagePolicy);
-        botDriver.SetBotPolicy(&botPolicy);
-        LOG_WARNING("[Lua] 运行时创建失败——全量内建兜底");
-    }
+    // ep09 步骤 4：per-shard 策略注入（damageFor 经 ShardDeps 在 OpenRoom 注入 ✓）
+    //   bot 决策 per-shard：bot_ai 在归属 shard 的 VM 上跑（同 shard 单写者）
+    for (std::size_t i = 0; i < luaBotByShard.size(); ++i)
+        botDriver.SetShardBotPolicy(i, luaBotByShard[i].get());
+    if (luaBotByShard.size() < shards.shardCount())
+        for (std::size_t i = luaBotByShard.size(); i < shards.shardCount(); ++i)
+            botDriver.SetShardBotPolicy(i, &botPolicy);   // 部分失败回退内建
+    LOG_INFO("[Lua] 策略层已接（per-shard VM=" + std::to_string(luaByShard.size()) + "/" +
+             std::to_string(shards.shardCount()) +
+             "·damage/bot=lua·patch=" + (patchChannels.empty() ? "不可用（部分失败）" : "聚合可用）"));
 #else
-    shards.SetSharedDamage(&damagePolicy);
     botDriver.SetBotPolicy(&botPolicy);
 #endif
     sightline::application::ApplicationOrchestrator app{
@@ -332,9 +353,6 @@ int main(int argc, char** argv) {
             .audit = *persistence,
             .board = *persistence,
             .version = config,
-#if SIGHTLINE_HAS_LUA
-            .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
-#endif
             .tick = *tickDispatcher,
             .shards = shards,
             .lobby = lobby,

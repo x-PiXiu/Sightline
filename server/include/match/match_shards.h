@@ -7,6 +7,7 @@
 //     worker 版 cmdQ 串行执行天然免竞态（同一 shard 的 cmd/data 严格单线程）。
 #pragma once
 #include "match/match_session.h"
+#include "application/ports.h"   // ep09 步骤 4：IPatchChannel（per-shard patch 通道）
 #include <atomic>
 #include <deque>
 #include <mutex>
@@ -34,8 +35,14 @@ struct IBotControl {
  *  geometry/damage 为 nullptr 时保持既有兼容路径（空表/内建策略——238 断言未注入行为）。 */
 struct ShardDeps {
     const MapGeometry* geometry = nullptr;
-    IDamagePolicy*     damage   = nullptr;
+    IDamagePolicy*     damage   = nullptr;   // 全 shard 同策略（builtin 共享路径）
+    /** ep09 步骤 4：per-shard 策略（LuaVmFactory——每 shard 独立 VM·lua_State 非线程安全的解）
+     *  优先于 damage（返回非空则用 per-shard，否则回退共享 damage） */
+    std::function<IDamagePolicy*(std::size_t idx)> damageFor;
     IBotControl*       bot      = nullptr;   // cmdQ 执行体调（AddBot/RemoveBot/StartMatch 随行）
+    /** ep09 G5：per-shard patch 通道（=该 shard 的 LuaRuntime；下标对齐 shard idx）——
+     *  cmdQ Patch 执行体调用；空=HAS_LUA off（patch 命令聚合器拒收） */
+    std::vector<sightline::application::IPatchChannel*> patches;
     std::function<GameConfig()> currentConfig;   // 新 session 初始规则快照（main 组装=ApplyConfig 同源）
     /** ep09 G1/G3：pid→(roomId,epoch) 快照查询（main 闭包=lobby.LocateFromSnapshot——
      *  用例层不见 LobbyService 类型，依赖经此端口）——Route 填路由 + Drain 校验在途判旧 */
@@ -66,6 +73,7 @@ struct ShardCommand {
     Kind kind;
     std::uint32_t roomId = 0;
     std::string source;                          // Patch 的 lua 源码（步骤 4）
+    std::string patchName;                       // Patch 目标脚本名（damage/bot_ai）
     std::vector<RosterEntry> roster;             // StartMatch 名册
     std::optional<GameConfig> config;            // ApplyConfig 快照（值过界）
     std::uint32_t pid = 0;                       // AddBot/RemoveBot
@@ -104,7 +112,10 @@ public:
         if (it == sh.rooms.end()) {
             auto s = std::make_unique<MatchSession>(DeriveSeed(roomId));
             if (deps_.geometry) s->SetGeometry(*deps_.geometry);
-            if (deps_.damage)   s->SetDamagePolicy(deps_.damage);
+            // ep09 步骤 4：per-shard 策略优先（LuaVmFactory），回退共享 damage（builtin）
+            IDamagePolicy* dmg = deps_.damageFor ? deps_.damageFor(roomId % shards_.size())
+                                                 : deps_.damage;
+            if (dmg) s->SetDamagePolicy(dmg);
             if (deps_.currentConfig) s->SetConfig(deps_.currentConfig());
             it = sh.rooms.emplace(roomId, std::move(s)).first;
         }
@@ -217,6 +228,20 @@ public:
         return true;
     }
 
+    /** 控制面直投（指定 shard——聚合器回退广播用） */
+    bool RouteCommandTo(std::size_t idx, ShardCommand c) {
+        auto& sh = shards_[idx];
+        std::lock_guard lk(sh.qMutex);
+        if (sh.cmdQ.size() >= kCmdQCap) { ++sh.dropCount; return false; }
+        sh.cmdQ.push_back(std::move(c));
+        return true;
+    }
+
+    /** ep09 G5：shard idx 的 patch 通道（聚合器取 LastGoodSource 回退源用；越界=nullptr） */
+    sightline::application::IPatchChannel* PatchChannelAt(std::size_t idx) const {
+        return (idx < deps_.patches.size()) ? deps_.patches[idx] : nullptr;
+    }
+
     /** G8：全 shard 丢弃计数聚合（横幅/审计读数——原子读，无锁） */
     std::uint64_t TotalDropped() const {
         std::uint64_t n = 0;
@@ -320,8 +345,20 @@ private:
         case ShardCommand::Kind::RemoveBot:
             if (deps_.bot) deps_.bot->UnregisterBot(c.roomId, c.pid);
             break;
-        case ShardCommand::Kind::Patch:
-            break;   // 步骤 4：LuaRuntime 聚合接线（G5 两阶段）
+        case ShardCommand::Kind::Patch: {
+            // ep09 G5：本 shard 的 VM 执行 patch（编译+不变式自测+引用原子换——失败自回退内部）
+            // PatchResult 事件入 out→合流→编排器聚合器收口（两阶段：失败聚合=重发 LastGoodSource 回退）
+            auto* channel = (idx < deps_.patches.size()) ? deps_.patches[idx] : nullptr;
+            const auto r = channel ? channel->Patch(c.patchName, c.source)
+                                   : sightline::application::PatchResult{false, "无 patch 通道（HAS_LUA off）"};
+            MatchEvent ev;
+            ev.type = MatchEvent::Type::PatchResult;
+            ev.roomId = c.roomId;
+            ev.patchOk = r.ok;
+            ev.patchName = c.patchName;
+            out.push_back(std::move(ev));
+            break;
+        }
         }
     }
 
@@ -369,13 +406,6 @@ private:
         return roomId * 2654435761u ^ 0x9E3779B9u;
     }
 
-    bool RouteCommandTo(std::size_t idx, ShardCommand c) {
-        auto& sh = shards_[idx];
-        std::lock_guard lk(sh.qMutex);
-        if (sh.cmdQ.size() >= kCmdQCap) { ++sh.dropCount; return false; }
-        sh.cmdQ.push_back(std::move(c));
-        return true;
-    }
 
     ShardDeps deps_;
     std::vector<Shard> shards_;

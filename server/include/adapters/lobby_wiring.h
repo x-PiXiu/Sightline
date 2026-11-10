@@ -137,6 +137,8 @@ public:
                 // DeliverMatch(15 号) 之后经 IWireSink 端口播——此处不再自播，单一入口）。
                 break;
             }
+            case MT::PatchResult:              // ep09 G5：聚合域内存事件——永不入 wire（编排器消费）
+                break;
             case MT::EntityLeave: {
                 const std::string p = sightline::wire::EntityLeaveMsg{e.leavePlayerId}.Encode();
                 for (int fd : lobby_.RoomMemberFds(e.roomId))

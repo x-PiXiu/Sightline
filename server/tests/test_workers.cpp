@@ -94,11 +94,14 @@ int main() {
         CHECK(applied);
 
         // 快照流（激活后）：worker 自驱 Tick（30Hz）——Merge 里有 Snapshot 事件
-        bool sawSnapshot = false;
-        for (int i = 0; i < 40 && !sawSnapshot; ++i)
+        //（宽限 2s：Merge 时序随线程调度抖动——跨轮累计计数）
+        int snapCount = 0;
+        for (int i = 0; i < 200 && snapCount == 0; ++i) {
             for (const auto& e : pool.OnFrameTick(0))
-                if (e.type == MatchEvent::Type::Snapshot) sawSnapshot = true;
-        CHECK(sawSnapshot);
+                if (e.type == MatchEvent::Type::Snapshot) ++snapCount;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        CHECK(snapCount > 0);
 
         CHECK(pool.FaultCount() == 0);                      // 正常路径零 fault（G6 通道在位）
         pool.Stop();                                        // G11：停收→join

@@ -46,7 +46,8 @@ public:
      *  shardCount=1 即 Serial 单桶（行为与旧 byRoom_ 全等）。 */
     explicit BotDriver(std::size_t shardCount = 1)
         : byShard_(shardCount ? shardCount : 1),
-          waypointsByShard_(byShard_.size()) {}
+          waypointsByShard_(byShard_.size()),
+          botPolicyByShard_(byShard_.size(), nullptr) {}
 
     /** 26 号：席位登记（FSM 初始态；进对局前的房内待命） */
     void OnBotAdded(std::uint32_t roomId, std::uint32_t pid, const std::string& name,
@@ -87,14 +88,13 @@ public:
             nav_ = sightline::match::BuildNavGrid(geo.occluders);
             navBuilt_ = true;
         }
-        // 航点 per-shard（同 shard 单写者——OnMatchStarted 经 cmdQ 在归属线程执行）：
-        // 合同 patrolPoints 优先，否则 spawnPoints 世界位，再否则场心环——patrolPoints 静态=与旧"每局重建"语义等价
+        // 航点 per-shard 构建（归属线程单写者——测试无 Prebuild 时兜底；生产=Prebuild 已填同内容）
         auto& waypoints = waypointsByShard_[roomId % waypointsByShard_.size()];
         waypoints.clear();
         if (!geo.patrolPoints.empty()) {
-            for (const auto& p : geo.patrolPoints) waypoints.push_back({p.x, p.y});
+            for (const auto& pt : geo.patrolPoints) waypoints.push_back({pt.x, pt.y});
         } else if (!geo.spawnPoints.empty()) {
-            for (const auto& s : geo.spawnPoints) waypoints.push_back({s.x, s.y});
+            for (const auto& sp : geo.spawnPoints) waypoints.push_back({sp.x, sp.y});
         } else {
             waypoints = {{300.f, -300.f}, {-300.f, 300.f}, {300.f, 300.f}, {-300.f, -300.f}};
         }
@@ -169,14 +169,20 @@ public:
         for (auto& [roomId, list] : byRoom) {
             auto* session = shards.Find(roomId);
             if (!session || session->IsEnded()) continue;    // 未开局/终局：本房 bot 静默（快照保留期）
-            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], out);
+            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], botPolicyByShard_[roomId % botPolicyByShard_.size()], out);
         }
         return out;
     }
 
     // v1.6 收口②/G2：组合根注入——配置视图（bot 段热更即时）与决策策略（步骤 4 换 Lua 实现同口）。
     void SetBotTuning(const sightline::application::IBotTuning* t) { tuning_ = t; }
-    void SetBotPolicy(sightline::match::IBotPolicy* p) { botPolicy_ = p; }
+    /** ep09 步骤 4：per-shard 决策策略（每 shard 独立 VM 的 bot_ai——lua_State 非线程安全解） */
+    void SetShardBotPolicy(std::size_t idx, sightline::match::IBotPolicy* p) {
+        if (idx < botPolicyByShard_.size()) botPolicyByShard_[idx] = p;
+    }
+    void SetBotPolicy(sightline::match::IBotPolicy* p) {          // 兼容：全槽同策略（builtin）
+        for (auto& slot : botPolicyByShard_) slot = p;
+    }
 
 private:
     struct Bot {
@@ -201,7 +207,7 @@ private:
     // v1.6 注入位：配置视图（G2·中档基准热更）+ 决策策略（收口②·步骤 4 换 Lua 同口）。
     // 组合根注入，进程期存活；nullptr=内建路径（测试/未注入零变化）。
     const sightline::application::IBotTuning* tuning_ = nullptr;
-    sightline::match::IBotPolicy* botPolicy_ = nullptr;
+
 
     // G2（v1.6）：中档（默认 diff=1）=配置表 bot 段（IBotTuning 视图·热更即时生效）；
     // 0/2 档保留内置绝对档位（难度档位进表=后续演进，ep08 范围外）。
@@ -221,6 +227,7 @@ private:
 
     void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchSession& match,
                  const std::vector<sightline::match::Vec2>& waypoints,
+                 sightline::match::IBotPolicy* botPolicy,
                  std::vector<sightline::match::MatchEvent>& out) {
         const sightline::match::Entity* E = match.EntityById(b.pid);
         if (!E || !E->bHasReport) { b.lastTickMs = nowMs; return; }   // 未在局/未激活：静默
@@ -267,8 +274,8 @@ private:
         // ── 行动·移动（栅格寻路兜底：LOS 直行 / 否则 A* 路径逐段走）──
         // 收口②：决策走策略端口（未注入=内建 Decide 原路径——238 断言零变化；注入后
         // Builtin=Sanitize(Decide)，步骤 4 换 Lua 实现同口）
-        sightline::match::BotIntent intent = botPolicy_
-            ? botPolicy_->Decide(w, b.st, b.mem, nowMs, t)
+        sightline::match::BotIntent intent = botPolicy
+            ? botPolicy->Decide(w, b.st, b.mem, nowMs, t)
             : sightline::match::Decide(w, b.st, b.mem, nowMs, t);   // 非常量：moveTarget 出界钳制就地改写
         if (intent.hasMove) {
             intent.moveTarget = ClampMoveTarget(nav_, intent.moveTarget);   // 意图目标钳制（见函数注释；权威边界在域层 UpdateEntity）
@@ -364,7 +371,7 @@ public:
         for (auto& [roomId, list] : byRoom) {
             auto* session = shards.Find(roomId);
             if (!session || session->IsEnded()) continue;    // 未开局/终局：本房 bot 静默
-            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], out);
+            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], botPolicyByShard_[roomId % botPolicyByShard_.size()], out);
         }
     }
 
@@ -386,6 +393,7 @@ public:
     sightline::match::NavGrid nav_;
     bool navBuilt_ = false;
     std::vector<std::vector<sightline::match::Vec2>> waypointsByShard_;   // per-shard（同 shard 单写者）
+    std::vector<sightline::match::IBotPolicy*> botPolicyByShard_;   // per-shard（同 shard 单写者·声明序在 byShard_ 后——初始化列表依赖其 size）
 };
 
 } // namespace adapters

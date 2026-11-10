@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "application/config_views.h"
+#include "application/patch_aggregator.h"
 #include "application/durability_policy.h"
 #include "application/ports.h"
 #include "lobby/lobby.h"
@@ -53,6 +54,9 @@ public:
         Fanout(events);
         for (const auto& e : events)
             if (e.type == MatchEvent::Type::Ended) d_.lobby.SetRoomInMatch(e.roomId, false);
+            else if (e.type == MatchEvent::Type::PatchResult)
+                patchAgg_.OnPatchResult(e.patchOk, now);   // ep09 G5：VM 回执聚合（两阶段收口）
+        patchAgg_.OnFrameTick(now);                  // G5：500ms 超时检查
     }
 
     // 事件源 ③：MatchWiring 的 Fire/StartMatch/RemovePlayer 处理器经回调送同一订阅点（B1 修复）。
@@ -78,6 +82,29 @@ public:
     const std::string& Notice() const { return notice_; }
 
 private:
+    // ===== ep09 步骤 4（G5·ADR-13）：patch 两阶段聚合器（主线程单写者）=====
+    struct AggSink final : PatchAggregator::Sink {
+        explicit AggSink(ApplicationOrchestrator& o) : o_(o) {}
+        void BroadcastPatch(std::size_t idx, const std::string& name,
+                            const std::string& source) override {
+            o_.d_.shards.RouteCommandTo(idx, [&] {
+                match::ShardCommand c;
+                c.kind = match::ShardCommand::Kind::Patch;
+                c.roomId = 0;                          // 路由专用（RouteCommandTo 直指定 idx）
+                c.patchName = name;
+                c.source = source;
+                return c;
+            }());
+        }
+        void Notice(const std::string& msg) override { o_.SetNotice(msg); }
+        std::string LastGoodSource(const std::string& name) override {
+            auto* ch = o_.d_.shards.PatchChannelAt(0);  // 恢复点取任一通道（加载初值/上次成功版）
+            return ch ? ch->LastGoodSource(name) : std::string();
+        }
+        std::size_t ShardCount() const override { return o_.d_.shards.shardCount(); }
+        ApplicationOrchestrator& o_;
+    };
+
     void SetNotice(std::string s) { notice_ = std::move(s); }
 
     // 完整规则快照 → 对局用例（用例层不认识 ConfigService；经五张只读视图组装 GameConfig）。
@@ -106,15 +133,8 @@ private:
             // 步骤 4：公式/决策面热修（IPatchChannel）。source 空=运行时自读 scriptDir（IO 在适配器）。
             // patch 审计行随步骤 5 AuditWal 落库（lite 下 LOG 行已带时间戳记录——双钟分立：
             // 这里不拿 steady 的 d_.now() 充当 UTC 审计时钟）。
-            if (!d_.patches) {
-                SetNotice("patch 未启用（Lua 运行时未装——构建缺 lua5.4 或未注入）");
-            } else {
-                const auto r = d_.patches->Patch(c.arg, {});
-                if (r.ok)
-                    d_.wire.BroadcastConfig(d_.version.Snapshot());   // §10.2.3：伤害输出可能变→刷新 30 号
-                SetNotice(r.ok ? "patch 生效 " + r.versionOrError
-                               : "patch 拒收: " + r.versionOrError);
-            }
+            // ep09 G5：patch 广播聚合（两阶段收口）——HAS_LUA off 由聚合器拒收
+            (void)patchAgg_.Begin(c.arg, d_.now());   // ep09 G5：广播聚合——收口在 PatchResult 事件回流
             break;
         }
         case ConsoleCommand::Kind::Help:
@@ -161,6 +181,8 @@ private:
         }
     }
 
+    AggSink aggSink_{*this};
+    PatchAggregator patchAgg_{aggSink_};
     OrchestratorDeps d_;
     std::string notice_;
     bool stopped_ = false;

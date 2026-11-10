@@ -105,7 +105,7 @@ struct ScoreRow {                          // ep07：结算行（25 号载荷源
 
 struct MatchEvent {
     enum class Type { MatchStart, EntityLeave, Snapshot, FireResult,
-                      Kill, Respawn, Ended };   // ep07：+三态
+                      Kill, Respawn, Ended, PatchResult };   // ep07：+三态；ep09 步骤 4：+PatchResult（G5 聚合·内存事件永不入 wire）
     Type type;
     std::uint32_t roomId = 0;
     std::vector<RosterEntry> roster;      // MatchStart：全员名册
@@ -121,6 +121,9 @@ struct MatchEvent {
     std::uint16_t invulnMs = 0;                        // Respawn（无敌窗）
     float respawnX = 0.f, respawnY = 0.f, respawnZ = 0.f, respawnYawDeg = 0.f;  // v4.5：权威落位坐标（客户端传送同源）
     std::uint8_t endReason = 0;                        // Ended（1=击杀上限 2=真人全离）
+    // —— ep09 步骤 4（G5·ADR-24 内存事件结构/wire 零改动）——
+    bool patchOk = false;                              // PatchResult：该 VM 的 patch 成败
+    std::string patchName;                             // PatchResult：脚本名（damage/bot_ai）
     std::vector<ScoreRow> scores;                      // Ended（结算比分）
 };
 

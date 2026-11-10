@@ -71,6 +71,9 @@ struct IBanStore {   // §14-P1：ep08 只建通道，ep09 防作弊期消费
 struct IPatchChannel {
     virtual ~IPatchChannel() = default;
     virtual PatchResult Patch(std::string_view name, std::string_view source) = 0;
+    /** ep09 步骤 4（G5 回退源）：当前生效脚本源（加载时初值+每次成功 patch 更新）——
+     *  聚合器在广播前取存，任一 VM 失败时重发此源=整体回退（ADR-13 两阶段收口） */
+    virtual std::string LastGoodSource(std::string_view name) const = 0;
 };
 
 // 整洁架构修正（v1.5 实勘发现）：设计草案 §10.1.3 的 OrchestratorDeps 原写

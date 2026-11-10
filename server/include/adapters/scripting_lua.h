@@ -8,6 +8,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -52,6 +53,8 @@ public:
     // source 空 = 从 scriptDir/<name>.lua 重读（console `patch damage` 流——文件 IO 在适配器，
     // 编排器不碰文件系统）。
     sightline::application::PatchResult Patch(std::string_view name, std::string_view source) override;
+    /** ep09 G5：当前生效源（加载时=文件初值；每次成功 patch 更新——聚合回退的恢复点） */
+    std::string LastGoodSource(std::string_view name) const override;
 
     lua_State* L() const { return L_.get(); }
     int Ref(const std::string& name) const;          // 未加载 = -1（LUA_NOREF 同值）
@@ -68,6 +71,7 @@ private:
     int* RefSlot(const std::string& name);           // damage / bot_ai 各一（Patch 换这里）
 
     LuaRuntimeConfig cfg_;
+    std::map<std::string, std::string> lastSource_;   // ep09 G5：脚本名→当前生效源
     LuaAllocCtx alloc_;          // 声明先于 L_：析构序 L_ 先关（见文件头注①）
     LuaStatePtr L_;
     int refDamage_ = -1;
