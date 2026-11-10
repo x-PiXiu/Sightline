@@ -89,6 +89,19 @@
 
 **EWeaponType 契约锁**：服务端 `fire_judge.h` 与客户端 `SightlineProtocol.h` 各自声明同值枚举（`Rifle=0 / Pistol=1`），双端硬编码同步；`game_config.lua` 的 `weapons` 表**只填参数、不发明 id**，字符串键到枚举的映射由 `config_service.cpp` 负责。
 
+### 第 9 期（多房分桶 + 账号数据层 · v4.9 · 登记于设计批示，实施随步骤 5~7）
+
+> **域注记**：31~35 为**账号域**消息——与房级消息（15/17/19/20/21/25）之间**无顺序保证**（两域各自漏斗），客户端状态机必须容忍乱序；全部**异步回执**（请求-稍后回执模型，禁止同步等）。
+
+| msgid | 名称 | 方向 | payload 结构 | 说明 |
+|-------|------|------|--------------|------|
+| 31 | MSG_C2S_REGISTER | C → S | `[1B accountLen][account≤24B][1B passLen][pass≤64B]` | 注册（成功即自动登录态）。服务端即时 PBKDF2 哈希（**密码绝不入日志**）；合法性 `^[A-Za-z0-9_]{2,24}$`+pass 6~64B，非法=回执 reason=4。传输侧明文——**TLS 缺口标注 ep12 收口** |
+| 32 | MSG_C2S_LOGIN | C → S | `[1B accountLen][account≤24B][1B passLen][pass≤64B]` | 登录（游客 4 号路径零改动并行）。成功后服务端 `SET sess:<pid> <account_id> EX 86400`（Redis BestEffort，挂→跳过+降级计数不阻塞） |
+| 33 | MSG_S2C_AUTH_RESULT | S → C | `[1B ok][1B reason][4B accountId][1B mode][1B nameLen][name]`（≥8B） | reason：0 ok / 1 已存在 / 2 不存在 / 3 密码错 / 4 参数非法 / 5 服务不可用；mode：0 guest / 1 account。**accountId 非 pid**（草案 v1.2 E7 裁决）——pid 仍由进大厅/建房路径分配（既有 4 号机制零改），身份层与在线层解耦。**回执寻址=发起时 fd 快照**（fd 失效=丢+计数，重连重查） |
+| 34 | MSG_C2S_QUERY_STATS | C → S | `[1B limit≤20]` | 战绩查询（**只查自己**——身份从连接上下文取 fd→pid→登录态 accountId，客户端不传身份防伪造）。异步走 persistence worker 账号队列（主线程零阻塞 IO） |
+| 35 | MSG_S2C_STATS_RESULT | S → C | `[1B count]{[4B matchId][1B kills][1B deaths][8B endedAt]}×count`（1+14B×count） | 按 ended_at 倒序。未登录发起=33 号通道回 reason=4（客户端提示"登录后可查"） |
+
+
 **字节布局三处漂移校正（2026-11-06 代码实勘）**
 
 | 位置 | 原登记 / 注释 | 实际 | 处理 |
@@ -132,4 +145,5 @@
 | 2026-11-06 | **v4.8 登记**：新增 28（`C2S_SWITCH_WEAPON`）/ 30（`S2C_CONFIG_VERSION`，变长、含 per-weapon `damage`）；17 号 flags 补 bit3~4=`weaponType`（wire 零增长）；20 号维持空包、21 号一个字节不动；补 `EWeaponType` 契约锁与 flags 位分配表 | ep08 · 设计草案 §6 |
 | 2026-11-06 | **v4.8 实施落地（wire 字节与登记一致）**：双端枚举 28/30 补齐且书写顺序归位；服务端 `messages.h` 新增 `SwitchWeaponMsg` / `ConfigVersionMsg` + flags 助手，`FrameWriter` 在 15 号后与配置变更时广播 30 号，`MatchWiring` 注册 28 号处理器，`MatchService` 接 per-weapon 参数与换枪状态机；客户端协议头镜像解析、路由白名单扩 30、`MatchSession` 运行时参数覆盖层、`SightlineCharacter` 飘字/射速/弹匣/换弹改读覆盖层 + 数字键 1/2。`tests/test_v48.cpp` 59 项断言全绿；UE 侧编译待编辑器验证 | ep08 · 步骤 6 |
 | 2026-11-06 | **排期裁决（P1）**：规则 9 / 12 的「完整合法性校验与踢人」由 ep08 **顺延 ep09（防作弊期）**；ep08 仅预埋 `IBanStore` 端口。**纯排期，契约字节与消息号零变化** | 用户拍板 · ep08 设计草案 §14 |
+| 2026-11-11 | **v4.9 登记**：新增账号域五消息 31~35（注册/登录/回执/战绩查询/战绩回执）——**异步回执+与房级消息无顺序保证**（域注记）；33 号 `accountId 非 pid`（身份层与在线层解耦）；34 号身份从连接上下文取（防伪造）。房级消息（15/17/19/20/21/25）与服务器级（26/30）一个字节未动 | ep09 · 设计草案 v1.2 §5 批示登记 |
 | 2026-11-07 | **v4.8.1 登记**：21 号 23B→**25B**（+2B `reloadRemainingMs` u16 le）——gate=1（换弹中）时携带服务器换弹钟剩余毫秒，客户端据以对齐本地钟（本地钟降级为预测、服务器权威）。**动因（2026-11-07 连拒实锤）**：ep07 修复的"拒收回补自愈≤1 发"假设在按住全自动下被击穿——客户端本地钟（打空瞬间上弦）先于服务器钟（打空弹到达上弦·晚 RTT/2）到期，补满后连发全吃服务器换弹尾，服务器日志 13 连拒 1.6s。双端 messages/MatchSession/Character 同步；服务端 8 组回归+客户端冷编译 Succeeded | ep08 · 双钟漂移连拒根治（用户日志+服务器日志对齐实锤） |

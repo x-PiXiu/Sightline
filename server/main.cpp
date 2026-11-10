@@ -29,6 +29,7 @@
 #include "adapters/frame_codec.h"
 #include "adapters/lobby_wiring.h"
 #include "adapters/map_geometry.h"
+#include "match/match_shards.h"
 #include "adapters/match_wiring.h"
 #include "adapters/config_service.h"
 #include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
@@ -45,7 +46,7 @@
 #include "application/orchestrator.h"
 #include "match/policies.h"     // v1.6：端口已迁 match/
 #include "lobby/lobby.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
 #include "protocol/msg_ids.h"
 
 namespace {
@@ -216,7 +217,6 @@ int main(int argc, char** argv) {
 
     // 5. 业务用例 + 出站适配器 + 连接表（先于帧驱动构造，供回调捕获）
     sightline::lobby::LobbyService lobby;
-    sightline::match::MatchService match;
     adapters::ConnTable connections;
     adapters::FrameWriter writer{connections, lobby};
     std::map<int, int> fdWorker;                         // fd → worker 下标（选择计数的 main 侧账本）
@@ -264,7 +264,19 @@ int main(int argc, char** argv) {
         static_cast<unsigned>(EnvOr("SIGHTLINE_CMD_PORT", "18889").empty()
                                   ? 18889 : std::atoi(EnvOr("SIGHTLINE_CMD_PORT", "18889").c_str())));
     adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
-    adapters::BotDriverPort botDriverPort{botDriver, match, lobby};   // → IBotDriver 端口
+    // ===== ep09 步骤 1：多房分桶容器（MatchShards——OpenRoom/Find/TickAll/ApplyConfigAll）=====
+    // v1 SerialDispatcher 形态：主线程顺序 TickAll；worker 池在步骤 3 接管同一结构。
+    // geometry 持有在此（ShardDeps 延迟注入——开房发生在 wiring 运行期，晚于下方装载段）
+    std::optional<sightline::match::MapGeometry> mapGeo;
+    sightline::match::MatchShards shards{
+        sightline::match::ShardDeps{
+            .geometry = nullptr,             // 启动期装载段 SetSharedGeometry（见下）
+            .damage   = nullptr,             // 策略注入段 SetSharedDamage（HAS_LUA 分支后定案）
+            .currentConfig = [&config] {
+                return sightline::application::ComposeGameConfig(config, config, config, config);
+            }},                              // 组装单源=ComposeGameConfig（防与 ApplyConfig 双源漂移）
+        sightline::match::MatchShards::kDefaultShardCount};
+    adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver 端口
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
     // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
     // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。
@@ -278,17 +290,17 @@ int main(int argc, char** argv) {
     if (luaRt) {                       // E2：状态都起不来 → 整体落回内建（服务照起）
         luaDmg = std::make_unique<adapters::LuaDamagePolicy>(luaRt, &config);
         luaBot = std::make_unique<adapters::LuaBotPolicy>(luaRt);
-        match.SetDamagePolicy(luaDmg.get());
+        shards.SetSharedDamage(luaDmg.get());
         botDriver.SetBotPolicy(luaBot.get());
         patchChan = luaRt.get();       // patch 命令通道（§10.2.6 唯一新增注入位）
         LOG_INFO("[Lua] 策略层已接（damage=lua·bot=lua·patch=可用）");
     } else {
-        match.SetDamagePolicy(&damagePolicy);
+        shards.SetSharedDamage(&damagePolicy);
         botDriver.SetBotPolicy(&botPolicy);
         LOG_WARNING("[Lua] 运行时创建失败——全量内建兜底");
     }
 #else
-    match.SetDamagePolicy(&damagePolicy);
+    shards.SetSharedDamage(&damagePolicy);
     botDriver.SetBotPolicy(&botPolicy);
 #endif
     sightline::application::ApplicationOrchestrator app{
@@ -307,7 +319,7 @@ int main(int argc, char** argv) {
 #if SIGHTLINE_HAS_LUA
             .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
 #endif
-            .match = match,
+            .shards = shards,
             .botDriver = botDriverPort,
             .lobby = lobby,
         }};
@@ -324,15 +336,17 @@ int main(int argc, char** argv) {
     {
         const std::string path = ResolveGeometryPath();
         if (auto geometry = adapters::LoadMapGeometry(path)) {
-            match.SetGeometry(*geometry);
+            mapGeo = std::move(*geometry);                  // ep09：提升作用域——开房注入经 SetSharedGeometry
+            shards.SetSharedGeometry(&*mapGeo);
+            const sightline::match::MapGeometry& geo = *mapGeo;   // 后续日志/自检改用引用语法（原 optional->）
             LOG_INFO("[几何合同] 装载 path=" + path +
-                     " 盒=" + std::to_string(geometry->occluders.boxes.size()) +
-                     " 球=" + std::to_string(geometry->occluders.spheres.size()) +
-                     " 命中体 r=" + std::to_string(geometry->hitbox.radius) +
-                     " h=" + std::to_string(geometry->hitbox.halfHeight));
+                     " 盒=" + std::to_string(geo.occluders.boxes.size()) +
+                     " 球=" + std::to_string(geo.occluders.spheres.size()) +
+                     " 命中体 r=" + std::to_string(geo.hitbox.radius) +
+                     " h=" + std::to_string(geo.hitbox.halfHeight));
             // 出生点净空自检（2026-11-03 联调实锤：4 箱全压出生点 → 人机原地不动+子弹先中箱皮）
-            for (const std::size_t ix : sightline::match::BlockedSpawnPoints(*geometry)) {
-                const auto& sp = geometry->spawnPoints[ix];
+            for (const std::size_t ix : sightline::match::BlockedSpawnPoints(geo)) {
+                const auto& sp = geo.spawnPoints[ix];
                 LOG_WARNING("[几何合同] 出生点 " + std::to_string(ix + 1) + " @(" +
                             std::to_string(sp.x) + "," + std::to_string(sp.y) +
                             ") 被掩体压住（含命中体 34cm 膨胀带）——人机会原地不动、子弹先中箱皮打不中它；"
@@ -349,7 +363,7 @@ int main(int argc, char** argv) {
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
-    adapters::MatchWiring matchWiring{dispatcher, match, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟
+    adapters::MatchWiring matchWiring{dispatcher, shards, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟
     // ③ 号事件源：20 号 Fire 事件经回调进编排器，与 ①/② 在同一订阅点扇出（B1 修复）
     matchWiring.SetMatchEventSink([&app](std::vector<sightline::match::MatchEvent>&& es) {
         app.OnWiringEvents(std::move(es));                  // v1.6：Fire/StartMatch/RemovePlayer 三源统一点

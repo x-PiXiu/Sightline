@@ -1,7 +1,7 @@
-// test_match.cpp —— M3 对局链路纯单测：MatchService 用例 + D3-15 编排过桥（LobbyService 组合）
+// test_match.cpp —— M3 对局链路纯单测：MatchSession 用例 + D3-15 编排过桥（LobbyService 组合）
 // 不起网络：喂查询/请求，断言事件与名册（整洁架构体检第 3 条）
-// 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_match && /tmp/test_match
-#include "match/match_service.h"
+// 编译：g++ -std=c++20 -I include tests/test_match.cpp src/match/match_session.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_match && /tmp/test_match
+#include "match/match_session.h"
 #include "match/nav_grid.h"
 #include "match/perception.h"
 #include "match/bot_brain.h"
@@ -42,7 +42,7 @@ static void stage(const std::string& name) {
 }
 
 int main() {
-    MatchService m;
+    MatchSession m;
 
     stage("开始对局：出生点 = 名册序，全员在局");
     std::vector<RosterEntry> roster = {
@@ -167,7 +167,7 @@ int main() {
     stage("非房主请求由适配层拦截（此处仅验用例收到的名册不受影响）");
     // （IsHost 拒绝发生在 wireMatch——用例层只接收合法输入；拦截行为在服务器联调期验证）
 
-    // ===== 第 5 期：开火命中（D5 系列；fire_judge 纯决策头 + MatchService 编排 + 几何合同装载）=====
+    // ===== 第 5 期：开火命中（D5 系列；fire_judge 纯决策头 + MatchSession 编排 + 几何合同装载）=====
     stage("M5 方向重建：yaw/pitch → 单位向量（§4.1 合同公式）");
     const auto d0 = DirectionFromYawPitch(0.f, 0.f);
     CHECK(std::fabs(d0.x - 1.f) < 1e-5 && std::fabs(d0.y) < 1e-5 && std::fabs(d0.z) < 1e-5);
@@ -232,7 +232,7 @@ int main() {
     }
 
     stage("M5 开火编排：命中扣血 / 幻影枪容差 / 未命中事件 / 打空换弹恢复（审计修复①端到端）");
-    MatchService fm;
+    MatchSession fm;
     std::vector<RosterEntry> roster5{{10, "a", 0}, {11, "b", 0}, {12, "c", 0}};
     fm.StartMatch(1, roster5);
     fm.SetGeometry(MapGeometry{});                               // 空遮挡（显式注入）
@@ -266,7 +266,7 @@ int main() {
 
     stage("死窗根除（2026-11-05 用户日志三窗口实锤）：打空瞬间钟已上（无需下一发尝试）→ 复火首枪到期即接受");
     {
-        MatchService dm;
+        MatchSession dm;
         std::vector<RosterEntry> rosterD{{30, "a", 0}, {31, "b", 0}};
         dm.StartMatch(1, rosterD);
         dm.SetGeometry(MapGeometry{});
@@ -300,7 +300,7 @@ int main() {
     // —— ep06 延迟补偿回溯：历史环/插值/回溯翻转/钳制（单钟·非零中心回归）——
     stage("ep06 历史环与回溯判定：插值/回溯翻转/钳制/非零中心 Z 回归");
     {
-        MatchService hm;
+        MatchSession hm;
         std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
         hm.StartMatch(1, rs);
         hm.SetGeometry(MapGeometry{});
@@ -331,7 +331,7 @@ int main() {
     }
     // 环形裁剪：35 条上报 → histCount=32（覆盖最老）——以判定行为验收
     {
-        MatchService tm;
+        MatchSession tm;
         std::vector<RosterEntry> rs{{20, "a", 0}, {21, "b", 0}};
         tm.StartMatch(1, rs);
         tm.SetGeometry(MapGeometry{});
@@ -346,7 +346,7 @@ int main() {
     // 但位移=冻结时长×速度——纯 seq 版误钳诚实玩家 → 和解回拉（用户"按 W 被往后拉"根因）。
     // bound=max(seq版, 时间版)——时间版按到达间隔放行（cap 0.6s 防瞬移）。
     {
-        MatchService cm;
+        MatchSession cm;
         std::vector<RosterEntry> rs{{30, "a", 0}};
         cm.StartMatch(1, rs);
         cm.UpdateEntity(30, 0.f, 0.f, 100.f, 0.f, 0.f, 0x00, 1, 1000);            // 首报
@@ -366,7 +366,7 @@ int main() {
     // 垂直分钳（2026-11-04 坠楼段复盘）：下落（dz<0）放宽到 kMaxFallSpeedUuPerSec×gapScale=400×gapScale
     // ——诚实重力长坠不再逐拍被钳（和解不再持续回拉）；上升维持原界（防飞天）；水平界不变
     {
-        MatchService vm;
+        MatchSession vm;
         std::vector<RosterEntry> rs{{31, "a", 0}};
         vm.StartMatch(1, rs);
         vm.UpdateEntity(31, 0.f, 0.f, 2000.f, 0.f, 0.f, 0x01, 1, 1000);           // 首报：高空
@@ -383,7 +383,7 @@ int main() {
     // 活动区钳制（2026-11-04 审计 A 级收编）：UpdateEntity 权威位 x/y 钳 ±kPlayAreaHalfUu——
     // 对全体实体生效（真人同样被钳；此前仅人机适配器钳目标=边界形同虚设）。z 不钳（坠落合法）。
     {
-        MatchService pam;
+        MatchSession pam;
         std::vector<RosterEntry> rs{{32, "a", 0}};
         pam.StartMatch(1, rs);
         std::uint64_t now = 1000;
@@ -406,7 +406,7 @@ int main() {
         auto ev3 = pam.Tick(now);
         CHECK(ev3.size() == 1 && ev3[0].entities[0].x == 4000.f && ev3[0].entities[0].y == -4000.f);  // 双轴各自钳
         {  // 界内诚实移动不受影响（新实体——避免从界外瞬回被超速钳制拦截的合理行为干扰断言）
-            MatchService pbm;
+            MatchSession pbm;
             std::vector<RosterEntry> rs{{33, "b", 0}};
             pbm.StartMatch(1, rs);
             std::uint64_t now2 = 1000;
@@ -419,7 +419,7 @@ int main() {
     // 活动区推导（2026-11-04 03:20 局数据冲突回归）：界=合同地板盒（足印最大）——出生点在界外
     // 时锚/落位钳入（24 号带钳后坐标=客户端传送不再被拽回），越界步行钳在推导界上
     {
-        MatchService dm3;
+        MatchSession dm3;
         MapGeometry g;
         g.occluders.boxes.push_back(OccluderBox{0, 0, -200.5f, 1500.f, 1500.f, 200.f, 0});   // 地板 ±1500
         g.occluders.boxes.push_back(OccluderBox{100, 0, 50.f, 10.f, 10.f, 50.f, 0});         // 小盒不得干扰推导
@@ -441,7 +441,7 @@ int main() {
     // —— ep07 死亡/重生/结算/导航/感知/人机脑 ——
     stage("ep07 死亡状态机：4 枪击杀/Kill 事件/死亡门/死者不入候选/重生满血/无敌/历史清/握手");
     {
-        MatchService dm;
+        MatchSession dm;
         std::vector<RosterEntry> rs{{40, "s", 0}, {41, "v", 1}};
         dm.StartMatch(1, rs);
         dm.SetGeometry(MapGeometry{});
@@ -505,7 +505,7 @@ int main() {
     }
     stage("ep07 重生握手回归：在途旧报只拒不改基准 → 放行首拍权威位=上报位（拉扯第五轮·无过冲）");
     {
-        MatchService rk;
+        MatchSession rk;
         MapGeometry g;
         g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{400, 0, 92, 180}, SpawnPoint{-400, 0, 92, 0}};
         rk.SetGeometry(g);
@@ -548,7 +548,7 @@ int main() {
     }
     stage("自主换弹（29 号语义）：半匣上钟/换弹中火拒/重复换弹拒/到期满匣续射/未激活拒");
     {
-        MatchService sm;
+        MatchSession sm;
         std::vector<RosterEntry> rs{{90, "a", 0}};
         sm.StartMatch(7, rs);
         CHECK(sm.Reload(90, 1000) == false);                   // 未激活（未上报）→ 拒
@@ -573,7 +573,7 @@ int main() {
     }
     stage("ep07 重生选点排除已占用：活人占 A 旁 40cm→死者必落 B；两点全占→回退仍能重生");
     {
-        MatchService om;
+        MatchSession om;
         MapGeometry g;
         g.spawnPoints = {SpawnPoint{0, 0, 92, 0}, SpawnPoint{800, 0, 92, 180}};
         om.SetGeometry(g);
@@ -624,7 +624,7 @@ int main() {
     }
     stage("ep07 无敌诊断：重生 2s 保护内完美瞄准=miss+最近候选[无敌]；保护过期=命中（选点随机下射手恒居西）");
     {
-        MatchService iv;
+        MatchSession iv;
         MapGeometry g;
         g.spawnPoints = {SpawnPoint{-300.f, 0.f, 92.f, 0.f}, SpawnPoint{500.f, 0.f, 92.f, 180.f}};
         iv.SetGeometry(g);
@@ -676,7 +676,7 @@ int main() {
     }
     stage("ep07 终局：10 杀 Ended（原因 1·比分两行）/终局静默/AbortMatch");
     {
-        MatchService em;
+        MatchSession em;
         std::vector<RosterEntry> rs{{50, "a", 0}, {51, "b", 1}};
         em.StartMatch(2, rs);
         em.SetGeometry(MapGeometry{});
@@ -788,10 +788,10 @@ int main() {
     }
 
     // ── 2026-11-03 联调回归：同一服务进程连开多局（用户现场"开枪无回包"根因=终局字段跨局泄漏）──
-    // 旧测试每段 new 一个 MatchService，从没测过"上一局结束后同实例再开局"——bug 就藏在这道缝里
+    // 旧测试每段 new 一个 MatchSession，从没测过"上一局结束后同实例再开局"——bug 就藏在这道缝里
     stage("ep07 跨局复位①：AbortMatch 后同实例再开局——首报激活/开火必有判定/不得开局即结算");
     {
-        MatchService xm;
+        MatchSession xm;
         xm.SetGeometry(MapGeometry{});
         std::vector<RosterEntry> rs{{60, "h", 0}, {61, "b", 0}};
         xm.StartMatch(3, rs);
@@ -807,7 +807,7 @@ int main() {
     }
     stage("ep07 跨局复位②：击杀上限终局+快照停发后同实例再开局（用户现场形态：无结算行·开枪无回包）");
     {
-        MatchService km;
+        MatchSession km;
         km.SetGeometry(MapGeometry{});
         std::vector<RosterEntry> rs{{70, "a", 0}, {71, "b", 0}};
         km.StartMatch(5, rs);
@@ -850,7 +850,9 @@ int main() {
         MapGeometry g;
         g.spawnPoints = {SpawnPoint{442, -474, 90, 133}, SpawnPoint{820, -820, 90, -47}};
         g.patrolPoints = {Vec3{1050, -820, 90}, Vec3{200, -1200, 90}, Vec3{1200, -200, 90}};
-        MatchService bm;
+        // ep09：Tick 已路由化（MatchShards）——session 经容器持有（引用语义兼容后续 bm. 调用）
+        MatchShards bmShards{ShardDeps{}, 1};
+        MatchSession& bm = bmShards.OpenRoom(rid);
         bm.SetGeometry(g);
         adapters::BotDriver drv;
         drv.OnBotAdded(rid, bot, "Bot", 1);
@@ -864,7 +866,7 @@ int main() {
         bool reached = false;                                  // 真人未上报=不可见 → 人机只巡逻
         std::uint64_t now = 1000;
         for (int i = 0; i < 300 && !reached; ++i) {            // ≤10s（400cm/s·最远航点 <8m）
-            (void)drv.Tick(now += 33, bm, lob);
+            (void)drv.Tick(now += 33, bmShards, lob);
             for (const auto& p : g.patrolPoints)
                 if (std::hypot(be->x - p.x, be->y - p.y) < 80.f) reached = true;
         }
@@ -876,7 +878,7 @@ int main() {
         for (int i = 0; i < 180 && !sawKill; ++i) {            // ≤6s
             now += 33;
             bm.UpdateEntity(host, hx, hy, 90, 180, 0, 0, ++hseq, now);
-            for (const auto& e : drv.Tick(now, bm, lob)) {
+            for (const auto& e : drv.Tick(now, bmShards, lob)) {
                 if (e.type == MatchEvent::Type::FireResult && e.fire.shooterPid == bot) {
                     sawShot = true;
                     if (!e.fire.bAccepted) sawRejected = true;
@@ -891,7 +893,7 @@ int main() {
         // 开局锚定握手（2026-11-03"开局拉出地图"修复）：有合同出生点时实体未激活前，
         // 远离锚点的上报（切图前旧世界角色的 19 号）必须被忽略
         {
-            MatchService am;
+            MatchSession am;
             am.SetGeometry(g);
             std::vector<RosterEntry> rs{{901, "h", 0}, {902, "b", 1}};
             am.StartMatch(rid, rs);
@@ -927,7 +929,8 @@ int main() {
         const auto host2 = static_cast<std::uint32_t>(lob2.PlayerIdByFd(901));
         MapGeometry g;
         g.spawnPoints = {SpawnPoint{1700, 0, 92, 0}, SpawnPoint{3900, 0, 92, 180}};   // 人机贴东缘出生（感知半径内可见玩家）
-        MatchService bm2;
+        MatchShards bm2Shards{ShardDeps{}, 1};
+        MatchSession& bm2 = bm2Shards.OpenRoom(rid2);
         bm2.SetGeometry(g);
         adapters::BotDriver drv2;
         drv2.OnBotAdded(rid2, bot2, "Bot", 1);
@@ -940,13 +943,13 @@ int main() {
             now += 200;
             bm2.UpdateEntity(host2, 1710, 0, 92, 0, 0, 0, ++pseq, now);
             (void)bm2.Fire(host2, now);
-            (void)drv2.Tick(now, bm2, lob2);
+            (void)drv2.Tick(now, bm2Shards, lob2);
         }
         const auto* bb = bm2.EntityById(bot2);
         CHECK(bb && bb->weapon.hp == 25.f);                    // 残血：撤退前提成立
         for (int i = 0; i < 200; ++i) {                        // ~6.6s：背敌撤退 400cm/s 顶向栅格界（±4100）
             now += 33;
-            (void)drv2.Tick(now, bm2, lob2);
+            (void)drv2.Tick(now, bm2Shards, lob2);
         }
         bb = bm2.EntityById(bot2);
         CHECK(bb && bb->x <= 4000.01f);                        // ★不越过活动区（域层钳·意图层已被钳到栅格界 4100）
@@ -968,6 +971,6 @@ int main() {
         CHECK(BlockedSpawnPoints(g).empty());                  // 撤箱全放行
     }
 
-    std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchService + D3-15 过桥，未起网络）\n";
+    std::cout << "全部通过：" << g_checked << " 项断言 ✓（MatchSession + D3-15 过桥，未起网络）\n";
     return 0;
 }

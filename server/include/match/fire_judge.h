@@ -41,7 +41,7 @@ inline constexpr int           kEntityHistoryCap  = 32;      // ep06：权威位
 inline constexpr std::uint64_t kRespawnMs         = 3000;    // ep07：死亡→重生倒计时（服务器权威）
 inline constexpr std::uint64_t kInvulnMs          = 2000;    // ep07：重生无敌（防出生即死·行业惯例）
 inline constexpr int           kKillLimit         = 10;      // ep07：先到 10 杀结束（D7-02·ep08 进数值表）
-// 活动区半宽**回退缺省**（2026-11-04 审计 A 级收编 + 同日勘误）：正式界=MatchService::SetGeometry
+// 活动区半宽**回退缺省**（2026-11-04 审计 A 级收编 + 同日勘误）：正式界=MatchSession::SetGeometry
 // 从合同地板盒（足印最大遮挡盒）推导并注入 UpdateEntity 钳制——本常量仅在合同无地板盒时兜底。
 // ⚠ 勘误：合同 size=半尺寸（map_geometry.h 语义），地板盒 size=[4000,4000,200] → 实际地板 ±4000
 // （80m×80m）；本常量曾按"4000=全宽"误读为 2000 → 97cb827 版把玩家/人机钳在地图中央 1/4，
@@ -69,7 +69,7 @@ struct WeaponParams {
 
 // 步骤 2 向后兼容缺省：ConsumeWeaponGate / ConsumeAmmo 新增尾参的默认值，逐字段等于现行
 // kDamagePerShot / kMagCapacity / kReloadMs / kFireMinIntervalMs —— 保证 6 处直调测试与
-// match_service.cpp 两处调用「行为零变化」（238 断言安全网）。步骤 3 起调用方改传 cfg->weapons[type]。
+// match_session.cpp 两处调用「行为零变化」（238 断言安全网）。步骤 3 起调用方改传 cfg->weapons[type]。
 inline constexpr WeaponParams kDefaultWeaponParams{
     /*damage=*/25, /*mag=*/30, /*reloadMs=*/2500, /*fireMs=*/95
 };

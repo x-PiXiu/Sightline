@@ -1,6 +1,6 @@
 // bot_driver.h —— ep07 人机驱动适配器（整洁架构接口适配器·与 match_wiring 平级的"另一个输入源"）
 // 铁律（ep07 设计草案 §3.1）：人机的移动与开火必须经与真人完全相同的入口
-// （MatchService::UpdateEntity / MatchService::Fire）——不得直写 Entity、不得绕四道门；
+// （MatchSession::UpdateEntity / MatchSession::Fire）——不得直写 Entity、不得绕四道门；
 // 人机超速照样被钳制 → ep09"人机不作弊"是结构性保证。
 // 并发模型：主线程单线程驱动（main 33ms tick 统一调 Tick）——与业务串行铁律一致，零锁。
 // 自愈（❗12）：Tick 内自检——房间被解散（真人数归零）→ AbortMatch + 人机清场。
@@ -16,7 +16,8 @@
 #include "lobby/lobby.h"
 #include "logger/logger.h"
 #include "match/bot_brain.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
+#include "match/match_shards.h"
 #include "match/nav_grid.h"
 #include "match/policies.h"              // v1.6 收口②：IBotPolicy（决策策略端口）
 #include "match/perception.h"
@@ -27,7 +28,7 @@ namespace adapters {
  *  FSM 四态的 moveTarget 都可能落在栅格外（TakeCover 撤退方向无界 / Engage 追击出界敌 /
  *  Search 的 lastKnown 在界外）——统一在适配器钳回活动区（kPlayAreaHalfUu=域常量单源）。
  *  分工：本函数只管"FSM 意图目标不越图"（寻路输入卫生）；权威位边界执法在
- *  MatchService::UpdateEntity（域规则·对全体实体含真人生效）——两层不互替。 */
+ *  MatchSession::UpdateEntity（域规则·对全体实体含真人生效）——两层不互替。 */
 inline sightline::match::Vec2 ClampMoveTarget(const sightline::match::NavGrid& g,
                                               sightline::match::Vec2 p) {
     // 钳到栅格界（=地板+建格余量，随地图推导）——FSM 意图目标不越过可寻路范围；
@@ -70,7 +71,7 @@ public:
      *  不重推规则：2026-11-03 联调实锤，14 号处理器的名册是值传递副本（spawnIndex 全 0），按它取点
      *  = 所有人机叠在房主出生点（客户端胶囊互挤+零距互射） */
     void OnMatchStart(std::uint32_t roomId, const sightline::match::MapGeometry& geo,
-                      sightline::match::MatchService& match, std::uint64_t nowMs) {
+                      sightline::match::MatchSession& match, std::uint64_t nowMs) {
         auto it = byRoom_.find(roomId);
         if (it == byRoom_.end()) return;
         nav_ = sightline::match::BuildNavGrid(geo.occluders);
@@ -130,16 +131,19 @@ public:
      *  返回人机开火产出的领域事件（21 判定 / 23 击杀）——"同真人入口"不止同进还要同出：真人的 Fire
      *  事件经 FrameWriter 广播，人机的也必须走同一输出端口（2026-11-03 联调：此前返回值被丢——
      *  人机打人只扣血不广播，受害客户端不知道自己已死 → 服务器冻结尸体位、客户端照走 → 和解回拉） */
-    std::vector<sightline::match::MatchEvent> Tick(std::uint64_t nowMs, sightline::match::MatchService& match,
+    /** ep09 多房化：match 单例参数 → MatchShards 容器——byRoom_ 本就按房组织，逐房 Find
+     *  路由到各自 session 驱动（房内单线程语义由调用方保证：Serial=主线程顺序；worker 版=归属 worker）。
+     *  终局静默从「全局 break」（单房）改「本房 continue」（多房——其它房的人机照跑）。 */
+    std::vector<sightline::match::MatchEvent> Tick(std::uint64_t nowMs, sightline::match::MatchShards& shards,
                                                    sightline::lobby::LobbyService& lobby) {
         std::vector<sightline::match::MatchEvent> out;
-        // 自愈（❗12）：房间已解散（最后真人离开）→ 清场；仅当常驻的单局正属本房时才中止对局——
-        // 别的房间（大厅里加过人机又解散）不得误杀进行中的对局
+        // 自愈（❗12）：房间已解散（最后真人离开）→ 清场+中止本房对局（Find 到才 abort——
+        // 多房下 Find(roomId) 即"本房局"，不存在单例时代的跨房误杀问题）
         for (auto it = byRoom_.begin(); it != byRoom_.end();) {
             if (!lobby.HasRoom(it->first)) {
-                const bool ownsMatch = (match.RoomId() == it->first);
-                if (ownsMatch) match.AbortMatch();
-                LOG_INFO("[人机] 房间已解散 → " + std::string(ownsMatch ? "AbortMatch + " : "") +
+                auto* s = shards.Find(it->first);
+                if (s) s->AbortMatch();
+                LOG_INFO("[人机] 房间已解散 → " + std::string(s ? "AbortMatch + " : "") +
                          "清场 房=" + std::to_string(it->first));
                 it = byRoom_.erase(it);
             } else {
@@ -148,8 +152,9 @@ public:
         }
         if (!navBuilt_) return out;
         for (auto& [roomId, list] : byRoom_) {
-            if (match.IsEnded()) break;                      // 终局：本帧人机全部静默（快照保留期）
-            for (auto& b : list) TickOne(b, nowMs, match, out);
+            auto* session = shards.Find(roomId);
+            if (!session || session->IsEnded()) continue;    // 未开局/终局：本房 bot 静默（快照保留期）
+            for (auto& b : list) TickOne(b, nowMs, *session, out);
         }
         return out;
     }
@@ -199,7 +204,7 @@ private:
         return t;
     }
 
-    void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchService& match,
+    void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchSession& match,
                  std::vector<sightline::match::MatchEvent>& out) {
         const sightline::match::Entity* E = match.EntityById(b.pid);
         if (!E || !E->bHasReport) { b.lastTickMs = nowMs; return; }   // 未在局/未激活：静默

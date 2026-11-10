@@ -29,7 +29,7 @@ struct BotTuning {
                                     //  扣扳机按此间隔——连发压制→点射节奏；适配器节流，不进 Decide 纯函数）
 };
 
-/** 感知输入（driver 组装·只读 DTO——MatchService 不为人机开门） */
+/** 感知输入（driver 组装·只读 DTO——MatchSession 不为人机开门） */
 struct BotSelf {
     float x = 0.f, y = 0.f, z = 0.f;
     float yaw = 0.f;

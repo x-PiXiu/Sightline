@@ -99,6 +99,10 @@ public:
     bool IsHost(int fd) const;                                   // fd 是否其所在房的现任房主（首位）
     bool RoomIdByFd(int fd, uint32_t& outRoomId) const;          // fd 是否在房中
     int  PlayerIdByFd(int fd) const;                             // fd→PlayerId 翻译；无则 -1
+    /** ep09 多房路由：pid→roomId 反查（19/20 号上行按玩家编址、对局按房路由）。
+     *  实现遍历 rooms_×memberFds 比对 playersByFd_（O(房数×4)，房个位数量级够用；
+     *  索引化留压测归因——草案 §4.8 的 immutable snapshot 是步骤 2 的并发化形态） */
+    bool RoomIdByPid(uint32_t pid, uint32_t& outRoomId) const;
     std::vector<RoomMemberInfo> RoomRoster(uint32_t roomId) const;  // 按加入序（首位=房主；ep07 尾部并人机）
     // —— ep07：人机席位 + 对局状态过桥 ——
     int  AddBot(uint32_t roomId);                       // 分配 pid+登记（房不存在/满 → -1）

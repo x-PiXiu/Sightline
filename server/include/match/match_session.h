@@ -1,4 +1,4 @@
-// match_service.h —— 第 3 期对局用例（整洁架构内两层：与 LobbyService 并列）
+// match_session.h —— 第 3 期对局用例（整洁架构内两层：与 LobbyService 并列）
 // 依赖规则（D3-15）：只认 PlayerId 不认 fd——fd↔PlayerId 翻译归适配层 wireMatch；
 //                   与 LobbyService 互不 include，名册由适配层以纯数据过桥；
 //                   零 include net/*——可脱离网络纯单测
@@ -124,8 +124,13 @@ struct MatchEvent {
     std::vector<ScoreRow> scores;                      // Ended（结算比分）
 };
 
-class MatchService {
+class MatchSession {
 public:
+    /** ep09 v1.2 ADR-23：随机源 seed 注入（重生选点均匀随机 e9790a8 的确定性化）——
+     *  0=随机设备（生产默认）；非 0=确定性（双模式对拍/单测）。MatchShards 开房时按
+     *  roomId 派生（每 session 独立序列——共享 rng 会交叉消耗，对拍与隔离双输） */
+    explicit MatchSession(std::uint32_t rngSeed = 0);
+
     /** 开始对局：名册由适配层从 LobbyService 查询后过桥传入（校验房主/在房在适配层完成） */
     std::vector<MatchEvent> StartMatch(std::uint32_t roomId, std::vector<RosterEntry> roster);
 
@@ -140,7 +145,10 @@ public:
      *  最小版，完整反作弊 ep08）→ 服务器按输入自推权威位（上次权威+钳制增量）→ 存权威位+ackedSeq；
      *  未知 pid 静默忽略（不在局者上报无效）。16 号对局期由适配层拒收（R10），不进此函数 */
     void SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs);   // ep06：22 号 RTT 上报（回溯量源）
-    void UpdateEntity(std::uint32_t playerId, float x, float y, float z,
+    /** ep09 v1.2 ADR-24：输入方法统一「输入→事件流」签名——UpdateEntity 当前无事件产出
+     *  （位置入库+钳制，事件全部由 Tick/Fire 产），返回空流；签名统一后调用方
+     *  （wiring/bot 直调链路）以同一 appendOutbox 模式接住全部输入方法的返回值 */
+    std::vector<MatchEvent> UpdateEntity(std::uint32_t playerId, float x, float y, float z,
                       float yaw, float pitch, std::uint8_t flags, std::uint32_t seq = 0,
                       std::uint64_t recvMs = 0);   // ep06：接收时刻（单钟·历史环时间戳）
 

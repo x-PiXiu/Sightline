@@ -1,5 +1,5 @@
-// match_service 实现 —— M3：开始对局 + 成员离场；M4：实体暂存 + 快照组装；M3：权威推算（R12）
-#include "match/match_service.h"
+// match_session 实现 —— M3：开始对局 + 成员离场；M4：实体暂存 + 快照组装；M3：权威推算（R12）
+#include "match/match_session.h"
 #include <algorithm>
 #include <cmath>
 
@@ -17,10 +17,13 @@ namespace {
     constexpr float kMaxFallSpeedUuPerSec = 4000.f;
 }
 
-std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vector<RosterEntry> roster) {
+MatchSession::MatchSession(std::uint32_t rngSeed)
+    : rng_(rngSeed ? rngSeed : std::random_device{}()) {}
+
+std::vector<MatchEvent> MatchSession::StartMatch(std::uint32_t roomId, std::vector<RosterEntry> roster) {
     roomId_ = roomId;
     bActive_ = true;
-    // 局级状态开局全量复位（2026-11-03 联调根因）：服务进程常驻、MatchService 跨局复用——上一局的
+    // 局级状态开局全量复位（2026-11-03 联调根因）：服务进程常驻、MatchSession 跨局复用——上一局的
     // 终局三件套（击杀上限/AbortMatch 置位）若漏复位，新局首拍即被 Tick 判"已结束"停用，且 UpdateEntity
     // 终局门静默丢全部上报 → 实体永不激活 → Fire 静默返回（现场症状=开枪零回包）
     bEnded_ = false;
@@ -59,31 +62,31 @@ std::vector<MatchEvent> MatchService::StartMatch(std::uint32_t roomId, std::vect
     return out;
 }
 
-void MatchService::SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs) {
+void MatchSession::SetShooterRtt(std::uint32_t playerId, std::uint16_t rttMs) {
     for (Entity& E : entities_)
         if (E.playerId == playerId) { E.shooterRtt = rttMs; return; }
     // 未知 pid：静默忽略（与 UpdateEntity 同纪律）
 }
 
-const Entity* MatchService::EntityById(std::uint32_t pid) const {
+const Entity* MatchSession::EntityById(std::uint32_t pid) const {
     for (const Entity& E : entities_)
         if (E.playerId == pid) return &E;
     return nullptr;
 }
 
-Entity* MatchService::FindEntity(std::uint32_t pid) {  // 声明早在头文件——首个定义（Reload 起用）
+Entity* MatchSession::FindEntity(std::uint32_t pid) {  // 声明早在头文件——首个定义（Reload 起用）
     for (Entity& E : entities_)
         if (E.playerId == pid) return &E;
     return nullptr;
 }
 
-void MatchService::AbortMatch() {                      // ep07：终局中止（❗12——最后真人离开）
+void MatchSession::AbortMatch() {                      // ep07：终局中止（❗12——最后真人离开）
     bActive_ = false;
     bEnded_ = true;
     entities_.clear();
 }
 
-std::vector<MatchEvent> MatchService::RemovePlayer(std::uint32_t playerId) {
+std::vector<MatchEvent> MatchSession::RemovePlayer(std::uint32_t playerId) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;
     for (auto it = entities_.begin(); it != entities_.end(); ++it) {
@@ -96,20 +99,20 @@ std::vector<MatchEvent> MatchService::RemovePlayer(std::uint32_t playerId) {
     return out;
 }
 
-bool MatchService::IsActive(std::uint32_t playerId) const {
+bool MatchSession::IsActive(std::uint32_t playerId) const {
     for (const Entity& E : entities_) if (E.playerId == playerId) return true;
     return false;
 }
 
-void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float z,
+std::vector<MatchEvent> MatchSession::UpdateEntity(std::uint32_t playerId, float x, float y, float z,
                                 float yaw, float pitch, std::uint8_t flags, std::uint32_t seq,
                                 std::uint64_t recvMs) {
-    if (bEnded_) return;                                   // ep07：终局静默（❗5）
+    if (bEnded_) return {};                    // ep07：终局静默（❗5）——ADR-24：统一事件流签名
     for (Entity& E : entities_) {
         if (E.playerId != playerId) continue;
         if (E.bDead) {                                     // ep07：死亡冻结（❗13——只推增量基准防旧包堆积）
             E.lx = x; E.ly = y; E.lz = z;
-            return;
+            return {};
         }
         if (E.rebasePending) {                             // ep07：重生握手（❗9）
             // ⚠ 开局首报同吃此门：客户端必须先到 15 号出生点（合同点）再发 19——远离出生点的
@@ -124,7 +127,7 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
                 // lx/ly/lz，把重生落位刚重置的 spawn 基准污染回尸体位——放行首拍 dx=上报−尸体位
                 // 是全程距离 → 被 300uu 钳制 → 权威位过冲出生点 → 17 号逐拍带误差硬拉。
                 // 开局路径不受影响（首报走 bHasReport=false 采纳分支不读 lx），所以只有"重生后"病。
-                return;
+                return {};
             }
         }
         if (!E.bHasReport) {
@@ -176,12 +179,13 @@ void MatchService::UpdateEntity(std::uint32_t playerId, float x, float y, float 
         E.history[E.histHead] = {recvMs, E.x, E.y, E.z};
         E.histHead = std::uint8_t((E.histHead + 1) % kEntityHistoryCap);
         E.histCount = std::uint8_t(std::min<int>(E.histCount + 1, kEntityHistoryCap));
-        return;
+        return {};
     }
     // 未知 pid：不在局者上报无效——静默忽略（服务器的"信任但只转发"不等于"来者不拒"）
+    return {};
 }
 
-std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
+std::vector<MatchEvent> MatchSession::Tick(std::uint64_t nowMs) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;
     // —— ep07：死亡 → 重生倒计时处理（服务器选点=离最近活敌最远·D7-03）——
@@ -274,7 +278,7 @@ std::vector<MatchEvent> MatchService::Tick(std::uint64_t nowMs) {
 }
 
 // ===== 自主换弹（2026-11-05 用户令·29 号）：换弹钟权威在服务器，客户端只发意图 =====
-bool MatchService::Reload(std::uint32_t playerId, std::uint64_t nowMs) {
+bool MatchSession::Reload(std::uint32_t playerId, std::uint64_t nowMs) {
     if (!bActive_ || bEnded_) return false;                // 对局外/终局
     Entity* E = FindEntity(playerId);
     if (!E || !E->bHasReport) return false;                // 未激活=打不了也换不了
@@ -286,7 +290,7 @@ bool MatchService::Reload(std::uint32_t playerId, std::uint64_t nowMs) {
 }
 
 // ===== ep08 v4.8：配置表 / 换枪状态机 =====
-void MatchService::SetConfig(const GameConfig& c) {
+void MatchSession::SetConfig(const GameConfig& c) {
     // 只取本用例执行的字段（ISP）：武器/血量/死亡规则/回溯钳制；formula/bot 归各自消费者。
     weaponTable_ = c.weapons;
     weaponCount_ = (c.weaponCount == 0 || c.weaponCount > 4) ? 2 : c.weaponCount;
@@ -295,13 +299,13 @@ void MatchService::SetConfig(const GameConfig& c) {
     rewind_ = c.rewind;
 }
 
-std::uint8_t MatchService::WeaponTypeOf(std::uint32_t playerId) const {
+std::uint8_t MatchSession::WeaponTypeOf(std::uint32_t playerId) const {
     for (const Entity& E : entities_)
         if (E.playerId == playerId) return E.weaponType;
     return 0;
 }
 
-bool MatchService::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t, std::string* why) {
+bool MatchSession::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::uint64_t, std::string* why) {
     // 拒绝原因做出参（用例层零日志——编排/落日志归适配器；2026-11-07 实机验证轮补外显）
     const auto Set = [why](const char* r) { if (why) *why = r; };
     if (!bActive_ || bEnded_) { Set("对局门"); return false; }
@@ -321,7 +325,7 @@ bool MatchService::SwitchWeapon(std::uint32_t playerId, std::uint8_t type, std::
 
 // ===== M5：开火裁决（D5 系列；规则在 fire_judge.h 纯决策头，此处只编排）=====
 
-void MatchService::SetGeometry(const MapGeometry& geometry) {
+void MatchSession::SetGeometry(const MapGeometry& geometry) {
     geometry_ = geometry;                                    // 构建期烘焙注入（D5-08v2 拒绝运行时上报）
     // 活动区从合同推导（2026-11-04 审计 A 级升级）：地板=足印最大的遮挡盒（hx*hy 最大）——
     // 多地图/挪出生点后规则随数据走，不再拍常量。无盒（缺省合同）回退 kPlayAreaHalfUu。
@@ -336,7 +340,7 @@ void MatchService::SetGeometry(const MapGeometry& geometry) {
     }
 }
 
-std::vector<MatchEvent> MatchService::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {
+std::vector<MatchEvent> MatchSession::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;                               // ① 在对局中？
     Entity* shooter = nullptr;

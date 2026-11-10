@@ -43,7 +43,7 @@ struct IConfigVersion {
 };
 
 // 死亡/重生/回溯规则视图（v1.6 收口③）：deathmatch/rewind 两组此前零消费者（改 respawn_ms 不生效）。
-// ISP：MatchService 需要的规则面独立成口，不牵动武器/公式/审计。
+// ISP：MatchSession 需要的规则面独立成口，不牵动武器/公式/审计。
 struct IMatchRules {
     virtual ~IMatchRules() = default;
     virtual sightline::match::DeathmatchRules Deathmatch() const = 0;
@@ -87,5 +87,23 @@ struct IConfigSource {
     virtual ReloadResult Reload(std::string_view note) = 0;   // 校验→版本→原子替换→发 ConfigChanged
     virtual void Rollback() = 0;                              // 内存快照环 revert，不重读磁盘
 };
+
+/** ep09：GameConfig 组装**单源**（orchestrator.ApplyConfig 与 MatchShards 开房注入共用——
+ *  防双源漂移：新增视图字段改这里一处，两路消费者自动同步） */
+inline sightline::match::GameConfig ComposeGameConfig(const ICombatParams& combat,
+                                                      const IBotTuning& tuning,
+                                                      const IMatchRules& rules,
+                                                      const IConfigVersion& version) {
+    sightline::match::GameConfig c;            // 默认=ep07 常量（视图缺项时安全回退）
+    c.maxHp = combat.MaxHp();
+    for (std::size_t i = 0; i < c.weapons.size(); ++i)
+        c.weapons[i] = combat.Weapon(static_cast<EWeaponType>(i));
+    c.weaponCount = version.Snapshot().weaponCount;
+    c.formula = combat.Formula();
+    c.bot = tuning.Get();
+    c.deathmatch = rules.Deathmatch();
+    c.rewind = rules.Rewind();
+    return c;
+}
 
 } // namespace sightline::application

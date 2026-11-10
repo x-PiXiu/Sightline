@@ -53,7 +53,7 @@ build_deps() {
 build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
-        src/match/match_service.cpp src/adapters/*.cpp \
+        src/match/match_session.cpp src/adapters/*.cpp \
         -o sightline_server -lpthread $LUA_LIB $DB_LIBS
     echo "✓ sightline_server 编译完成"
 }
@@ -63,7 +63,7 @@ build_test() {
     $CXX $FLAGS tests/test_lobby.cpp src/lobby/lobby_service.cpp -o /tmp/test_lobby
     /tmp/test_lobby
     # shellcheck disable=SC2086
-    $CXX $FLAGS tests/test_match.cpp src/match/match_service.cpp src/lobby/lobby_service.cpp \
+    $CXX $FLAGS tests/test_match.cpp src/match/match_session.cpp src/lobby/lobby_service.cpp \
         src/logger/logger.cpp -o /tmp/test_match   # logger：BotDriver 日志依赖（2026-11-05 勘误——
                                                    #  对齐 test 头注释标准行，此前漏致链接失败）
     /tmp/test_match
@@ -94,7 +94,7 @@ build_test() {
         /tmp/test_db_integration
     fi
     # shellcheck disable=SC2086
-    $CXX $FLAGS tests/test_v48.cpp src/match/match_service.cpp -o /tmp/test_v48  # 步骤 6：契约 v4.8
+    $CXX $FLAGS tests/test_v48.cpp src/match/match_session.cpp -o /tmp/test_v48  # 步骤 6：契约 v4.8
     /tmp/test_v48
 }
 

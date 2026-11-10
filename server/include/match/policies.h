@@ -1,7 +1,7 @@
 // policies.h —— ep08 步骤 2：策略端口（v1.6 归属修正）
 // v1.5 曾把本组端口放 include/application/，理由「接口归用例层所有」——但端口的真正拥有者是
 // **消费方**（手册 §四 DIP：接口归「高层」=调用方所有）。IDamagePolicy 的调用方是
-// MatchService::Fire、IBotPolicy 的调用方是 BotDriver，两者都在 match/ 适配链内层；
+// MatchSession::Fire、IBotPolicy 的调用方是 BotDriver，两者都在 match/ 适配链内层；
 // 若端口住 application/（更高编排层），match → application 即成向上依赖（反向）。
 // 故迁回 match/：application/orchestrator 只是**注入方**（依赖方向 application → match ✓），
 // 步骤 4 的 Lua* 实现住适配器层（adapters → match ✓），方向全部向内。

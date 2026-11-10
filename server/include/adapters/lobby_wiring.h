@@ -15,7 +15,7 @@
 #include "application/config_views.h"   // ep08：30 号只读视图端口（适配器→用例，方向向内）
 #include "lobby/lobby.h"
 #include "logger/logger.h"
-#include "match/match_service.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
+#include "match/match_session.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
 #include "net/client_connection.h"
 #include "protocol/messages.h"   // v4 wire 结构体（Encode 唯一落点）
 #include "protocol/msg_ids.h"

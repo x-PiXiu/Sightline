@@ -232,6 +232,18 @@ int LobbyService::PlayerIdByFd(int fd) const {
     return pit == playersByFd_.end() ? -1 : static_cast<int>(pit->second.playerId);
 }
 
+bool LobbyService::RoomIdByPid(uint32_t pid, uint32_t& outRoomId) const {
+    for (const auto& [roomId, room] : rooms_)
+        for (const int fd : room.memberFds) {
+            const auto pit = playersByFd_.find(fd);
+            if (pit != playersByFd_.end() && pit->second.playerId == pid) {
+                outRoomId = roomId;
+                return true;
+            }
+        }
+    return false;   // 人机/未进房者查不到——人机的房归属经 BotInfo.roomId 由驱动器自持
+}
+
 // —— ep07：人机席位 ——
 int LobbyService::AddBot(uint32_t roomId) {
     auto it = rooms_.find(roomId);

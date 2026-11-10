@@ -8,24 +8,25 @@
 #include "adapters/bot_driver.h"
 #include "application/ports.h"
 #include "lobby/lobby.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
+#include "match/match_shards.h"
 
 namespace adapters {
 
 class BotDriverPort final : public sightline::application::IBotDriver {
 public:
     BotDriverPort(BotDriver& driver,
-                  sightline::match::MatchService& match,
+                  sightline::match::MatchShards& shards,
                   sightline::lobby::LobbyService& lobby)
-        : driver_(driver), match_(match), lobby_(lobby) {}
+        : driver_(driver), shards_(shards), lobby_(lobby) {}
 
     std::vector<sightline::application::MatchEvent> Tick(std::uint64_t nowMs) override {
-        return driver_.Tick(nowMs, match_, lobby_);
+        return driver_.Tick(nowMs, shards_, lobby_);
     }
 
 private:
     BotDriver& driver_;
-    sightline::match::MatchService& match_;
+    sightline::match::MatchShards& shards_;
     sightline::lobby::LobbyService& lobby_;
 };
 

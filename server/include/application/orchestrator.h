@@ -14,7 +14,8 @@
 #include "application/durability_policy.h"
 #include "application/ports.h"
 #include "lobby/lobby.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
+#include "match/match_shards.h"
 #include "match/policies.h"        // v1.6：端口已迁 match/（消费方拥有——见 policies.h 头注）
 
 namespace sightline::application {
@@ -32,7 +33,7 @@ struct OrchestratorDeps {
     ILeaderboard&   board;
     IConfigVersion& version;
     IPatchChannel*  patches = nullptr;          // 步骤 4 注入 LuaRuntime；步骤 3 为空
-    match::MatchService&       match;
+    match::MatchShards&        shards;           // ep09：多房分桶容器（TickAll/ApplyConfigAll/OpenRoom）
     IBotDriver&                botDriver;
     lobby::LobbyService&       lobby;            // Ended → SetRoomInMatch 过桥
 };
@@ -48,7 +49,7 @@ public:
         for (const auto& c : d_.commands.Drain()) Dispatch(c);
         const auto now = d_.now();
         auto botEvents   = d_.botDriver.Tick(now);   // 事件源 ②（原 main.cpp:238）
-        auto matchEvents = d_.match.Tick(now);       // 事件源 ①（原 main.cpp:239）
+        auto matchEvents = d_.shards.TickAll(now);   // 事件源 ①（ep09：多房合流——每条自带 roomId）
         Fanout(botEvents);
         Fanout(matchEvents);
         for (const auto& e : matchEvents)
@@ -86,16 +87,8 @@ private:
     // 完整规则快照 → 对局用例（用例层不认识 ConfigService；经五张只读视图组装 GameConfig）。
     // v1.6 收口③：deathmatch/rewind/bot 三组随行——此前只推武器表，改 respawn_ms 不生效。
     void ApplyConfig() {
-        match::GameConfig c;                       // 默认=ep07 常量（视图缺项时安全回退）
-        c.maxHp = d_.combat.MaxHp();
-        for (std::size_t i = 0; i < c.weapons.size(); ++i)
-            c.weapons[i] = d_.combat.Weapon(static_cast<match::EWeaponType>(i));
-        c.weaponCount = d_.version.Snapshot().weaponCount;
-        c.formula = d_.combat.Formula();
-        c.bot = d_.tuning.Get();
-        c.deathmatch = d_.rules.Deathmatch();
-        c.rewind = d_.rules.Rewind();
-        d_.match.SetConfig(c);
+        // ep09：组装逻辑提为 ComposeGameConfig 单源（config_views.h）——MatchShards 开房注入同源
+        d_.shards.ApplyConfigAll(ComposeGameConfig(d_.combat, d_.tuning, d_.rules, d_.version));
     }
 
     void Dispatch(const ConsoleCommand& c) {

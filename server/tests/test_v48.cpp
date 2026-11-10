@@ -3,7 +3,7 @@
 //       17 号 flags bit3~4、换枪状态机与 per-weapon 换弹钟。
 // 铁律：零网络 / 零 Lua / 零 DB，纯字节 + 纯逻辑断言。
 #include "match/fire_judge.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
 #include "protocol/messages.h"
 #include "protocol/msg_ids.h"
 
@@ -106,7 +106,7 @@ int main() {
 
     // ---- 5) 换枪状态机 + per-weapon 换弹钟 ----
     {
-        mc::MatchService m;
+        mc::MatchSession m;
         mc::GameConfig gc;                              // v1.6：SetWeaponTable → SetConfig（完整规则快照）
         gc.weapons = {mc::kDefaultWeaponParams,
                       mc::WeaponParams{20, 12, 1800, 220},
@@ -155,7 +155,7 @@ int main() {
     // ---- 7) 热重载三语义（§3.5 · 步骤 3 验收门：改表不重编，行为按类生效）----
     {
         // 语义① 数值类=下一发即时生效（伤害 25→50，SetConfig 后第二发按新值扣）
-        mc::MatchService m;
+        mc::MatchSession m;
         m.StartMatch(1, {{1, "a", 0}, {2, "b", 0}});
         m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
         m.UpdateEntity(2, 500.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
@@ -169,7 +169,7 @@ int main() {
     }
     {
         // 语义② 倒计时类=在途不动（换弹钟已上，热改 reloadMs 不改写已存到期时刻）
-        mc::MatchService m;
+        mc::MatchSession m;
         m.StartMatch(1, {{1, "a", 0}});
         m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
         CHECK(m.Fire(1, 1500).size() == 1);                     // 打一发（满匣 R 被拒——magUsed=0 门）
@@ -183,7 +183,7 @@ int main() {
     }
     {
         // 语义③ 容量收缩=自愈（magUsed 28 > 新匣 25 → 下一发 MagEmpty 触发自动换弹 → 补到新容量）
-        mc::MatchService m;
+        mc::MatchSession m;
         m.StartMatch(1, {{1, "a", 0}});
         m.UpdateEntity(1, 0.f, 0.f, 90.f, 0.f, 0.f, 0, 1, 1000);
         for (int i = 0; i < 28; ++i) (void)m.Fire(1, 1000 + i * 100);   // 打 28 发（<30 不上钟）

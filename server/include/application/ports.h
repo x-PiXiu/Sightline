@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "application/config_views.h"
-#include "match/match_service.h"
+#include "match/match_session.h"
 
 namespace sightline::application {
 
