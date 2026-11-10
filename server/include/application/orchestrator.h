@@ -33,8 +33,9 @@ struct OrchestratorDeps {
     ILeaderboard&   board;
     IConfigVersion& version;
     IPatchChannel*  patches = nullptr;          // 步骤 4 注入 LuaRuntime；步骤 3 为空
-    match::MatchShards&        shards;           // ep09：多房分桶容器（TickAll/ApplyConfigAll/OpenRoom）
-    IBotDriver&                botDriver;
+    ITickDispatcher&           tick;             // ep09 步骤 3：Serial/Worker 可插拔调度（§4.11）
+    match::MatchShards&        shards;           // 配置传播/指标面（Tick 节拍已归 tick）：多房分桶容器（TickAll/ApplyConfigAll/OpenRoom）
+
     lobby::LobbyService&       lobby;            // Ended → SetRoomInMatch 过桥
 };
 
@@ -48,13 +49,9 @@ public:
         if (stopped_) return;
         for (const auto& c : d_.commands.Drain()) Dispatch(c);
         const auto now = d_.now();
-        auto drainEvents = d_.shards.DrainAndApply(now);   // 事件源 ⓪（ep09：Mailbox 输入先生效——位置/开火/换弹）
-        auto botEvents   = d_.botDriver.Tick(now);   // 事件源 ②（原 main.cpp:238）
-        auto matchEvents = d_.shards.TickAll(now);   // 事件源 ①（ep09：多房合流——每条自带 roomId）
-        Fanout(drainEvents);
-        Fanout(botEvents);
-        Fanout(matchEvents);
-        for (const auto& e : matchEvents)
+        auto events = d_.tick.OnFrameTick(now);      // ep09 步骤 3：drain cmdQ/dataQ+bot+Tick 统一收（§4.11）
+        Fanout(events);
+        for (const auto& e : events)
             if (e.type == MatchEvent::Type::Ended) d_.lobby.SetRoomInMatch(e.roomId, false);
     }
 
@@ -62,11 +59,8 @@ public:
     // v1.6 收口⑥：MatchStart 在此触发 30 号广播——「开局先 15 号后 30 号」的时序归用例层
     // （此前由 FrameWriter 内部在 MatchStart 编码后自播=第二数据入口，已收敛为端口单一入口）。
     void OnWiringEvents(std::vector<MatchEvent> events) {
-        bool bStart = false;
-        for (const auto& e : events)
-            if (e.type == MatchEvent::Type::MatchStart) bStart = true;
-        Fanout(events);                                        // 15 号先出（DeliverMatch）
-        if (bStart) d_.wire.BroadcastConfig(d_.version.Snapshot());   // 30 号随后
+        // v1.6 收口⑥的 30 号随行已并入 Fanout（MatchStart 检测统一）——Serial/Worker 两路同源
+        Fanout(events);                                        // 15 号先出（DeliverMatch）→ 30 号随后
     }
 
     // G4：配置变更是独立域事件，不混进 MatchEvent 流；编排器订阅后写审计 + 触发 30 号广播。
@@ -90,7 +84,7 @@ private:
     // v1.6 收口③：deathmatch/rewind/bot 三组随行——此前只推武器表，改 respawn_ms 不生效。
     void ApplyConfig() {
         // ep09：组装逻辑提为 ComposeGameConfig 单源（config_views.h）——MatchShards 开房注入同源
-        d_.shards.ApplyConfigAll(ComposeGameConfig(d_.combat, d_.tuning, d_.rules, d_.version));
+        d_.shards.ApplyConfigVia(ComposeGameConfig(d_.combat, d_.tuning, d_.rules, d_.version));   // ep09：Serial 直调/Worker cmdQ
     }
 
     void Dispatch(const ConsoleCommand& c) {
@@ -134,6 +128,10 @@ private:
     void Fanout(std::span<const MatchEvent> es) {
         if (es.empty()) return;
         d_.wire.DeliverMatch(es);
+        bool bStart = false;
+        for (const auto& e : es)
+            if (e.type == MatchEvent::Type::MatchStart) bStart = true;
+        if (bStart) d_.wire.BroadcastConfig(d_.version.Snapshot());   // v1.6 收口⑥：15 号后 30 号（两路统一）
         // §5.3 分级（v1.6 收口⑤）：终局/击杀=Must，其余 BestEffort——
         // 决策归纯策略（DurabilityPolicy），执行归 sink（按 QueueAction 真分派，不再
         // 「算出 SpillToWal 却只当 !=DropAndCount 用」的假分派）；状态由执行者自报（State()）。

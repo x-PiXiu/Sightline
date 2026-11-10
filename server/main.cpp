@@ -30,6 +30,7 @@
 #include "adapters/lobby_wiring.h"
 #include "adapters/map_geometry.h"
 #include "match/match_shards.h"
+#include "adapters/serial_dispatcher.h"
 #include "adapters/match_wiring.h"
 #include "adapters/config_service.h"
 #include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
@@ -279,7 +280,9 @@ int main(int argc, char** argv) {
                 return lobby.LocateFromSnapshot(pid, roomId, epoch);
             }},                              // ep09 G1/G3：快照路由源（lobby 原子快照·零锁读）
         sightline::match::MatchShards::kDefaultShardCount};
-    adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver 端口
+    adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver+IBotControl 双端口
+    // ===== ep09 步骤 3：节拍调度器（ITickDispatcher——Serial v1；worker 池刀 B 换 PinnedWorker）=====
+    adapters::SerialDispatcher tickDispatcher{shards, botDriver, lobby};
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
     // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
     // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。
@@ -322,8 +325,8 @@ int main(int argc, char** argv) {
 #if SIGHTLINE_HAS_LUA
             .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
 #endif
+            .tick = tickDispatcher,
             .shards = shards,
-            .botDriver = botDriverPort,
             .lobby = lobby,
         }};
     config.Subscribe([&app, realP](const sightline::application::ConfigChanged& e) {

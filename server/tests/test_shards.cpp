@@ -46,7 +46,9 @@ int main() {
         s.StartMatch(7, {{10, "p10", 0}, {11, "p11", 0}});
         CHECK(shards.Route(10, MakeMove(10, 100.f, 200.f)));
         const auto evs = shards.DrainAndApply(1033);
-        CHECK(evs.empty());                                    // Move 无事件产出（ADR-24）
+        // v3：drain 返回=本帧全部事件（含 Tick 快照）——Move 不产判定类事件（ADR-24 核对点）
+        for (const auto& e : evs)
+            CHECK(e.type != MatchEvent::Type::FireResult && e.type != MatchEvent::Type::Kill);
         const auto* e = s.EntityById(10);
         CHECK(e && e->bHasReport);
         CHECK(std::fabs(e->x - 100.f) < 0.01f && std::fabs(e->y - 200.f) < 0.01f);
@@ -76,7 +78,8 @@ int main() {
         CHECK(shards.Route(10, MakeMove(10, 100.f, 100.f)));   // 投递（快照 (7,1)）
         (*loc.table)[10] = {8, 2};                                 // 玩家已换房（快照变更）
         (void)shards.DrainAndApply(1033);                       // drain：Route 时填的 (7,1) ≠ 最新 (8,2) → 丢
-        CHECK(!s.EntityById(10)->bHasReport);                   // 幽灵位置未写入
+        const auto* e10 = s.EntityById(10);
+        CHECK(!e10 || !e10->bHasReport);                        // 幽灵位置未写入
         CHECK(shards.ActiveRooms() == 1);
     }
 

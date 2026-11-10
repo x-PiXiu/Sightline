@@ -181,25 +181,27 @@ public:
             lobby_.SetRoomInMatch(roomId, true);            // ep07：对局态过桥（对局中拒 JOIN 码5·❗11）
             // v1.6 收口⑥：StartMatch 事件走同一订阅点（编排器在此触发 15 号后 30 号广播
             // + MatchStart 进归档流=战报开档）；未注入回调 = ep07 原路径。
-            auto& session = shards_.OpenRoom(roomId);   // ep09：无则建+注入（幂等）
             {
-                auto evs = session.StartMatch(roomId, entries);
+                // ep09 步骤 3：StartMatchVia（Serial=同帧执行事件走 sink·Worker=cmdQ 事件从合流出）
+                auto evs = shards_.StartMatchVia(roomId, std::move(entries));
                 if (eventSink_) eventSink_(std::move(evs));
                 else writer_.deliverMatch(evs);
             }
             // 活动区数据校验（数据问题数据入口拦——与"掩体压出生点"同族纪律）：出生点在合同地板
             // 之外 → 域已钳入界内（锚/24 号同源），但请挪回地板重烘焙，否则重生/开局仍在钳制边缘
-            if (const auto& g = session.Geometry(); !g.spawnPoints.empty())
+            if (auto* session = shards_.Find(roomId); session) {
+                const auto& g = session->Geometry();       // 活动区校验用合同（空表=跳过）
                 for (std::size_t i = 0; i < g.spawnPoints.size(); ++i) {
                     const auto& sp = g.spawnPoints[i];
-                    if (sp.x < session.PlayMinX() || sp.x > session.PlayMaxX() ||
-                        sp.y < session.PlayMinY() || sp.y > session.PlayMaxY())
+                    if (sp.x < session->PlayMinX() || sp.x > session->PlayMaxX() ||
+                        sp.y < session->PlayMinY() || sp.y > session->PlayMaxY())
                         LOG_WARNING("[活动区] 出生点 " + std::to_string(i) + " (" +
                                     std::to_string(sp.x) + "," + std::to_string(sp.y) +
                                     ") 在地板合同之外——已钳入界内；请挪回地板并重烘焙");
                 }
+            }
             // 人机首报读用例分配结果（Entity::spawnIx）——不传本地 entries：值传递副本里 spawnIndex 全 0
-            if (bot_) bot_->OnMatchStart(roomId, session.Geometry(), session, Now_());
+            // bot 开局链（navGrid/首报）已并入 cmdQ StartMatch 执行体（IBotControl::OnMatchStarted）
         });
         // 26/27：人机席位指令（仅房主——D2-11 同款校验线）
         disp_.on(protocol::MSG_C2S_BOT_ADD, "添加人机",
@@ -225,7 +227,7 @@ public:
             std::string botName = "Bot";
             for (const auto& m : lobby_.RoomRoster(roomId))
                 if (m.playerId == static_cast<std::uint32_t>(pid)) { botName = m.name; break; }
-            if (bot_) bot_->OnBotAdded(roomId, static_cast<std::uint32_t>(pid), botName, msg->difficulty);
+            shards_.RegisterBotVia(roomId, static_cast<std::uint32_t>(pid), botName, msg->difficulty);   // ep09：cmdQ 化
             writer_.deliver(lobby_.RoomStateAndList(roomId));
             LOG_INFO("[人机] 已添加 房=" + std::to_string(roomId) + " pid=" + std::to_string(pid));
         });
@@ -248,7 +250,7 @@ public:
                 return;
             }
             writer_.deliver(lobby_.RemoveBot(msg->botPid));
-            if (bot_) bot_->RemoveBot(msg->botPid);
+            shards_.UnregisterBotVia(msg->botPid);   // ep09：cmdQ 化（快照定位→归属 shard）
             LOG_INFO("[人机] 已移除 pid=" + std::to_string(msg->botPid));
         });
 

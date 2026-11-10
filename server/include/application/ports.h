@@ -79,6 +79,20 @@ struct IPatchChannel {
 struct IBotDriver {
     virtual ~IBotDriver() = default;
     virtual std::vector<MatchEvent> Tick(std::uint64_t nowMs) = 0;
+    // ===== ep09 步骤 3：控制面化（bot 登记经 cmdQ——worker 下主线程零直写 bot 状态）=====
+    virtual void RegisterBot(std::uint32_t roomId, std::uint32_t pid,
+                             const std::string& name, std::uint8_t difficulty) = 0;
+    virtual void UnregisterBot(std::uint32_t pid) = 0;
+};
+
+/** ep09 步骤 3（草案 §4.11·ADR-20）：对局节拍调度端口——Serial/PinnedWorker 可插拔。
+ *  OnFrameTick=每帧从调度器收「本帧全部对局事件」（Serial=ProcessShard 直返；
+ *  Worker=合流区收 worker 产物）。实现归适配器（worker_pool.h），用例层只认端口。 */
+struct ITickDispatcher {
+    virtual ~ITickDispatcher() = default;
+    virtual void Start() = 0;                                              // Worker：起线程；Serial：空
+    virtual void Stop() = 0;                                               // G11 启停序
+    virtual std::vector<MatchEvent> OnFrameTick(std::uint64_t nowMs) = 0;  // 每帧事件合流
 };
 
 } // namespace sightline::application
