@@ -54,12 +54,13 @@ public:
             const auto nowMs = Now_();                       // 注入钟（ADR-1 单钟）——历史环打戳与 Tick/回溯同源
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                            // 未登录/不在房：上报无效
-            auto* session = SessionByPid_(static_cast<uint32_t>(pid));
-            if (!session) return;                           // ep09：不在任何对局房——上报无效
-            auto evs = session->UpdateEntity(static_cast<uint32_t>(pid),
-                                msg->x, msg->y, msg->z, msg->yaw, msg->pitch,
-                                msg->flags, msg->seq, nowMs);   // ep06：接收时刻入历史环（单钟）
-            if (!evs.empty()) { eventSink_ ? eventSink_(std::move(evs)) : writer_.deliverMatch(evs); }
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::Move;
+            in.atMs = nowMs;                                 // ep06：接收时刻入历史环（单钟）
+            in.x = msg->x; in.y = msg->y; in.z = msg->z;
+            in.yaw = msg->yaw; in.pitch = msg->pitch;
+            in.flags = msg->flags; in.seq = msg->seq;
+            (void)shards_.Route(static_cast<uint32_t>(pid), std::move(in));   // ep09：投递化（drain 层消费）
         }, true);
 
         // 22 RTT_REPORT（ep06 回溯量源·1Hz·6B）：客户端心跳自测 RTT 上报——域内钳 1000ms（D6-04）
@@ -76,8 +77,10 @@ public:
                 return static_cast<std::uint16_t>(static_cast<std::uint8_t>(payload[o])) |
                        static_cast<std::uint16_t>(static_cast<std::uint8_t>(payload[o + 1])) << 8;
             };
-            if (auto* session = SessionByPid_(static_cast<std::uint32_t>(pid)))
-                session->SetShooterRtt(static_cast<std::uint32_t>(pid), rd16(0));
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::Rtt;
+            in.rttMs = rd16(0);
+            (void)shards_.Route(static_cast<std::uint32_t>(pid), std::move(in));
             // up/down KB/s（offset 2/4）：ep12 带宽统计消费——本期收下不存
         });
 
@@ -85,7 +88,9 @@ public:
         disp_.on(protocol::MSG_C2S_MOVE_REPORT, "位置上报(v4停用)",
                  [this](int fd, const std::string&) {
             const int pid = lobby_.PlayerIdByFd(fd);
-            const auto* session = pid >= 0 ? SessionByPid_(static_cast<std::uint32_t>(pid)) : nullptr;
+            std::uint32_t rid = 0, ep = 0;
+            const auto* session = pid >= 0 ? shards_.Find(
+                (lobLocate_(static_cast<std::uint32_t>(pid), rid, ep), rid)) : nullptr;
             if (session && session->IsActive(static_cast<std::uint32_t>(pid))) {
                 LOG_WARNING("[位置上报] v4 R10：对局期 16 已停用 fd=" + std::to_string(fd));
                 return;
@@ -107,12 +112,11 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                             // 未登录：无效
-            auto* session = SessionByPid_(static_cast<std::uint32_t>(pid));
-            if (!session) return;                            // ep09：不在任何对局房——开火无效
-            LOG_INFO("[开火·请求] shooter=" + std::to_string(pid) + " fd=" + std::to_string(fd));
-            auto events = session->Fire(static_cast<std::uint32_t>(pid), Now_());   // 注入钟（ADR-1 单钟）
-            if (eventSink_) eventSink_(std::move(events));     // ep08：Fire 事件源交编排器
-            else writer_.deliverMatch(events);                 // 未注入 = ep07 原路径
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::Fire;
+            in.atMs = Now_();                                // 注入钟（ADR-1 单钟·judgeAt 采样源）
+            (void)shards_.Route(static_cast<std::uint32_t>(pid), std::move(in));   // ep09：投递化
+            // Fire 事件经 DrainAndApply 产出→编排器统一扇出（B1 三源统一点不变）
         }, true);
 
         // 29：自主换弹（2026-11-05·空 payload）——换弹钟权威在服务器；静默布尔落 INFO 日志
@@ -124,8 +128,10 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;                             // 未登录：无效
-            auto* session = SessionByPid_(static_cast<std::uint32_t>(pid));
-            if (session && session->Reload(static_cast<std::uint32_t>(pid), Now_()))
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::Reload;
+            in.atMs = Now_();
+            if (shards_.Route(static_cast<std::uint32_t>(pid), std::move(in)))
                 LOG_INFO("[换弹·请求] shooter=" + std::to_string(pid));
         });
 
@@ -142,17 +148,12 @@ public:
             }
             const int pid = lobby_.PlayerIdByFd(fd);
             if (pid < 0) return;
-            std::string why;
-            auto* session = SessionByPid_(static_cast<std::uint32_t>(pid));
-            if (!session || !session->SwitchWeapon(static_cast<std::uint32_t>(pid), msg->weaponType, Now_(), &why)) {
-                LOG_INFO("[换枪] 拒绝 pid=" + std::to_string(pid) + " type=" +
-                         std::to_string(msg->weaponType) + " 原因=" + why);
-                LOG_INFO("[换枪] 拒绝 pid=" + std::to_string(pid) +
-                         " type=" + std::to_string(msg->weaponType));
-                return;
-            }
-            LOG_INFO("[换枪] pid=" + std::to_string(pid) + " → type=" +
-                     std::to_string(msg->weaponType) + "（新枪满匣·在途换弹取消）");
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::SwitchWeapon;
+            in.atMs = Now_();
+            in.flags = msg->weaponType;                      // weaponType 复用 flags 字节位（1B 载荷）
+            (void)shards_.Route(static_cast<std::uint32_t>(pid), std::move(in));
+            // 拒绝原因（why 出参）随投递化归 drain 层静默——28 号本就"被拒无回执"，日志降级可接受
         });
 
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
@@ -267,12 +268,9 @@ private:
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count());
     }
-    /** ep09 多房路由：fd→pid→roomId→session（Serial v1 直调形；Mailbox/epoch 在步骤 2 接管）。
-     *  反查 O(房数×4)——个位房数量级够用，索引化留压测归因（草案 §4.8）。 */
-    sightline::match::MatchSession* SessionByPid_(std::uint32_t pid) {
-        std::uint32_t roomId = 0;
-        if (!lobby_.RoomIdByPid(pid, roomId)) return nullptr;
-        return shards_.Find(roomId);
+    /** ep09 步骤 2：快照定位（16 号日志用）——正式路由已投递化（Route） */
+    bool lobLocate_(std::uint32_t pid, std::uint32_t& roomId, std::uint32_t& epoch) {
+        return lobby_.LocateFromSnapshot(pid, roomId, epoch);
     }
     // fd → PlayerId 翻译 → 对局离场（不在局则空转）
     void HandleMemberGone(int fd) {
@@ -280,11 +278,10 @@ private:
         if (pid < 0) return;
         // v1.6：离场事件同走订阅点（EntityLeave 进归档流=战报完整性）；未注入=原路径
         {
-            auto* session = SessionByPid_(static_cast<uint32_t>(pid));
-            if (!session) return;                           // ep09：不在任何对局房——离场空转
-            auto evs = session->RemovePlayer(static_cast<uint32_t>(pid));
-            if (eventSink_) eventSink_(std::move(evs));
-            else writer_.deliverMatch(evs);
+            sightline::match::MatchInput in;
+            in.kind = sightline::match::MatchInput::Kind::RemovePlayer;   // 数据面 FIFO 保序（G1 配套）
+            (void)shards_.Route(static_cast<uint32_t>(pid), std::move(in));
+            // 离场事件经 DrainAndApply 产出→编排器统一扇出（EntityLeave 进归档流不变）
         }
     }
 

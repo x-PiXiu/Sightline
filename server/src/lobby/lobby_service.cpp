@@ -56,6 +56,7 @@ std::vector<Event> LobbyService::LeaveInternal(int fd) {
     list.rooms = Snapshot();
     list.count = list.rooms.size();
     out.push_back(std::move(list));
+    RebuildSnapshot_();                               // ep09 G3：出房/解散→快照重建
     return out;
 }
 
@@ -142,6 +143,8 @@ std::vector<Event> LobbyService::CreateRoom(int fd, const std::string& roomName)
     const uint32_t roomId = room.roomId;
     rooms_.emplace(roomId, std::move(room));
     roomByFd_.emplace(fd, roomId);
+    ++pit->second.roomEpoch;                            // ep09 G1：进房自增
+    RebuildSnapshot_();                                 // ep09 G3
 
     out.push_back({EvType::CreateOk, fd, 0, roomId});
     auto pushes = RoomStateAndList(roomId);
@@ -161,6 +164,8 @@ std::vector<Event> LobbyService::Join(int fd, uint32_t roomId) {
 
     room.memberFds.push_back(fd);
     roomByFd_.emplace(fd, roomId);
+    ++pit->second.roomEpoch;                            // ep09 G1：进房自增（旧房在途输入判旧）
+    RebuildSnapshot_();                                 // ep09 G3：成员表变更→快照重建
     out.push_back({EvType::JoinOk, fd, 0, roomId, 0, room.memberFds.size()});
     auto pushes = RoomStateAndList(roomId);
     out.insert(out.end(), pushes.begin(), pushes.end());
@@ -233,15 +238,33 @@ int LobbyService::PlayerIdByFd(int fd) const {
 }
 
 bool LobbyService::RoomIdByPid(uint32_t pid, uint32_t& outRoomId) const {
-    for (const auto& [roomId, room] : rooms_)
+    uint32_t epoch = 0;
+    return LocateFromSnapshot(pid, outRoomId, epoch);
+}
+
+bool LobbyService::LocateFromSnapshot(uint32_t pid, uint32_t& outRoomId, uint32_t& outEpoch) const {
+    const auto snap = snap_.load(std::memory_order_acquire);   // 原子取当前快照（零锁读）
+    const auto it = snap->pidRoomEpoch.find(pid);
+    if (it == snap->pidRoomEpoch.end()) return false;          // 不在房/人机外未知 pid——在途判旧即丢
+    outRoomId = it->second.first;
+    outEpoch = it->second.second;
+    return true;
+}
+
+void LobbyService::RebuildSnapshot_() {
+    auto snap = std::make_shared<LobbySnapshot>();   // 构建期非 const，store 时隐式转 const
+    for (const auto& [rid, room] : rooms_) {
         for (const int fd : room.memberFds) {
             const auto pit = playersByFd_.find(fd);
-            if (pit != playersByFd_.end() && pit->second.playerId == pid) {
-                outRoomId = roomId;
-                return true;
-            }
+            if (pit != playersByFd_.end())
+                snap->pidRoomEpoch.emplace(pit->second.playerId,
+                                           std::make_pair(rid, pit->second.roomEpoch));
         }
-    return false;   // 人机/未进房者查不到——人机的房归属经 BotInfo.roomId 由驱动器自持
+        for (const auto& b : bots_)
+            if (b.roomId == rid)
+                snap->pidRoomEpoch.emplace(b.playerId, std::make_pair(rid, 1u));   // 人机恒 epoch=1
+    }
+    snap_.store(std::move(snap), std::memory_order_release);
 }
 
 // —— ep07：人机席位 ——
@@ -257,6 +280,7 @@ int LobbyService::AddBot(uint32_t roomId) {
     // 命名带房间内序号（2026-11-03 用户令：三人机都叫"Bot"→ 播报"Bot 击杀了 Bot"分不清谁是谁）
     const std::string name = "Bot" + std::to_string(botCount + 1);
     bots_.push_back({pid, name, roomId});
+    RebuildSnapshot_();                                 // ep09 G3：人机席位进快照（恒 epoch=1）
     return static_cast<int>(pid);
 }
 
@@ -269,6 +293,7 @@ std::vector<Event> LobbyService::RemoveBot(uint32_t botPid) {
             if (rooms_.count(roomId)) out = RoomStateAndList(roomId);   // 成员变化 → 标准推送
             return out;
         }
+    RebuildSnapshot_();                               // ep09 G3
     return out;
 }
 

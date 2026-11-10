@@ -3,7 +3,9 @@
 //           一切"该通知谁"以领域事件返回，由外层 FrameWriter 翻译成帧（可脱离网络纯单测）。
 #pragma once
 #include <cstddef>
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -20,6 +22,14 @@ struct Player {
     uint32_t playerId = 0;
     std::string name;          // 全服唯一（服务器查重）
     int connFd = 0;            // 回包通道（适配层知道它是什么）
+    uint32_t roomEpoch = 0;    // ep09 G1：每次进房自增（换房/重进的在途输入判旧依据）
+};
+
+/** ep09 G1/G3：房间成员不可变快照（atomic 换指针——复用 ConfigService 手法）。
+ *  构建线程=主线程（成员表变更 <1/s）；读方=对局输入路由（worker 版高频零锁读）。
+ *  只含「在房」pid；人机恒 epoch=1（服务器权威实体，无在途判旧需求——epoch 恒定即不过滤）。 */
+struct LobbySnapshot {
+    std::unordered_map<uint32_t, std::pair<uint32_t, uint32_t>> pidRoomEpoch;   // pid → (roomId, epoch)
 };
 
 struct Room {
@@ -103,6 +113,9 @@ public:
      *  实现遍历 rooms_×memberFds 比对 playersByFd_（O(房数×4)，房个位数量级够用；
      *  索引化留压测归因——草案 §4.8 的 immutable snapshot 是步骤 2 的并发化形态） */
     bool RoomIdByPid(uint32_t pid, uint32_t& outRoomId) const;
+    /** ep09 G1/G3：快照版查询（O(1) 哈希·零锁）——对局输入路由的唯一入口；
+     *  RoomIdByPid 扫描版退役（调用方已全部切本接口） */
+    bool LocateFromSnapshot(uint32_t pid, uint32_t& outRoomId, uint32_t& outEpoch) const;
     std::vector<RoomMemberInfo> RoomRoster(uint32_t roomId) const;  // 按加入序（首位=房主；ep07 尾部并人机）
     // —— ep07：人机席位 + 对局状态过桥 ——
     int  AddBot(uint32_t roomId);                       // 分配 pid+登记（房不存在/满 → -1）
@@ -132,6 +145,10 @@ public:
     std::vector<BotInfo> bots_;                          // ep07：人机席位（无 fd·房间解散时清）
     std::unordered_map<uint32_t, bool> roomInMatch_;     // ep07：房间对局态（Join 过桥·D3-15 经适配层）
     uint32_t nextPlayerId_ = 1;
+    // ===== ep09 G1/G3：成员快照（atomic 换指针）=====
+    std::atomic<std::shared_ptr<const LobbySnapshot>> snap_{
+        std::make_shared<const LobbySnapshot>()};
+    void RebuildSnapshot_();
     uint32_t nextRoomId_ = 1;
 };
 

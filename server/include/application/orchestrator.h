@@ -48,8 +48,10 @@ public:
         if (stopped_) return;
         for (const auto& c : d_.commands.Drain()) Dispatch(c);
         const auto now = d_.now();
+        auto drainEvents = d_.shards.DrainAndApply(now);   // 事件源 ⓪（ep09：Mailbox 输入先生效——位置/开火/换弹）
         auto botEvents   = d_.botDriver.Tick(now);   // 事件源 ②（原 main.cpp:238）
         auto matchEvents = d_.shards.TickAll(now);   // 事件源 ①（ep09：多房合流——每条自带 roomId）
+        Fanout(drainEvents);
         Fanout(botEvents);
         Fanout(matchEvents);
         for (const auto& e : matchEvents)

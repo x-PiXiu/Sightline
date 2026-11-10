@@ -274,7 +274,10 @@ int main(int argc, char** argv) {
             .damage   = nullptr,             // 策略注入段 SetSharedDamage（HAS_LUA 分支后定案）
             .currentConfig = [&config] {
                 return sightline::application::ComposeGameConfig(config, config, config, config);
-            }},                              // 组装单源=ComposeGameConfig（防与 ApplyConfig 双源漂移）
+            },                               // 组装单源=ComposeGameConfig（防与 ApplyConfig 双源漂移）
+            .locate = [&lobby](std::uint32_t pid, std::uint32_t& roomId, std::uint32_t& epoch) {
+                return lobby.LocateFromSnapshot(pid, roomId, epoch);
+            }},                              // ep09 G1/G3：快照路由源（lobby 原子快照·零锁读）
         sightline::match::MatchShards::kDefaultShardCount};
     adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver 端口
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。

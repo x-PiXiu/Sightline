@@ -84,6 +84,8 @@ build_test() {
     fi
     if [ -n "$DB_LIBS" ]; then
         # shellcheck disable=SC2086
+        $CXX $FLAGS tests/test_shards.cpp src/match/match_session.cpp -o /tmp/test_shards
+        /tmp/test_shards   # ep09 步骤 2：多房容器+Mailbox（G1/G3/E8 契约·零 IO）
         $CXX $FLAGS tests/test_persistence.cpp src/adapters/persistence.cpp \
             src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp \
             src/adapters/audit_wal.cpp src/logger/logger.cpp \
