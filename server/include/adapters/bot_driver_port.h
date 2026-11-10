@@ -29,7 +29,7 @@ public:
                      const std::string& name, std::uint8_t difficulty) override {
         driver_.OnBotAdded(roomId, pid, name, difficulty);
     }
-    void UnregisterBot(std::uint32_t pid) override { driver_.RemoveBot(pid); }
+    void UnregisterBot(std::uint32_t roomId, std::uint32_t pid) override { driver_.RemoveBot(roomId, pid); }
     // —— sightline::match::IBotControl（cmdQ 执行体调——RegisterBot/UnregisterBot 同名转发）——
     void OnMatchStarted(std::uint32_t roomId, const sightline::match::MapGeometry& geo,
                         sightline::match::MatchSession& session, std::uint64_t nowMs) override {

@@ -31,6 +31,7 @@
 #include "adapters/map_geometry.h"
 #include "match/match_shards.h"
 #include "adapters/serial_dispatcher.h"
+#include "adapters/worker_pool.h"
 #include "adapters/match_wiring.h"
 #include "adapters/config_service.h"
 #include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
@@ -264,11 +265,12 @@ int main(int argc, char** argv) {
     adapters::TcpCommandListener cmdPort(commands,
         static_cast<unsigned>(EnvOr("SIGHTLINE_CMD_PORT", "18889").empty()
                                   ? 18889 : std::atoi(EnvOr("SIGHTLINE_CMD_PORT", "18889").c_str())));
-    adapters::BotDriver botDriver;                          // ep07 人机驱动（主线程·零锁）
     // ===== ep09 步骤 1：多房分桶容器（MatchShards——OpenRoom/Find/TickAll/ApplyConfigAll）=====
     // v1 SerialDispatcher 形态：主线程顺序 TickAll；worker 池在步骤 3 接管同一结构。
     // geometry 持有在此（ShardDeps 延迟注入——开房发生在 wiring 运行期，晚于下方装载段）
     std::optional<sightline::match::MapGeometry> mapGeo;
+    // ep09 步骤 3：SIGHTLINE_WORKERS=1 → PinnedWorker 分桶（4 worker 错相 8ms）；默认 Serial 保底
+    const bool useWorkers = EnvOr("SIGHTLINE_WORKERS", "0") == "1";
     sightline::match::MatchShards shards{
         sightline::match::ShardDeps{
             .geometry = nullptr,             // 启动期装载段 SetSharedGeometry（见下）
@@ -279,10 +281,18 @@ int main(int argc, char** argv) {
             .locate = [&lobby](std::uint32_t pid, std::uint32_t& roomId, std::uint32_t& epoch) {
                 return lobby.LocateFromSnapshot(pid, roomId, epoch);
             }},                              // ep09 G1/G3：快照路由源（lobby 原子快照·零锁读）
-        sightline::match::MatchShards::kDefaultShardCount};
+        sightline::match::MatchShards::kDefaultShardCount,
+        useWorkers ? sightline::match::MatchShards::Mode::Worker
+                   : sightline::match::MatchShards::Mode::Serial};
+    adapters::BotDriver botDriver{shards.shardCount()};      // ep09：分桶化（byShard_ 与容器同构）
     adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver+IBotControl 双端口
     // ===== ep09 步骤 3：节拍调度器（ITickDispatcher——Serial v1；worker 池刀 B 换 PinnedWorker）=====
-    adapters::SerialDispatcher tickDispatcher{shards, botDriver, lobby};
+    std::unique_ptr<sightline::application::ITickDispatcher> tickDispatcher;
+    if (useWorkers)
+        tickDispatcher = std::make_unique<adapters::WorkerPool>(shards, botDriver, lobby,
+                                                                shards.shardCount());
+    else
+        tickDispatcher = std::make_unique<adapters::SerialDispatcher>(shards, botDriver, lobby);
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
     // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
     // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。
@@ -325,7 +335,7 @@ int main(int argc, char** argv) {
 #if SIGHTLINE_HAS_LUA
             .patches = patchChan,      // 步骤 4：patch <name> 命令经此端口（编排器不知 Lua 存在）
 #endif
-            .tick = tickDispatcher,
+            .tick = *tickDispatcher,
             .shards = shards,
             .lobby = lobby,
         }};
@@ -344,6 +354,7 @@ int main(int argc, char** argv) {
         if (auto geometry = adapters::LoadMapGeometry(path)) {
             mapGeo = std::move(*geometry);                  // ep09：提升作用域——开房注入经 SetSharedGeometry
             shards.SetSharedGeometry(&*mapGeo);
+            botDriver.PrebuildNav(*mapGeo);                 // ep09 G6：nav/航点启动期只读共享（消 worker 竞态）
             const sightline::match::MapGeometry& geo = *mapGeo;   // 后续日志/自检改用引用语法（原 optional->）
             LOG_INFO("[几何合同] 装载 path=" + path +
                      " 盒=" + std::to_string(geo.occluders.boxes.size()) +
@@ -437,6 +448,7 @@ int main(int argc, char** argv) {
             LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
             writer.deliver(lobby.ShutdownBroadcast());
             app.Shutdown();          // ep08：停止接帧
+            tickDispatcher->Stop();  // ep09 G11：worker 停收→join（Serial 空操作）——残余 Mailbox 随停机序丢弃
 #if SIGHTLINE_HAS_DB
             if (realP) realP->Shutdown();   // 步骤 5（B6）：停 ingest → 2s 排水 → join worker
 #endif

@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include "net/channel.h"
 #include "net/event_loop.h"
 #include "net/inet_address.h"
 #include "net/buffer.h"

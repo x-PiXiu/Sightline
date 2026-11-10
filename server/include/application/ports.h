@@ -82,7 +82,7 @@ struct IBotDriver {
     // ===== ep09 步骤 3：控制面化（bot 登记经 cmdQ——worker 下主线程零直写 bot 状态）=====
     virtual void RegisterBot(std::uint32_t roomId, std::uint32_t pid,
                              const std::string& name, std::uint8_t difficulty) = 0;
-    virtual void UnregisterBot(std::uint32_t pid) = 0;
+    virtual void UnregisterBot(std::uint32_t roomId, std::uint32_t pid) = 0;
 };
 
 /** ep09 步骤 3（草案 §4.11·ADR-20）：对局节拍调度端口——Serial/PinnedWorker 可插拔。

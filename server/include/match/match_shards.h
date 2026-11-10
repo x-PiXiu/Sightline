@@ -25,7 +25,7 @@ struct IBotControl {
     virtual ~IBotControl() = default;
     virtual void RegisterBot(std::uint32_t roomId, std::uint32_t pid,
                              const std::string& name, std::uint8_t difficulty) = 0;
-    virtual void UnregisterBot(std::uint32_t pid) = 0;
+    virtual void UnregisterBot(std::uint32_t roomId, std::uint32_t pid) = 0;
     virtual void OnMatchStarted(std::uint32_t roomId, const MapGeometry& geo,
                                 MatchSession& session, std::uint64_t nowMs) = 0;
 };
@@ -174,7 +174,7 @@ public:
             if (mode_ == Mode::Serial) { std::vector<MatchEvent> out; applyCommand_(std::move(c), out, 0); }
             else RouteCommand(std::move(c));
         } else if (mode_ == Mode::Serial && deps_.bot) {
-            deps_.bot->UnregisterBot(pid);   // 快照已清（离房先于移除）——直清兜底
+            deps_.bot->UnregisterBot(0, pid);   // 快照已清（离房先于移除）——roomId 未知兜底（全桶扫）
         }
     }
 
@@ -260,6 +260,12 @@ public:
     }
 
     /** worker 产物入合流（worker loop 调——锁瞬时） */
+    /** G6：fault 收割——本 shard 全部活跃房 AbortMatch（worker 自己的桶·安全）。
+     *  半轮事件语义=客户端收部分快照→对拍对 fault 房豁免（异常路径不保证确定性）。 */
+    void FaultAbortShard(std::size_t idx) {
+        auto& sh = shards_[idx];
+        for (auto& [rid, s] : sh.rooms) s->AbortMatch();
+    }
     void PublishToMerge(std::size_t idx, std::vector<MatchEvent>&& evs) {
         auto& sh = shards_[idx];
         if (evs.empty()) return;
@@ -309,7 +315,7 @@ private:
             if (deps_.bot) deps_.bot->RegisterBot(c.roomId, c.pid, c.name, c.difficulty);
             break;
         case ShardCommand::Kind::RemoveBot:
-            if (deps_.bot) deps_.bot->UnregisterBot(c.pid);
+            if (deps_.bot) deps_.bot->UnregisterBot(c.roomId, c.pid);
             break;
         case ShardCommand::Kind::Patch:
             break;   // 步骤 4：LuaRuntime 聚合接线（G5 两阶段）

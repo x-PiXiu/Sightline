@@ -86,6 +86,8 @@ build_test() {
         # shellcheck disable=SC2086
         $CXX $FLAGS tests/test_shards.cpp src/match/match_session.cpp -o /tmp/test_shards
         /tmp/test_shards   # ep09 步骤 2：多房容器+Mailbox（G1/G3/E8 契约·零 IO）
+        $CXX $FLAGS -pthread tests/test_workers.cpp src/match/match_session.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_workers $LUA_LIB
+        /tmp/test_workers   # ep09 步骤 3：WorkerPool 并发（真线程·TSan L1 靶场）
         $CXX $FLAGS tests/test_persistence.cpp src/adapters/persistence.cpp \
             src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp \
             src/adapters/audit_wal.cpp src/logger/logger.cpp \

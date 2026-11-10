@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -40,27 +41,34 @@ inline sightline::match::Vec2 ClampMoveTarget(const sightline::match::NavGrid& g
 
 class BotDriver {
 public:
+    /** ep09 步骤 3：分桶化——byRoom_ → byShard_（每 shard 一张房表）——worker 只碰自己的桶
+     *  （OnBotAdded/RemoveBot/Tick 全经 cmdQ/归属 worker；跨 worker 零共享=零竞态）。
+     *  shardCount=1 即 Serial 单桶（行为与旧 byRoom_ 全等）。 */
+    explicit BotDriver(std::size_t shardCount = 1)
+        : byShard_(shardCount ? shardCount : 1),
+          waypointsByShard_(byShard_.size()) {}
+
     /** 26 号：席位登记（FSM 初始态；进对局前的房内待命） */
     void OnBotAdded(std::uint32_t roomId, std::uint32_t pid, const std::string& name,
                     std::uint8_t difficulty) {
-        byRoom_[roomId].push_back(Bot{pid, name, difficulty});
+        byShard_[roomId % byShard_.size()][roomId].push_back(Bot{pid, name, difficulty});
         LOG_INFO("[人机] 席位登记 房=" + std::to_string(roomId) + " pid=" + std::to_string(pid) +
                  " 名=" + name + " 难度=" + std::to_string(difficulty));
     }
 
     /** 27 号：移除席位 */
-    void RemoveBot(std::uint32_t pid) {
-        for (auto& [roomId, list] : byRoom_)
-            for (std::size_t i = 0; i < list.size(); ++i)
-                if (list[i].pid == pid) {
-                    LOG_INFO("[人机] 席位移除 pid=" + std::to_string(pid));
-                    list.erase(list.begin() + static_cast<long>(i));
-                    return;
-                }
+    void RemoveBot(std::uint32_t roomId, std::uint32_t pid) {
+        auto& byRoom = byShardAt_(roomId);
+        auto rit = byRoom.find(roomId);
+        if (rit == byRoom.end()) return;
+        auto& list = rit->second;
+        for (auto it = list.begin(); it != list.end(); ++it)
+            if (it->pid == pid) { list.erase(it); break; }
+        if (list.empty()) byRoom.erase(roomId);
     }
 
     bool OwnsBot(std::uint32_t pid) const {
-        for (const auto& [_, list] : byRoom_)
+        for (const auto& byRoom : byShard_) for (const auto& [_, list] : byRoom)
             for (const auto& b : list)
                 if (b.pid == pid) return true;
         return false;
@@ -72,18 +80,23 @@ public:
      *  = 所有人机叠在房主出生点（客户端胶囊互挤+零距互射） */
     void OnMatchStart(std::uint32_t roomId, const sightline::match::MapGeometry& geo,
                       sightline::match::MatchSession& match, std::uint64_t nowMs) {
-        auto it = byRoom_.find(roomId);
-        if (it == byRoom_.end()) return;
-        nav_ = sightline::match::BuildNavGrid(geo.occluders);
-        navBuilt_ = true;
-        // 航点表（每局重建——不跨局累加）：合同 patrolPoints 优先，否则 spawnPoints 世界位轮转，再否则场心环
-        waypoints_.clear();
+        auto it = byShardAt_(roomId).find(roomId);
+        if (it == byShardAt_(roomId).end()) return;
+        // nav：Prebuild 优先（main 装配期）——未 Prebuild（测试/兜底路径）惰性构建（布尔竞态=幂等双建无害）
+        if (!navBuilt_) {
+            nav_ = sightline::match::BuildNavGrid(geo.occluders);
+            navBuilt_ = true;
+        }
+        // 航点 per-shard（同 shard 单写者——OnMatchStarted 经 cmdQ 在归属线程执行）：
+        // 合同 patrolPoints 优先，否则 spawnPoints 世界位，再否则场心环——patrolPoints 静态=与旧"每局重建"语义等价
+        auto& waypoints = waypointsByShard_[roomId % waypointsByShard_.size()];
+        waypoints.clear();
         if (!geo.patrolPoints.empty()) {
-            for (const auto& p : geo.patrolPoints) waypoints_.push_back({p.x, p.y});
+            for (const auto& p : geo.patrolPoints) waypoints.push_back({p.x, p.y});
         } else if (!geo.spawnPoints.empty()) {
-            for (const auto& s : geo.spawnPoints) waypoints_.push_back({s.x, s.y});
+            for (const auto& s : geo.spawnPoints) waypoints.push_back({s.x, s.y});
         } else {
-            waypoints_ = {{300.f, -300.f}, {-300.f, 300.f}, {300.f, 300.f}, {-300.f, -300.f}};
+            waypoints = {{300.f, -300.f}, {-300.f, 300.f}, {300.f, 300.f}, {-300.f, -300.f}};
         }
         if (!geo.spawnPoints.empty() && match.Entities().size() > geo.spawnPoints.size())
             LOG_WARNING("[人机] 出生点不足：本局 " + std::to_string(match.Entities().size()) +
@@ -97,7 +110,7 @@ public:
             b.mem = sightline::match::BotMemory{};
             b.path.reset();
             b.pathI = 0;
-            b.wp = b.pid % waypoints_.size();                // 航点错开（相邻 pid 走不同航点）
+            b.wp = b.pid % waypoints.size();                 // 航点错开（相邻 pid 走不同航点）
             b.seq = 0;
             b.lastFireReqMs = 0;
             b.lastTickMs = nowMs;
@@ -116,8 +129,8 @@ public:
 
     /** 结束/中止：FSM 与记忆重置（席位保留——"再来一局"直接可用） */
     void OnMatchEnd(std::uint32_t roomId) {
-        auto it = byRoom_.find(roomId);
-        if (it == byRoom_.end()) return;
+        auto it = byShardAt_(roomId).find(roomId);
+        if (it == byShardAt_(roomId).end()) return;
         for (auto& b : it->second) {
             b.st = sightline::match::BotState::Patrol;
             b.mem = sightline::match::BotMemory{};
@@ -125,7 +138,7 @@ public:
         }
     }
 
-    void ClearRoom(std::uint32_t roomId) { byRoom_.erase(roomId); }
+    void ClearRoom(std::uint32_t roomId) { byShardAt_(roomId).erase(roomId); }
 
     /** 主循环 33ms tick（唯一驱动点·主线程）：自愈检查 + 逐人机 感知→决策→行动。
      *  返回人机开火产出的领域事件（21 判定 / 23 击杀）——"同真人入口"不止同进还要同出：真人的 Fire
@@ -139,22 +152,24 @@ public:
         std::vector<sightline::match::MatchEvent> out;
         // 自愈（❗12）：房间已解散（最后真人离开）→ 清场+中止本房对局（Find 到才 abort——
         // 多房下 Find(roomId) 即"本房局"，不存在单例时代的跨房误杀问题）
-        for (auto it = byRoom_.begin(); it != byRoom_.end();) {
+        for (auto& byRoom : byShard_)
+        for (auto it = byRoom.begin(); it != byRoom.end();) {
             if (!lobby.HasRoom(it->first)) {
                 auto* s = shards.Find(it->first);
                 if (s) s->AbortMatch();
                 LOG_INFO("[人机] 房间已解散 → " + std::string(s ? "AbortMatch + " : "") +
                          "清场 房=" + std::to_string(it->first));
-                it = byRoom_.erase(it);
+                it = byRoom.erase(it);
             } else {
                 ++it;
             }
         }
-        if (!navBuilt_) return out;
-        for (auto& [roomId, list] : byRoom_) {
+        if (!navBuilt_ || waypointsByShard_.empty()) return out;
+        for (auto& byRoom : byShard_)
+        for (auto& [roomId, list] : byRoom) {
             auto* session = shards.Find(roomId);
             if (!session || session->IsEnded()) continue;    // 未开局/终局：本房 bot 静默（快照保留期）
-            for (auto& b : list) TickOne(b, nowMs, *session, out);
+            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], out);
         }
         return out;
     }
@@ -205,6 +220,7 @@ private:
     }
 
     void TickOne(Bot& b, std::uint64_t nowMs, sightline::match::MatchSession& match,
+                 const std::vector<sightline::match::Vec2>& waypoints,
                  std::vector<sightline::match::MatchEvent>& out) {
         const sightline::match::Entity* E = match.EntityById(b.pid);
         if (!E || !E->bHasReport) { b.lastTickMs = nowMs; return; }   // 未在局/未激活：静默
@@ -246,7 +262,7 @@ private:
         w.visible = visible;
         if (b.mem.hasLastKnown) w.lastKnown = sightline::match::Vec3{b.mem.lastKnown.x, b.mem.lastKnown.y, 0.f};
         // 巡逻目标=驱动器航点表（此前读的是从未填充的每人机空表 → patrolTarget 落默认 (0,0)：人机全奔场心扎堆）
-        if (!waypoints_.empty()) w.patrolTarget = waypoints_[b.wp % waypoints_.size()];
+        if (!waypoints.empty()) w.patrolTarget = waypoints[b.wp % waypoints.size()];
 
         // ── 行动·移动（栅格寻路兜底：LOS 直行 / 否则 A* 路径逐段走）──
         // 收口②：决策走策略端口（未注入=内建 Decide 原路径——238 断言零变化；注入后
@@ -280,8 +296,8 @@ private:
                 }
             }
             // 航点推进（巡逻环）
-            if (!waypoints_.empty()) {
-                const auto& wp = waypoints_[b.wp % waypoints_.size()];
+            if (!waypoints.empty()) {
+                const auto& wp = waypoints[b.wp % waypoints.size()];
                 const float dx = b.x - wp.x, dy = b.y - wp.y;
                 if (dx * dx + dy * dy < 60.f * 60.f) ++b.wp;
             }
@@ -319,10 +335,57 @@ private:
         b.y += dy / len * step;
     }
 
-    std::unordered_map<std::uint32_t, std::vector<Bot>> byRoom_;
+    // ===== ep09 步骤 3：per-shard 分桶（worker 版只碰自己的桶——byShard_[idx] 单写者）=====
+    std::vector<std::map<std::uint32_t, std::vector<Bot>>> byShard_;
+    std::map<std::uint32_t, std::vector<Bot>>& byShardAt_(std::uint32_t roomId) {
+        return byShard_[roomId % byShard_.size()];
+    }
+
+public:
+    /** worker 版 per-shard 驱动（E3 直调·事件入调用方 out——PublishToMerge 由 worker loop 做）。
+     *  只遍历 byShard_[idx]——跨 worker 零共享。自愈同样只管本桶（别的桶别的 worker 自愈）。 */
+    void TickShard(std::uint64_t nowMs, sightline::match::MatchShards& shards,
+                   sightline::lobby::LobbyService& lobby,
+                   std::size_t idx, std::vector<sightline::match::MatchEvent>& out) {
+        if (idx >= byShard_.size()) return;
+        auto& byRoom = byShard_[idx];
+        for (auto it = byRoom.begin(); it != byRoom.end();) {
+            if (!lobby.HasRoom(it->first)) {
+                auto* s = shards.Find(it->first);
+                if (s) s->AbortMatch();
+                LOG_INFO("[人机] 房间已解散 → " + std::string(s ? "AbortMatch + " : "") +
+                         "清场 房=" + std::to_string(it->first));
+                it = byRoom.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        if (!navBuilt_ || waypointsByShard_.empty()) return;
+        for (auto& [roomId, list] : byRoom) {
+            auto* session = shards.Find(roomId);
+            if (!session || session->IsEnded()) continue;    // 未开局/终局：本房 bot 静默
+            for (auto& b : list) TickOne(b, nowMs, *session, waypointsByShard_[roomId % waypointsByShard_.size()], out);
+        }
+    }
+
+    /** 启动期预构建（G6 竞态根除：nav/waypoints 只读共享——写只发生在 main 装配期、worker 起线程前） */
+    void PrebuildNav(const sightline::match::MapGeometry& geo) {
+        nav_ = sightline::match::BuildNavGrid(geo.occluders);
+        navBuilt_ = true;
+        waypointsByShard_.assign(byShard_.size(), {});
+        for (auto& wps : waypointsByShard_) {
+            if (!geo.patrolPoints.empty()) {
+                for (const auto& pt : geo.patrolPoints) wps.push_back({pt.x, pt.y});
+            } else if (!geo.spawnPoints.empty()) {
+                for (const auto& sp : geo.spawnPoints) wps.push_back({sp.x, sp.y});
+            } else {
+                wps = {{300.f, -300.f}, {-300.f, 300.f}, {300.f, 300.f}, {-300.f, -300.f}};
+            }
+        }
+    }
     sightline::match::NavGrid nav_;
     bool navBuilt_ = false;
-    std::vector<sightline::match::Vec2> waypoints_;
+    std::vector<std::vector<sightline::match::Vec2>> waypointsByShard_;   // per-shard（同 shard 单写者）
 };
 
 } // namespace adapters
