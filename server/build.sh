@@ -84,6 +84,8 @@ build_test() {
     fi
     if [ -n "$DB_LIBS" ]; then
         # shellcheck disable=SC2086
+        $CXX $FLAGS tests/test_account.cpp -o /tmp/test_account -lcrypto
+        /tmp/test_account   # ep09 步骤 5：账号域纯逻辑（PBKDF2 往返/预检/流转·零 IO）
         $CXX $FLAGS tests/test_patch_agg.cpp -o /tmp/test_patch_agg
         /tmp/test_patch_agg   # ep09 步骤 4：PatchAggregator 两阶段收口（G5·纯逻辑零 IO）
         $CXX $FLAGS tests/test_shards.cpp src/match/match_session.cpp -o /tmp/test_shards

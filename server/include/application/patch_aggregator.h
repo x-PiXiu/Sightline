@@ -23,6 +23,9 @@ public:
         virtual void Notice(const std::string& msg) = 0;
         /** 回退源（任一 shard 的通道取——加载初值/上次成功 patch 的源） */
         virtual std::string LastGoodSource(const std::string& name) = 0;
+        /** R10：聚合收口审计留痕（成功/失败——AuditWal 落库·谁改了啥） */
+        virtual void AuditPatch(const std::string& name, bool ok, const std::string& detail,
+                                std::uint64_t atUtcMs) = 0;
         virtual std::size_t ShardCount() const = 0;
     };
 
@@ -79,6 +82,7 @@ private:
             if (failCount_ == 0 && !timeout) {
                 sink_.Notice("patch 成功（" + std::to_string(sink_.ShardCount()) + "/" +
                              std::to_string(sink_.ShardCount()) + " VM 同步生效）");
+                sink_.AuditPatch(name_, true, "N/N VM 同步生效", nowMs);
                 Reset_();
                 return;
             }
@@ -95,6 +99,7 @@ private:
         if (phase_ == Phase::Reverting) {
             sink_.Notice("patch 失败——已回退（" + std::to_string(sink_.ShardCount() - failCount_) +
                          "/" + std::to_string(sink_.ShardCount()) + " VM 确认旧版）·审计留痕");
+            sink_.AuditPatch(name_, false, "回退至 LastGoodSource（两阶段收口）", nowMs);
             Reset_();
         }
     }

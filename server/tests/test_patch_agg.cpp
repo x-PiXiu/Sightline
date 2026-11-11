@@ -28,6 +28,10 @@ struct FakeSink final : PatchAggregator::Sink {
     }
     void Notice(const std::string& msg) override { notices.push_back(msg); }
     std::string LastGoodSource(const std::string&) override { return goodSource; }
+    void AuditPatch(const std::string& name, bool ok, const std::string& detail,
+                    std::uint64_t atUtcMs) override { audits.push_back({name, ok, detail}); }
+    struct Au { std::string name; bool ok; std::string detail; };
+    std::vector<Au> audits;
     std::size_t ShardCount() const override { return shards; }
 };
 } // namespace

@@ -102,6 +102,14 @@ private:
             return ch ? ch->LastGoodSource(name) : std::string();
         }
         std::size_t ShardCount() const override { return o_.d_.shards.shardCount(); }
+        void AuditPatch(const std::string& name, bool ok, const std::string& detail,
+                        std::uint64_t atMs) override {
+            // R10：patch 收口审计留痕（AuditWal/MySQL——与 ConfigChanged 同一审计链）
+            // 时钟：main.nowMs=system 墙钟（ADR-1 注释）——聚合器收口时刻透传
+            o_.d_.audit.Append(sightline::application::AuditRecord{
+                "patch:" + name, ok ? "成功 " + detail : "失败 " + detail,
+                "patch_aggregator", "", atMs});
+        }
         ApplicationOrchestrator& o_;
     };
 
