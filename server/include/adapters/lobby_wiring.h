@@ -16,6 +16,7 @@
 #include "lobby/lobby.h"
 #include "logger/logger.h"
 #include "match/match_session.h"   // M3：FrameWriter 翻译对局事件（适配器→用例，方向向内）
+#include "application/account_ports.h"   // ep09 步骤 5：AccountResult（账号域 DTO）
 #include "net/client_connection.h"
 #include "protocol/messages.h"   // v4 wire 结构体（Encode 唯一落点）
 #include "protocol/msg_ids.h"
@@ -115,6 +116,27 @@ public:
                 multicastRoom(e.roomId, payload);       // 发给房内所有成员
                 break;
             }
+            }
+        }
+    }
+
+    /** ep09 步骤 5（G9/E9）：账号域回执出站（33/35 编码+fd 定向 send）——谦卑对象（零状态）
+     *  调用方=MatchWiring::HandleAuthResults（accountByFd 状态在 wiring——分层：编码发送在此） */
+    void DeliverAuth(const std::vector<sightline::application::AccountResult>& rs) {
+        for (const auto& r : rs) {
+            if (r.kind == sightline::application::AccountResult::Kind::Auth) {
+                sightline::wire::AuthResultMsg msg;
+                msg.ok = r.ok;
+                msg.reason = static_cast<std::uint8_t>(r.reason);
+                msg.accountId = r.accountId;
+                msg.mode = r.mode;
+                msg.name = r.name;
+                send(r.fd, protocol::MSG_S2C_AUTH_RESULT, msg.Encode());
+            } else {
+                sightline::wire::StatsResultMsg msg;
+                for (const auto& row : r.rows)
+                    msg.rows.push_back({row.matchId, row.kills, row.deaths, row.endedAt});
+                send(r.fd, protocol::MSG_S2C_STATS_RESULT, msg.Encode());
             }
         }
     }

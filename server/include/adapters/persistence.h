@@ -15,6 +15,8 @@
 #include <vector>
 
 #include "adapters/audit_wal.h"
+#include "adapters/password_pbkdf2.h"   // ep09 G9：worker 内哈希
+#include "application/account_ports.h"   // ep09：IAccountStore/AccountResult
 #include "adapters/mongo_store.h"
 #include "adapters/mysql_store.h"
 #include "adapters/redis_store.h"
@@ -30,7 +32,9 @@ struct RealPersistenceConfig {
     std::size_t statsCapacity = 1024;      // 统计队列上限（事件数·§5.3）
 };
 
-class RealPersistence final : public sightline::application::IPersistencePorts {
+class RealPersistence final : public sightline::application::IPersistencePorts,
+                              public sightline::application::IAccountStore,
+                              public sightline::application::IAccountResultSource {
 public:
     explicit RealPersistence(RealPersistenceConfig cfg);
     ~RealPersistence() override;
@@ -47,6 +51,12 @@ public:
     void Ingest(std::span<const sightline::application::MatchEvent> events,
                 sightline::application::Durability d) override;
     sightline::application::QueueState State() const override;
+
+    // ===== ep09 步骤 5（G9/ADR-16）：账号域——入队侧（wiring 调）+回流侧（orchestrator 调）=====
+    void Register(int fd, const std::string& account, const std::string& pass) override;
+    void Login(int fd, const std::string& account, const std::string& pass) override;
+    void QueryStats(int fd, std::uint32_t accountId, std::uint32_t limit) override;
+    std::vector<sightline::application::AccountResult> DrainAuthResults() override;
 
     // ---- IAuditSink：配置审计（无损——失败转 WAL，审计不丢）----
     void Append(const sightline::application::AuditRecord& r) override;
@@ -104,6 +114,17 @@ private:
     AuditWal wal_;
 
     // 双队列
+    // ===== ep09 步骤 5：账号队列（第三队列·有界 256·E6 交互优先）+回流队列 =====
+    mutable std::mutex accMx_;
+    struct AccReq {
+        enum class Kind : std::uint8_t { Register, Login, Query };
+        Kind kind; int fd; std::string account, pass;
+        std::uint32_t accountId = 0, limit = 20;
+    };
+    std::deque<AccReq> accQ_;
+    mutable std::mutex resultMx_;
+    std::deque<sightline::application::AccountResult> resultQ_;
+    adapters::Pbkdf2Hasher hasher_;                 // worker 内哈希（G9）
     mutable std::mutex auditMx_;
     std::deque<sightline::application::AuditRecord> auditQ_;      // 无损
     mutable std::mutex statsMx_;

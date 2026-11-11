@@ -68,6 +68,12 @@ struct AccountResult {
     std::vector<StatRow> rows;           // ended_at 倒序
 };
 
+/** ep09 G9/E9：账号域回流源（persistence worker 产 AccountResult→主线程 Drain→DeliverAuth） */
+struct IAccountResultSource {
+    virtual ~IAccountResultSource() = default;
+    virtual std::vector<AccountResult> DrainAuthResults() = 0;
+};
+
 /** 账号回执出站口（IWireSink 的账号域兄弟——独立 Fanout，域隔离不混 MatchEvent 流） */
 struct IAuthResultSink {
     virtual ~IAuthResultSink() = default;

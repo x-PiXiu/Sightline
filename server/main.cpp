@@ -32,6 +32,8 @@
 #include "match/match_shards.h"
 #include "adapters/serial_dispatcher.h"
 #include "adapters/worker_pool.h"
+#include "adapters/password_pbkdf2.h"
+#include "application/account_service.h"
 #include "adapters/match_wiring.h"
 #include "adapters/config_service.h"
 #include "adapters/scripting_lua.h"   // 步骤 4：声明层零 lua 依赖（使用点受 HAS_LUA 门控）
@@ -315,6 +317,12 @@ int main(int argc, char** argv) {
                    : sightline::match::MatchShards::Mode::Serial};
     adapters::BotDriver botDriver{shards.shardCount()};      // ep09：分桶化（byShard_ 与容器同构）
     adapters::BotDriverPort botDriverPort{botDriver, shards, lobby};   // → IBotDriver+IBotControl 双端口
+    // ===== ep09 步骤 5：账号域装配（G9/ADR-16——store=full 时 RealPersistence；lite=null 降级）=====
+    adapters::Pbkdf2Hasher accountHasher;
+    sightline::application::AccountService accountSvc{
+        {&accountHasher,
+         nullptr,                                      // store 在 persistence 装配后回填（下方）
+         nullptr}};                                    // emit 由 MatchWiring 构造后接线（下方 lambda）
     // ===== ep09 步骤 3：节拍调度器（ITickDispatcher——Serial v1；worker 池刀 B 换 PinnedWorker）=====
     std::unique_ptr<sightline::application::ITickDispatcher> tickDispatcher;
     if (useWorkers)
@@ -355,6 +363,9 @@ int main(int argc, char** argv) {
             .version = config,
             .tick = *tickDispatcher,
             .shards = shards,
+#if SIGHTLINE_HAS_DB
+            .authResults = realP,                // ep09 G9：full 模式回流源（lite=nullptr 账号域降级）
+#endif
             .lobby = lobby,
         }};
     config.Subscribe([&app, realP](const sightline::application::ConfigChanged& e) {
@@ -398,10 +409,16 @@ int main(int argc, char** argv) {
     // 6. MessageDispatcher：msgid → 处理器注册表（新消息只注册，不改旧代码）
     //    注册顺序契约：wireMatch 先注册（msgid 10 的对局离场钩子须先于大厅离开做 fd→PlayerId 翻译）
     adapters::MessageDispatcher dispatcher;
-    adapters::MatchWiring matchWiring{dispatcher, shards, lobby, writer, &botDriver, nowMs};   // ADR-1 单钟
+    adapters::MatchWiring matchWiring{dispatcher, shards, lobby, writer, &botDriver, nowMs, &accountSvc};   // ADR-1 单钟
     // ③ 号事件源：20 号 Fire 事件经回调进编排器，与 ①/② 在同一订阅点扇出（B1 修复）
     matchWiring.SetMatchEventSink([&app](std::vector<sightline::match::MatchEvent>&& es) {
         app.OnWiringEvents(std::move(es));                  // v1.6：Fire/StartMatch/RemovePlayer 三源统一点
+    });
+#if SIGHTLINE_HAS_DB
+    if (realP) accountSvc.SetStore(realP);                  // ep09 G9：full 模式账号存储（RealPersistence 实现 IAccountStore）
+#endif
+    accountSvc.SetEmit([&matchWiring](const sightline::application::AccountResult& r) {
+        matchWiring.HandleAuthResults({r});                 // E9：预检失败即时回执也走同一定向管道
     });
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);

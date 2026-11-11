@@ -30,6 +30,8 @@ public:
 
     // 封禁通道（IBanStore 语义·ep09 消费）：TTL 秒级临时封禁
     bool Ban(const std::string& name, std::uint32_t ttlSec);
+    /** ep09 G9：登录会话键（sess:<accountId> EX 86400——BestEffort 失败不阻塞） */
+    bool SetSession(std::uint32_t accountId, std::uint32_t ttlSec);
     bool IsBanned(const std::string& name);
 
     const std::string& LastError() const { return lastErr_; }

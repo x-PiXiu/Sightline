@@ -63,6 +63,67 @@ struct FireMsg {
 
 /** 28 SWITCH_WEAPON（v4.8 · 1B）：[1B weaponType]——0=Rifle / 1=Pistol，其余值整包拒收。
  *  20 号维持空包：服务器按当前 weaponType 判定，逐发不带 type（ep05 D5-11 预埋兑现）。 */
+// ===== ep09 v4.9：账号域五消息（31~35·异步回执·值语义——ADR-9）=====
+struct AuthResultMsg {                       // 33 S→C
+    bool ok = false;
+    std::uint8_t reason = 0;                 // 0 ok/1 已存在/2 不存在/3 密码错/4 参数非法/5 服务不可用
+    std::uint32_t accountId = 0;             // E7：非 pid——身份层与在线层解耦
+    std::uint8_t mode = 0;                   // 0 guest / 1 account
+    std::string name;
+    std::string Encode() const {
+        std::string p;
+        p += static_cast<char>(ok ? 1 : 0);
+        p += static_cast<char>(reason);
+        for (int i = 0; i < 4; ++i) p += static_cast<char>((accountId >> (8 * i)) & 0xFF);
+        p += static_cast<char>(mode);
+        p += static_cast<char>(name.size());
+        p += name;
+        return p;
+    }
+};
+
+struct RegisterMsg {                          // 31 C→S（LoginMsg 同构——32 复用本结构）
+    std::string account, pass;
+    static std::optional<RegisterMsg> Parse(std::span<const std::uint8_t> b) {
+        if (b.size() < 2) return std::nullopt;
+        const std::size_t aLen = b[0];
+        if (b.size() < 2 + aLen + 1) return std::nullopt;
+        const std::size_t pLen = b[1 + aLen];
+        if (b.size() != 2 + aLen + pLen) return std::nullopt;
+        RegisterMsg m;
+        m.account.assign(reinterpret_cast<const char*>(b.data()) + 1, aLen);
+        m.pass.assign(reinterpret_cast<const char*>(b.data()) + 2 + aLen, pLen);
+        return m;
+    }
+};
+using AccountLoginMsg = RegisterMsg;          // 32 同构（wire 布局一致）——4 号游客名占 MSG_C2S_LOGIN
+
+struct QueryStatsMsg {                        // 34 C→S
+    std::uint8_t limit = 20;
+    static std::optional<QueryStatsMsg> Parse(std::span<const std::uint8_t> b) {
+        if (b.size() != 1) return std::nullopt;
+        QueryStatsMsg m;
+        m.limit = b[0];
+        return m;
+    }
+};
+
+struct StatsResultMsg {                       // 35 S→C：[1B count]{[4B matchId][1B kills][1B deaths][8B endedAt]}×count
+    struct Row { std::uint32_t matchId = 0; std::uint8_t kills = 0, deaths = 0; std::uint64_t endedAt = 0; };
+    std::vector<Row> rows;
+    std::string Encode() const {
+        std::string p;
+        p += static_cast<char>(rows.size());
+        for (const auto& r : rows) {
+            for (int i = 0; i < 4; ++i) p += static_cast<char>((r.matchId >> (8 * i)) & 0xFF);
+            p += static_cast<char>(r.kills);
+            p += static_cast<char>(r.deaths);
+            for (int i = 0; i < 8; ++i) p += static_cast<char>((r.endedAt >> (8 * i)) & 0xFF);
+        }
+        return p;
+    }
+};
+
 struct SwitchWeaponMsg {
     std::uint8_t weaponType = 0;
 

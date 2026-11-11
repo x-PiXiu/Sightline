@@ -40,6 +40,12 @@ namespace protocol {
         // —— 第 8 期：契约 v4.8（已实施）——
         MSG_C2S_SWITCH_WEAPON   = 28, // C→S  [1B weaponType]（0=Rifle / 1=Pistol）——换枪意图，20 号维持空包
         MSG_C2S_RELOAD          = 29, // C→S  (空)——自主换弹
+        // ===== ep09 v4.9：账号域（31~35·异步回执·与房级消息无顺序保证——域注记见 MSG_IDS.md）=====
+        MSG_C2S_REGISTER        = 31, // C→S  [1B accountLen][account≤24B][1B passLen][pass≤64B]——成功即自动登录态
+        MSG_C2S_ACCOUNT_LOGIN   = 32, // C→S  [1B accountLen][account≤24B][1B passLen][pass≤64B]——账号登录（4 号游客并行零改动）
+        MSG_S2C_AUTH_RESULT     = 33, // S→C  [1B ok][1B reason][4B accountId][1B mode][1B nameLen][name]≥8B——accountId≠pid（E7）
+        MSG_C2S_QUERY_STATS     = 34, // C→S  [1B limit≤20]——身份从连接上下文取（防伪造·只查自己）
+        MSG_S2C_STATS_RESULT    = 35, // S→C  [1B count]{[4B matchId][1B kills][1B deaths][8B endedAt]}×count
         MSG_S2C_CONFIG_VERSION  = 30, // S→C  [1B verLen][ver][1B N]{[1B type][1B damage][1B mag][2B reloadMs][2B fireMs]}×N（每项 7B）
         // 9 号 JOIN_RESULT 码表 +5 = 对局进行中（对局中拒 JOIN）
     };

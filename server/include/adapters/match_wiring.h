@@ -10,6 +10,7 @@
 #include "adapters/lobby_wiring.h"   // MessageDispatcher / FrameWriter / ConnTable
 #include "lobby/lobby.h"
 #include "logger/logger.h"
+#include "application/account_service.h"   // ep09 步骤 5：账号域用例
 #include "match/match_session.h"
 #include "match/match_shards.h"
 #include "protocol/messages.h"   // v4 wire 结构体（variant 编解码——业务层禁 include，红线见 messages.h）
@@ -29,8 +30,10 @@ public:
     MatchWiring(MessageDispatcher& disp, sightline::match::MatchShards& shards,
                 sightline::lobby::LobbyService& lobby, FrameWriter& writer,
                 BotDriver* bot = nullptr,
-                std::function<std::uint64_t()> now = nullptr)
-        : disp_(disp), shards_(shards), lobby_(lobby), writer_(writer), bot_(bot), now_(std::move(now)) {}
+                std::function<std::uint64_t()> now = nullptr,
+                sightline::application::AccountService* accountSvc = nullptr)
+        : disp_(disp), shards_(shards), lobby_(lobby), writer_(writer), bot_(bot),
+          now_(std::move(now)), accountSvc_(accountSvc) {}
 
     // ep08 步骤 3（B1 修复）：Fire 是第三处事件源。注入后由编排器统一扇出，
     // MatchWiring 不认识编排器类型（只有 std::function），也不直接依赖任何具体 sink；
@@ -156,6 +159,43 @@ public:
             // 拒绝原因（why 出参）随投递化归 drain 层静默——28 号本就"被拒无回执"，日志降级可接受
         });
 
+        // ===== ep09 v4.9 账号域（31/32/34——异步回执 33/35 经 onAuthResults 回流）=====
+        disp_.on(protocol::MSG_C2S_REGISTER, "注册",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            const auto msg = sightline::wire::RegisterMsg::Parse(bytes);
+            if (!msg) {
+                LOG_WARNING("[注册] 非法 payload 长度=" + std::to_string(payload.size()) + " fd=" + std::to_string(fd));
+                return;
+            }
+            if (accountSvc_) (void)accountSvc_->Register(fd, msg->account, msg->pass);   // G9：异步投递
+        });
+        disp_.on(protocol::MSG_C2S_LOGIN, "登录",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            const auto msg = sightline::wire::AccountLoginMsg::Parse(bytes);
+            if (!msg) {
+                LOG_WARNING("[登录] 非法 payload 长度=" + std::to_string(payload.size()) + " fd=" + std::to_string(fd));
+                return;
+            }
+            if (accountSvc_) (void)accountSvc_->Login(fd, msg->account, msg->pass);
+        });
+        disp_.on(protocol::MSG_C2S_QUERY_STATS, "战绩查询",
+                 [this](int fd, const std::string& payload) {
+            const std::span<const std::uint8_t> bytes(
+                reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
+            const auto msg = sightline::wire::QueryStatsMsg::Parse(bytes);
+            if (!msg) {
+                LOG_WARNING("[战绩] 非法 payload 长度=" + std::to_string(payload.size()) + " fd=" + std::to_string(fd));
+                return;
+            }
+            const auto it = accountByFd_.find(fd);
+            const std::uint32_t aid = (it != accountByFd_.end()) ? it->second : 0;   // E7：登录态绑定
+            if (accountSvc_) (void)accountSvc_->QueryStats(fd, aid, msg->limit);
+        });
+
         // 14：开始对局——房主校验（D2-11 预留兑现）→ 名册纯数据过桥 → 用例 → 事件翻译
         disp_.on(protocol::MSG_C2S_START_MATCH, "开始对局",
                  [this](int fd, const std::string& payload) {
@@ -260,7 +300,19 @@ public:
     }
 
     // 断线编排：须在 lobby.Disconnect 之前调用（fd→PlayerId 翻译依赖 lobby 的映射仍在）
-    void HandleDisconnect(int fd) { HandleMemberGone(fd); }
+    void HandleDisconnect(int fd) {
+        HandleMemberGone(fd);
+        accountByFd_.erase(fd);                       // ep09：登录态随断线清理
+    }
+
+    /** ep09 G5/E9：账号域回执回流（persistence→orchestrator 回调至此）——
+     *  Auth ok 登记 accountByFd（34 号身份源）→ 编码发送经 FrameWriter::DeliverAuth */
+    void HandleAuthResults(const std::vector<sightline::application::AccountResult>& rs) {
+        for (const auto& r : rs)
+            if (r.kind == sightline::application::AccountResult::Kind::Auth && r.ok)
+                accountByFd_[r.fd] = r.accountId;      // 登录态登记
+        writer_.DeliverAuth(rs);
+    }
 
 private:
     // 注入钟（ADR-1 单钟）：main 以 nowMs（system_clock 墙钟）注入；空=回退 system_clock 同款
@@ -293,6 +345,8 @@ private:
     FrameWriter& writer_;
     BotDriver* bot_ = nullptr;   // ep07：人机驱动（可空——纯真人局）；声明序=构造初始化序（-Wreorder）
     std::function<std::uint64_t()> now_;   // 注入钟（ADR-1 单钟·2026-11-04 双钟复盘）——空=回退 system
+    sightline::application::AccountService* accountSvc_ = nullptr;   // ep09 步骤 5（可空=lite 账号域降级）
+    std::unordered_map<int, std::uint32_t> accountByFd_;             // 登录态：fd→accountId（E7）
     MatchEventSink eventSink_;   // v1.6：Fire/StartMatch/RemovePlayer 三源统一点（可空=保持原路径）
 };
 

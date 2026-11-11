@@ -9,6 +9,8 @@
 #include <mysql/mysql.h>
 
 #include <cstdlib>
+#include <chrono>
+#include <functional>
 #include <cstring>
 
 namespace adapters {
@@ -140,6 +142,67 @@ bool MysqlStore::QueryKillsByPlayer(std::vector<std::pair<std::string, int>>& ou
     }
     mysql_free_result(res);
     return true;
+}
+
+// ===== ep09 步骤 5（刀 B）：账号域三方法 =====
+bool MysqlStore::QueryRows(const std::string& sql,
+                           const std::function<bool(std::uint32_t, char**)>& rowFn) {
+    if (!conn_) return false;
+    if (mysql_query(conn_, sql.c_str()) != 0) { lastErr_ = mysql_error(conn_); return false; }
+    MYSQL_RES* res = mysql_store_result(conn_);
+    if (!res) return false;
+    const std::uint32_t cols = mysql_num_fields(res);
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(res)) != nullptr)
+        if (!rowFn(cols, row)) break;
+    mysql_free_result(res);
+    return true;
+}
+
+MysqlStore::RegResult MysqlStore::RegisterAccount(const std::string& name,
+                                                  const std::string& passHash,
+                                                  std::uint32_t& outAccountId) {
+    if (!conn_) return RegResult::Error;
+    // 查重前置（UNIQUE 撞库也可兜——显式查重给明确 reason）
+    std::string existingHash; std::uint32_t existingId = 0;
+    if (LookupAccount(name, existingHash, existingId)) return RegResult::Duplicate;
+    const std::string sql = "INSERT INTO t_account (name, pass_hash, created_at) VALUES ('" +
+                            Escape(name) + "', '" + Escape(passHash) + "', " +
+                            std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::system_clock::now().time_since_epoch()).count()) + ")";
+    if (!Exec(sql)) return RegResult::Error;
+    outAccountId = static_cast<std::uint32_t>(mysql_insert_id(conn_));
+    return RegResult::Ok;
+}
+
+bool MysqlStore::LookupAccount(const std::string& name, std::string& outPassHash,
+                               std::uint32_t& outAccountId) {
+    bool found = false;
+    QueryRows("SELECT id, pass_hash FROM t_account WHERE name='" + Escape(name) + "'",
+              [&](std::uint32_t, char** cols) {
+                  outAccountId = cols[0] ? static_cast<std::uint32_t>(std::atoi(cols[0])) : 0;
+                  outPassHash = cols[1] ? cols[1] : "";
+                  found = true;
+                  return false;                      // 单行
+              });
+    return found;
+}
+
+bool MysqlStore::QueryStatsByAccount(std::uint32_t accountId, std::uint32_t limit,
+                                     std::vector<StatRow>& out) {
+    out.clear();
+    return QueryRows("SELECT match_id, kills, deaths, ended_at FROM t_match_result "
+                     "WHERE account_id=" + std::to_string(accountId) +
+                     " ORDER BY ended_at DESC LIMIT " + std::to_string(limit),
+                     [&](std::uint32_t, char** cols) {
+                         StatRow r;
+                         r.matchId = cols[0] ? static_cast<std::uint32_t>(std::strtoul(cols[0], nullptr, 10)) : 0;
+                         r.kills = cols[1] ? static_cast<int>(std::atoi(cols[1])) : 0;
+                         r.deaths = cols[2] ? static_cast<int>(std::atoi(cols[2])) : 0;
+                         r.endedAt = cols[3] ? std::strtoull(cols[3], nullptr, 10) : 0;
+                         out.push_back(r);
+                         return true;
+                     });
 }
 
 } // namespace adapters

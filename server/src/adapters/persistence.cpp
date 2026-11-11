@@ -69,6 +69,41 @@ void RealPersistence::SetConfigVersion(std::string v) {
 
 // ===================== 入口（main 线程·只入队）=====================
 
+// ===== ep09 步骤 5（G9/ADR-16）：账号域入队侧（主线程零阻塞——入队微秒级）=====
+void RealPersistence::Register(int fd, const std::string& account, const std::string& pass) {
+    std::lock_guard<std::mutex> lk(accMx_);
+    if (accQ_.size() >= 256) {
+        app::AccountResult r; r.kind = app::AccountResult::Kind::Auth; r.fd = fd;
+        r.ok = false; r.reason = app::AuthReason::Unavailable; r.name = account;
+        { std::lock_guard<std::mutex> rk(resultMx_); resultQ_.push_back(std::move(r)); }
+        return;
+    }
+    AccReq q; q.kind = AccReq::Kind::Register; q.fd = fd; q.account = account; q.pass = pass;
+    accQ_.push_back(std::move(q));
+}
+void RealPersistence::Login(int fd, const std::string& account, const std::string& pass) {
+    std::lock_guard<std::mutex> lk(accMx_);
+    if (accQ_.size() >= 256) {
+        app::AccountResult r; r.kind = app::AccountResult::Kind::Auth; r.fd = fd;
+        r.ok = false; r.reason = app::AuthReason::Unavailable; r.name = account;
+        { std::lock_guard<std::mutex> rk(resultMx_); resultQ_.push_back(std::move(r)); }
+        return;
+    }
+    AccReq q; q.kind = AccReq::Kind::Login; q.fd = fd; q.account = account; q.pass = pass;
+    accQ_.push_back(std::move(q));
+}
+void RealPersistence::QueryStats(int fd, std::uint32_t accountId, std::uint32_t limit) {
+    std::lock_guard<std::mutex> lk(accMx_);
+    AccReq q; q.kind = AccReq::Kind::Query; q.fd = fd; q.accountId = accountId; q.limit = limit;
+    accQ_.push_back(std::move(q));                     // 查询必收（低频 1B 请求）
+}
+std::vector<app::AccountResult> RealPersistence::DrainAuthResults() {
+    std::deque<app::AccountResult> local;
+    { std::lock_guard<std::mutex> rk(resultMx_); local.swap(resultQ_); }
+    return std::vector<app::AccountResult>(std::make_move_iterator(local.begin()),
+                                           std::make_move_iterator(local.end()));
+}
+
 void RealPersistence::Ingest(std::span<const app::MatchEvent> events, app::Durability d) {
     if (events.empty() || stopping_.load()) return;
     // 投影过滤（§5.2）：只留开档/击杀/终局——快照/重生/离场是 wire 数据，不入持久化流
@@ -152,7 +187,7 @@ void RealPersistence::WorkerLoop() {
             std::unique_lock<std::mutex> lk(statsMx_);
             cv_.wait_for(lk, std::chrono::milliseconds(500), [this] {
                 return stopping_.load() || !statsQ_.empty() ||
-                       !auditQ_.empty() || rebuildReq_.load();
+                       !auditQ_.empty() || !accQ_.empty() || rebuildReq_.load();
             });
         }
         if (stopping_.load()) {
@@ -161,12 +196,69 @@ void RealPersistence::WorkerLoop() {
             bool empty;
             { std::lock_guard<std::mutex> lk(statsMx_); empty = statsQ_.empty(); }
             { std::lock_guard<std::mutex> lk(auditMx_); empty = empty && auditQ_.empty(); }
+            { std::lock_guard<std::mutex> lk(accMx_); empty = empty && accQ_.empty(); }
             if (empty) break;
             if (std::chrono::steady_clock::now() > stopAt) {
                 LOG_WARNING("[DB] 停机排水超时（2s）——剩余项计数丢弃 dropped=" +
                             std::to_string(dropped_.load()));
                 break;
             }
+        }
+
+        // ---- 0) 账号队列（E6 交互优先：用户在等 33/35 回执——先于审计/统计全清）----
+        //  PBKDF2/IO 全在本 worker（G9）；产出 AccountResult 回流→主线程 DeliverAuth（E9 fd 寻址）
+        for (;;) {
+            AccReq q;
+            { std::lock_guard<std::mutex> lk(accMx_);
+              if (accQ_.empty()) break;
+              q = std::move(accQ_.front()); accQ_.pop_front(); }
+            app::AccountResult r;
+            r.fd = q.fd;
+            if (q.kind == AccReq::Kind::Query) {
+                r.kind = app::AccountResult::Kind::Stats;
+                std::vector<MysqlStore::StatRow> rows;
+                r.ok = mysql_.QueryStatsByAccount(q.accountId, q.limit, rows);
+                if (!r.ok) r.reason = app::AuthReason::Unavailable;
+                else { r.reason = app::AuthReason::Ok; r.accountId = q.accountId;
+                       for (auto& row : rows)
+                           r.rows.push_back({row.matchId,
+                                             static_cast<std::uint8_t>(row.kills),
+                                             static_cast<std::uint8_t>(row.deaths),
+                                             row.endedAt}); }
+            } else {
+                r.kind = app::AccountResult::Kind::Auth;
+                r.name = q.account;
+                if (!mysql_.Connected()) {                 // G9：库故障→Unavailable（账号域可降级）
+                    r.ok = false; r.reason = app::AuthReason::Unavailable;
+                } else if (q.kind == AccReq::Kind::Register) {
+                    const std::string hash = hasher_.Hash(q.pass);
+                    std::uint32_t aid = 0;
+                    const auto rr = hash.empty()
+                        ? MysqlStore::RegResult::Error
+                        : mysql_.RegisterAccount(q.account, hash, aid);
+                    if (rr == MysqlStore::RegResult::Ok) {
+                        r.ok = true; r.reason = app::AuthReason::Ok;
+                        r.accountId = aid; r.mode = 1;
+                    } else {
+                        r.ok = false;
+                        r.reason = rr == MysqlStore::RegResult::Duplicate
+                                       ? app::AuthReason::AlreadyExists
+                                       : app::AuthReason::Unavailable;
+                    }
+                } else {                                   // Login：SELECT→Verify→Redis 会话
+                    std::string hash; std::uint32_t aid = 0;
+                    if (!mysql_.LookupAccount(q.account, hash, aid)) {
+                        r.ok = false; r.reason = app::AuthReason::NotFound;
+                    } else if (!hasher_.Verify(q.pass, hash)) {
+                        r.ok = false; r.reason = app::AuthReason::WrongPass;
+                    } else {
+                        r.ok = true; r.reason = app::AuthReason::Ok;
+                        r.accountId = aid; r.mode = 1;
+                        redis_.SetSession(aid, 86400);     // G9：BestEffort——失败不阻塞登录
+                    }
+                }
+            }
+            { std::lock_guard<std::mutex> rk(resultMx_); resultQ_.push_back(std::move(r)); }
         }
 
         // ---- 1) 审计队列（无损：失败→WAL）----

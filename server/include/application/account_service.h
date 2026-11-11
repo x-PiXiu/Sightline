@@ -23,6 +23,9 @@ public:
     };
 
     explicit AccountService(Deps d) : d_(d) {}
+    /** 装配旋钮（main 组合根：store 在 persistence 装配后回填/emit 在 wiring 构造后接线） */
+    void SetStore(IAccountStore* s) { d_.store = s; }
+    void SetEmit(std::function<void(const AccountResult&)> e) { d_.emit = std::move(e); }
 
     /** 31 号注册（成功即自动登录态——33 号 reason=0 带 accountId） */
     bool Register(int fd, const std::string& account, const std::string& pass) {

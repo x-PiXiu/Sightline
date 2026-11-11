@@ -12,6 +12,15 @@ CREATE TABLE IF NOT EXISTS t_config_version (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 战绩聚合行（Ended 落库·B3 修复带 config_version）：一局一人一行
+CREATE TABLE IF NOT EXISTS t_account (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(24) NOT NULL UNIQUE,
+  pass_hash  VARCHAR(128) NOT NULL,
+  created_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE t_match_result ADD COLUMN IF NOT EXISTS account_id INT NULL;   -- 游客=NULL；注册回溯绑定不做（边界）
+
 CREATE TABLE IF NOT EXISTS t_match_result (
     match_id      VARCHAR(40) NOT NULL,              -- 20261106T023015Z-003（C3：UTC 戳+会话序号）
     player_name   VARCHAR(64) NOT NULL,

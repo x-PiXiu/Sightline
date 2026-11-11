@@ -3,6 +3,7 @@
 // 连接串 SIGHTLINE_MYSQL_DSN = host:port:user:pass:db（例 127.0.0.1:3306:sightline:sightline:sightline）。
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,10 +47,26 @@ public:
     // G7 Rebuild 数据源：按玩家汇总 kills（真相对 Redis 投影）
     bool QueryKillsByPlayer(std::vector<std::pair<std::string, int>>& out);
 
+    // ===== ep09 步骤 5（刀 B）：账号域三方法（t_account + t_match_result.account_id）=====
+    /** 注册：INSERT（UNIQUE 撞=返回 Duplicate）→ 回读 LAST_INSERT_ID */
+    enum class RegResult : std::uint8_t { Ok, Duplicate, Error };
+    RegResult RegisterAccount(const std::string& name, const std::string& passHash,
+                              std::uint32_t& outAccountId);
+    /** 登录取哈希：SELECT id, pass_hash WHERE name（不存在=false） */
+    bool LookupAccount(const std::string& name, std::string& outPassHash,
+                       std::uint32_t& outAccountId);
+    /** 战绩查询：t_match_result WHERE account_id=? ORDER BY ended_at DESC LIMIT ?（35 号载荷源） */
+    struct StatRow { std::uint32_t matchId = 0; int kills = 0, deaths = 0; std::uint64_t endedAt = 0; };
+    bool QueryStatsByAccount(std::uint32_t accountId, std::uint32_t limit,
+                             std::vector<StatRow>& out);
+
     const std::string& LastError() const { return lastErr_; }
 
 private:
     bool Exec(const std::string& sql);              // mysql_query + 错误记账
+    /** 通用 SELECT 行回调（ep09：账号域查询——每行一次回调，返回 false 中止） */
+    bool QueryRows(const std::string& sql,
+                   const std::function<bool(std::uint32_t colCount, char** cols)>& rowFn);
     std::string Escape(const std::string& s);       // mysql_real_escape_string（名字=客户端可控输入）
 
     MYSQL* conn_ = nullptr;                         // void* 语义：头文件零 mysql 依赖

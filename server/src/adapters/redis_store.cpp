@@ -90,6 +90,10 @@ bool RedisStore::Ban(const std::string& name, std::uint32_t ttlSec) {
     return Cmd("SETEX ban:%s %u 1", name.c_str(), static_cast<unsigned>(ttlSec));
 }
 
+bool RedisStore::SetSession(std::uint32_t accountId, std::uint32_t ttlSec) {
+    return Cmd("SETEX sess:%u %u 1", accountId, static_cast<unsigned>(ttlSec));
+}
+
 bool RedisStore::IsBanned(const std::string& name) {
     if (!ctx_) return false;
     redisReply* r = reinterpret_cast<redisReply*>(

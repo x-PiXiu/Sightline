@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "application/config_views.h"
+#include "application/account_ports.h"   // ep09 步骤 5：AccountResult/IAccountResultSource
 #include "application/patch_aggregator.h"
 #include "application/durability_policy.h"
 #include "application/ports.h"
@@ -35,7 +36,10 @@ struct OrchestratorDeps {
     IConfigVersion& version;
     IPatchChannel*  patches = nullptr;          // 步骤 4 注入 LuaRuntime；步骤 3 为空
     ITickDispatcher&           tick;             // ep09 步骤 3：Serial/Worker 可插拔调度（§4.11）
-    match::MatchShards&        shards;           // 配置传播/指标面（Tick 节拍已归 tick）：多房分桶容器（TickAll/ApplyConfigAll/OpenRoom）
+    match::MatchShards&        shards;           // 配置传播/指标面（Tick 节拍已归 tick）
+    // ===== ep09 步骤 5（G9/E9）：账号域回流（persistence resultQ→主线程→wiring 编码定向 send）=====
+    IAccountResultSource* authResults = nullptr;          // full=RealPersistence；lite/null=账号域降级
+    std::function<void(const std::vector<AccountResult>&)> onAuthResults;   // 延迟接线（SetAuthResultsSink——wiring 构造后）
 
     lobby::LobbyService&       lobby;            // Ended → SetRoomInMatch 过桥
 };
@@ -57,6 +61,11 @@ public:
             else if (e.type == MatchEvent::Type::PatchResult)
                 patchAgg_.OnPatchResult(e.patchOk, now);   // ep09 G5：VM 回执聚合（两阶段收口）
         patchAgg_.OnFrameTick(now);                  // G5：500ms 超时检查
+        // ep09 步骤 5：账号域回流（AccountResult→wiring 编码定向 send 33/35——域隔离独立管道）
+        if (d_.authResults && d_.onAuthResults) {
+            auto authResults = d_.authResults->DrainAuthResults();   // 账号域回流（与对局域隔离）
+            if (!authResults.empty()) d_.onAuthResults(authResults);
+        }
     }
 
     // 事件源 ③：MatchWiring 的 Fire/StartMatch/RemovePlayer 处理器经回调送同一订阅点（B1 修复）。

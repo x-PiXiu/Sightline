@@ -54,7 +54,7 @@ build_server() {
     # shellcheck disable=SC2086
     $CXX $FLAGS main.cpp src/net/*.cpp src/logger/*.cpp src/lobby/lobby_service.cpp \
         src/match/match_session.cpp src/adapters/*.cpp \
-        -o sightline_server -lpthread $LUA_LIB $DB_LIBS
+        -o sightline_server -lpthread $LUA_LIB $DB_LIBS -lcrypto   # ep09 步骤 5：Pbkdf2Hasher（OpenSSL libcrypto）
     echo "✓ sightline_server 编译完成"
 }
 
@@ -74,7 +74,7 @@ build_test() {
     $CXX $FLAGS tests/test_ports.cpp -o /tmp/test_ports   # ep08 步骤 2：端口/值对象/纯策略（零依赖）
     /tmp/test_ports
     # shellcheck disable=SC2086
-    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp src/logger/logger.cpp -o /tmp/test_config $LUA_LIB $DB_LIBS  # 步骤 3：配置体系（logger/db=步骤 4/5 连带）
+    $CXX $FLAGS tests/test_config.cpp src/adapters/*.cpp src/logger/logger.cpp -o /tmp/test_config $LUA_LIB $DB_LIBS -lcrypto  # 步骤 3：配置体系（logger/db=步骤 4/5 连带）
     /tmp/test_config
     if [ -n "$LUA_INC" ]; then
         # shellcheck disable=SC2086
@@ -90,15 +90,15 @@ build_test() {
         /tmp/test_patch_agg   # ep09 步骤 4：PatchAggregator 两阶段收口（G5·纯逻辑零 IO）
         $CXX $FLAGS tests/test_shards.cpp src/match/match_session.cpp -o /tmp/test_shards
         /tmp/test_shards   # ep09 步骤 2：多房容器+Mailbox（G1/G3/E8 契约·零 IO）
-        $CXX $FLAGS -pthread tests/test_workers.cpp src/match/match_session.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_workers $LUA_LIB
+        $CXX $FLAGS -pthread tests/test_workers.cpp src/match/match_session.cpp src/lobby/lobby_service.cpp src/logger/logger.cpp -o /tmp/test_workers $LUA_LIB -lcrypto
         /tmp/test_workers   # ep09 步骤 3：WorkerPool 并发（真线程·TSan L1 靶场）
         $CXX $FLAGS tests/test_persistence.cpp src/adapters/persistence.cpp \
             src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp \
             src/adapters/audit_wal.cpp src/logger/logger.cpp \
-            -o /tmp/test_persistence $LUA_LIB $DB_LIBS   # 步骤 5：持久化纯单测（不连库）
+            -o /tmp/test_persistence $LUA_LIB $DB_LIBS -lcrypto   # 步骤 5：持久化纯单测（不连库）
         /tmp/test_persistence
         # shellcheck disable=SC2086
-        $CXX $FLAGS tests/test_db_integration.cpp src/adapters/persistence.cpp src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp src/adapters/audit_wal.cpp src/logger/logger.cpp -o /tmp/test_db_integration $LUA_LIB $DB_LIBS   # 步骤 5：真库冒烟（env 门控·缺省跳过）
+        $CXX $FLAGS tests/test_db_integration.cpp src/adapters/persistence.cpp src/adapters/mysql_store.cpp src/adapters/redis_store.cpp src/adapters/mongo_store.cpp src/adapters/audit_wal.cpp src/logger/logger.cpp -o /tmp/test_db_integration $LUA_LIB $DB_LIBS -lcrypto   # 步骤 5：真库冒烟（env 门控·缺省跳过）
         /tmp/test_db_integration
     fi
     # shellcheck disable=SC2086
