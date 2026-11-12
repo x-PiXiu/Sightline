@@ -104,10 +104,75 @@ int main() {
         CHECK(snapCount > 0);
 
         CHECK(pool.FaultCount() == 0);                      // 正常路径零 fault（G6 通道在位）
-        pool.Stop();                                        // G11：停收→join
+        pool.Stop();                                        // G11 四段组合（残余消费+尾包）
         pool.Stop();                                        // 幂等
     }
 
-    std::printf("全部通过：%d 项断言 ✓（ep09 步骤 3 WorkerPool 并发·真线程）\n", g_pass);
+    // ══ G11（P1-4）：停机四阶段**逐步断言**（§6.3——顺序反了丢事件，测试锁定）══
+    {
+        using FakeTable = std::shared_ptr<std::map<std::uint32_t,
+                                                   std::pair<std::uint32_t, std::uint32_t>>>;
+        FakeTable table = std::make_shared<std::map<std::uint32_t,
+                                                    std::pair<std::uint32_t, std::uint32_t>>>();
+        (*table)[300] = {9, 1};
+        MatchShards shards{ShardDeps{.locate = [table](std::uint32_t pid,
+                                                     std::uint32_t& rid, std::uint32_t& ep) {
+                               const auto it = table->find(pid);
+                               if (it == table->end()) return false;
+                               rid = it->second.first;
+                               ep = it->second.second;
+                               return true;
+                           }},
+                           2, MatchShards::Mode::Worker};
+        adapters::BotDriver bot{2};
+        sightline::lobby::LobbyService lobby;
+        adapters::WorkerPool pool{shards, bot, lobby, 2};
+
+        auto& h = shards.OpenRoom(9);
+        (void)shards.StartMatchVia(9, {{300, "p300", 0}});
+        pool.Start();
+
+        // 投递一条 Move（未消费——停收后由阶段③ 残余消费，输入不丢）
+        MatchInput mv;
+        mv.kind = MatchInput::Kind::Move;
+        mv.x = 777.f; mv.y = 888.f; mv.z = 90.f; mv.atMs = 1000; mv.seq = 1;
+        CHECK(shards.Route(300, std::move(mv)));
+
+        // —— 阶段① 停收（幂等：二次调用空转）——
+        pool.StopIngest();
+        pool.StopIngest();
+        // —— 阶段② join（workers 全停——此后主线程独占 shards，③④ 安全前提）——
+        pool.JoinWorkers();
+        // —— 阶段③④ 残余消费+末拍——尾包应含"Move 生效后的快照"——
+        pool.DrainResidualAndFinalTick();
+
+        // —— 阶段⑤ 冲尾包（OnFrameTick=DrainMerge）：残余输入不丢（777 位置生效于快照）——
+        int tailSnaps = 0;
+        bool sawPos = false;
+        for (const auto& e : pool.OnFrameTick(0)) {
+            if (e.type == MatchEvent::Type::Snapshot) {
+                ++tailSnaps;
+                for (const auto& ent : e.entities) {
+                    if (ent.playerId == 300) {
+                        sawPos = std::fabs(ent.x - 777.f) < 1.f &&
+                                 std::fabs(ent.y - 888.f) < 1.f;
+                    }
+                }
+            }
+        }
+        CHECK(tailSnaps > 0);   // 尾包含快照（残余输入→UpdateEntity→末拍快照）
+        CHECK(sawPos);          // 残余 Move 生效（停机序正确=输入不丢）
+
+        // —— 幂等：重复各阶段空转 ——
+        pool.StopIngest();
+        pool.JoinWorkers();
+        pool.DrainResidualAndFinalTick();
+        pool.Stop();
+
+        // —— shard state：room 9 session 仍在（WorkerPool::Stop 不清房——StartMatch 复位语义）——
+        CHECK(shards.Find(9) != nullptr);
+    }
+
+    std::printf("全部通过：%d 项断言 ✓（ep09 步骤 3 WorkerPool 并发·真线程+G11 停机阶段断言）\n", g_pass);
     return 0;
 }

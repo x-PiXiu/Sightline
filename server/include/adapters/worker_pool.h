@@ -48,16 +48,32 @@ public:
      *  ③ 残余消费（主线程代跑：drain cmdQ/dataQ+末拍 ProcessShard——join 后单线程安全）
      *  ④ 尾包入合流（调用方随后 DrainMerge 冲走——main 在 persistence Shutdown 前）
      *  顺序反了丢事件——test_workers 断言锁定（§6.3）。 */
-    void Stop() override {
+    // ===== ep09 G11（P1-4 阶段化·§6.3 逐步断言可测）：四阶段独立可调+Stop 组合 =====
+    /** ① 停收：workers 退出循环（幂等；重复调用空转）。阶段语义：此后**不得再投递**（Mailbox 仍锁保护，
+     *  主线程可安全代消费——阶段③）。 */
+    void StopIngest() {
         bool expect = true;
-        if (!running_.compare_exchange_strong(expect, false)) return;   // ① 停收（幂等）
+        running_.compare_exchange_strong(expect, false);
+    }
+    /** ② join：等 workers 完成当前拍退出——返回后主线程独占 shards（阶段③④安全的前提）。 */
+    void JoinWorkers() {
         for (auto& t : threads_)
-            if (t.joinable()) t.join();                                 // ② join
-        for (std::size_t i = 0; i < shards_.shardCount(); ++i) {        // ③④ 残余+尾包
+            if (t.joinable()) t.join();
+    }
+    /** ③④ 残余消费+末拍（**仅 JoinWorkers 之后可调**——主线程独占 shards 单线程安全）：
+     *  drain 残余 cmdQ/dataQ（已收输入不丢）+ 末拍 ProcessShard → 尾包入合流。 */
+    void DrainResidualAndFinalTick() {
+        for (std::size_t i = 0; i < shards_.shardCount(); ++i) {
             std::vector<sightline::match::MatchEvent> tail;
             shards_.ProcessShard(i, NowMs_(), tail);
             shards_.PublishToMerge(i, std::move(tail));
         }
+    }
+
+    void Stop() override {
+        StopIngest();                 // ① 停收
+        JoinWorkers();                // ② join
+        DrainResidualAndFinalTick();  // ③④ 残余+末拍→尾包（⑤ 冲尾包=调用方 OnFrameTick）
     }
 
     /** 主线程每帧：收全部 worker 产物（合流区）——Fanout 由编排器统一（按 roomId 零改动） */
