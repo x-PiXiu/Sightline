@@ -123,11 +123,19 @@ std::vector<MatchEvent> MatchSession::UpdateEntity(std::uint32_t playerId, float
             if (dx0 * dx0 + dy0 * dy0 < 100.f * 100.f) {   // 出生点附近首条 → 重定基准放行
                 E.rebasePending = false;
             } else {
-                // 在途旧报（死亡位置）→ 只拒不改基准（2026-11-04 拉扯第五轮复盘）：此处曾顺手推
-                // lx/ly/lz，把重生落位刚重置的 spawn 基准污染回尸体位——放行首拍 dx=上报−尸体位
-                // 是全程距离 → 被 300uu 钳制 → 权威位过冲出生点 → 17 号逐拍带误差硬拉。
-                // 开局路径不受影响（首报走 bHasReport=false 采纳分支不读 lx），所以只有"重生后"病。
-                return {};
+                // ep09 过载修复（32 档压测实锤·2026-11-12）：远离出生点的首报不再静默拒——
+                // **服务器权威拉回**：激活但权威位=出生点（该输入位置丢弃；后续输入从出生点
+                // 基准正常钳制走出）。旧语义（拒）：帧慢时 newest-wins 把首报（出生点）覆盖成
+                // 远点 Move → 门全拒 → **永不激活=幽灵**（移动中玩家的位置随延迟持续偏离）。
+                // 与 ep07 拉扯教训不冲突：当年"拒不改基准"防的是**旧位置污染增量基准**——
+                // 本分支基准仍=出生点（lx/ly/lz=spawn 系，见下），旧位置只被丢弃。
+                // respawn 门（重生握手）保持"拒"不动：死亡在途旧报=死亡位置，采纳会污染
+                //   重生基准（拉扯第五轮）；且重生玩家过载下位置连续、不会永久幽灵。
+                E.rebasePending = false;
+                E.bHasReport = true;             // 激活（权威位=出生点——输入位置丢弃）
+                E.lx = E.spawnX; E.ly = E.spawnY; E.lz = E.spawnZ;   // 增量基准=出生点
+                E.lastRecvMs = recvMs;           // 时间版基准同步
+                return {};                       // 该输入位置丢弃（权威位保持出生点）
             }
         }
         if (!E.bHasReport) {

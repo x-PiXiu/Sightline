@@ -87,7 +87,11 @@ public:
     struct Shard {
         std::unordered_map<std::uint32_t, std::unique_ptr<MatchSession>> rooms;
         // ep09 步骤 2：跨线程邮箱（草案 §4.4——Serial 主线程投递+同帧消费；worker 版跨线程）
-        std::deque<MatchInput>   dataQ;              // 数据面 FIFO（Move newest-wins）
+        std::deque<MatchInput>   dataQ;              // 数据面 FIFO（Move newest-wins·O(1) 索引见下）
+        // ep09 R2 消除（P1-5·尾扫 O(队列长)→O(1)）：pid → dataQ 下标（仅 Move 类登记）。
+        //   不变量：dataQ 只尾插+整批 swap 取走（无中间删）→ 下标恒有效；
+        //   drain swap 后 clear（锁内）；非 Move（Fire 等）尾插不影响已有下标 ✓
+        std::unordered_map<std::uint32_t, std::size_t> moveIx_;
         std::deque<ShardCommand> cmdQ;               // 控制面（先于数据面 drain）
         std::mutex               qMutex;             // dataQ/cmdQ 共用一把（同临界区，无嵌套锁）
         std::atomic<std::uint64_t> dropCount{0};     // G8：入队/校验丢弃原子计数（横幅读数）
@@ -198,9 +202,8 @@ public:
     static constexpr std::size_t kDataQCap = 4096;   // 背压上界（压测定档）
 
     /** 数据面投递：locate 解析路由（快照无此 pid=丢）→ 按 roomId 分 shard → dataQ。
-     *  Move newest-wins：同 (pid,roomId) 的未消费 Move 被新值覆盖（丢旧不丢新·插值无感）。
-     *  满则丢+计数（横幅可见）——返回 false=被丢（调用方日志）。
-     *  TODO(worker v2)：尾扫持锁 O(队列长)——worker 版换 pid→槽位索引（草案 R2）。 */
+     *  Move newest-wins：同 (pid,roomId) 的未消费 Move 被**原地覆盖**——R2 已消除：moveIx_
+     *  索引 O(1) 定位（替代尾扫 O(队列长)·压测归因主线程热点之一）。满则丢+计数。 */
     bool Route(std::uint32_t pid, MatchInput in) {
         if (!deps_.locate) return false;
         if (!deps_.locate(pid, in.roomId, in.epoch)) return false;   // 不在房/人机外未知：在途判旧即丢
@@ -208,12 +211,16 @@ public:
         auto& sh = shards_[in.roomId % shards_.size()];
         std::lock_guard lk(sh.qMutex);
         if (in.kind == MatchInput::Kind::Move) {
-            for (auto it = sh.dataQ.rbegin(); it != sh.dataQ.rend(); ++it)
-                if (it->kind == MatchInput::Kind::Move && it->pid == pid &&
-                    it->roomId == in.roomId) { *it = std::move(in); return true; }   // newest-wins
+            const auto it = sh.moveIx_.find(pid);
+            if (it != sh.moveIx_.end()) {
+                sh.dataQ[it->second] = std::move(in);   // newest-wins 原地覆盖（O(1)·保序）
+                return true;
+            }
         }
         if (sh.dataQ.size() >= kDataQCap) { ++sh.dropCount; return false; }
         sh.dataQ.push_back(std::move(in));
+        if (in.kind == MatchInput::Kind::Move)
+            sh.moveIx_[pid] = sh.dataQ.size() - 1;      // 登记下标（尾插不改已有下标 ✓）
         return true;
     }
 
@@ -269,6 +276,7 @@ public:
             std::lock_guard lk(sh.qMutex);
             cmds.swap(sh.cmdQ);
             inputs.swap(sh.dataQ);
+            sh.moveIx_.clear();        // R2：下标随队列取走失效（整批消费=重新登记从零开始）
         }
         for (auto& c : cmds) applyCommand_(std::move(c), out, idx);     // 控制面先于数据面
         for (auto& in : inputs) applyInput_(std::move(in), nowMs, out, sh);
