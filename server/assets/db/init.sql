@@ -19,7 +19,13 @@ CREATE TABLE IF NOT EXISTS t_account (
   created_at BIGINT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-ALTER TABLE t_match_result ADD COLUMN IF NOT EXISTS account_id INT NULL;   -- 游客=NULL；注册回溯绑定不做（边界）
+-- ep09 步骤 5：account_id 列（游客=NULL；注册回溯绑定不做——边界）。
+-- ⚠ MySQL 8.0 不支持 ADD COLUMN IF NOT EXISTS（那是 MariaDB 语法）——information_schema 判存在再执行（幂等）
+SET @hasCol := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 't_match_result'
+                  AND COLUMN_NAME = 'account_id');
+SET @ddl := IF(@hasCol = 0, 'ALTER TABLE t_match_result ADD COLUMN account_id INT NULL', 'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS t_match_result (
     match_id      VARCHAR(40) NOT NULL,              -- 20261106T023015Z-003（C3：UTC 戳+会话序号）
