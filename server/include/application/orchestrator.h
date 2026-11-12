@@ -87,6 +87,13 @@ public:
     // 停机：停 ingest（本编排器停止接帧）→ drain / join 由步骤 5 的持久化 worker 承担
     void Shutdown() { stopped_ = true; }
 
+    /** ep09 E9/G9（⚠ 2026-11-12 e2e 实锤补线）：账号域回流回调延迟接线——
+     *  wiring 构造晚于 orchestrator，Deps.onAuthResults 改旋钮后 main 侧在此接线；
+     *  未接线时 OnFrame 的 resultQ 消费段静默跳过（33 号永不回客户端=曾致 TestAccountE2E 超时）。 */
+    void SetAuthResultsSink(std::function<void(const std::vector<AccountResult>&)> fn) {
+        d_.onAuthResults = std::move(fn);
+    }
+
     // 用例层不打印日志：主循环读 Notice() 变化后由适配器落 LOG_INFO
     const std::string& Notice() const { return notice_; }
 

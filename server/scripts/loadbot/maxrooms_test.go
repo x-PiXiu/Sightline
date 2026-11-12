@@ -24,6 +24,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -157,6 +158,7 @@ func gradeOnce(t *testing.T, n int) (bool, string) {
 		spx   [4]int // spawnIndex（首报出生点用）
 	}
 	rooms := make([]room, n)
+	buildStart := time.Now() // 归因探针信号：建房完成时刻（探针轮询"就绪"行→采样维持期）
 	defer func() { // 全量 RST 清理（loadbot 血统：不留 TIME_WAIT）
 		for i := range rooms {
 			for _, c := range rooms[i].conns {
@@ -215,6 +217,7 @@ func gradeOnce(t *testing.T, n int) (bool, string) {
 	}
 
 	// —— 并行维持 5s（4n goroutine·30Hz 上报+收快照）——
+	t.Logf("房全部就绪（建房 %.1fs）→ 进入维持", time.Since(buildStart).Seconds()) // 归因探针采样信号
 	const maintain = 5 * time.Second
 	resCh := make(chan maintainRes, 4*n)
 	var wg sync.WaitGroup
@@ -270,6 +273,18 @@ func TestMaxRoomsStress(t *testing.T) {
 	targetAddr = stressAddr // 全部辅助切到外部实例
 
 	grades := []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512}
+	if g := os.Getenv("SIGHTLINE_STRESS_GRADES"); g != "" { // 单档/子集（perf 归因窗口可控）
+		grades = nil
+		for _, s := range strings.Split(g, ",") {
+			var v int
+			if _, err := fmt.Sscanf(s, "%d", &v); err == nil && v > 0 {
+				grades = append(grades, v)
+			}
+		}
+		if len(grades) == 0 {
+			t.Fatalf("SIGHTLINE_STRESS_GRADES 解析失败: %q", g)
+		}
+	}
 	maxOk := 0
 	for _, n := range grades {
 		ok, reason := gradeOnce(t, n)

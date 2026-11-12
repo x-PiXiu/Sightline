@@ -424,6 +424,12 @@ int main(int argc, char** argv) {
     accountSvc.SetEmit([&matchWiring](const sightline::application::AccountResult& r) {
         matchWiring.HandleAuthResults({r});                 // E9：预检失败即时回执也走同一定向管道
     });
+    // ep09 G9/E9（⚠ 2026-11-12 e2e 实锤补线）：账号域回流回调——此前漏接线（Deps.onAuthResults
+    //   改延迟接线后 main 侧从未调 SetAuthResultsSink → resultQ 消费段静默跳过 → 33 号永不回客户端）。
+    //   wiring 构造（416 行）在此行之前 → 可以安全捕获。
+    app.SetAuthResultsSink([&matchWiring](const std::vector<sightline::application::AccountResult>& rs) {
+        matchWiring.HandleAuthResults(rs);                  // 回流→wiring（登记登录态+33/35 定向发送）
+    });
     matchWiring.Register();
     adapters::wireLobby(dispatcher, lobby, writer, connections);
 
