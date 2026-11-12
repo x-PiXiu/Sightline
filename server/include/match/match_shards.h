@@ -272,11 +272,16 @@ public:
         }
         for (auto& c : cmds) applyCommand_(std::move(c), out, idx);     // 控制面先于数据面
         for (auto& in : inputs) applyInput_(std::move(in), nowMs, out, sh);
+        std::vector<std::uint32_t> reapable;          // ep09 G2（P1-2）：收集后删（E2：循环内 erase=UB）
         for (auto& [rid, s] : sh.rooms) {
             auto evs = s->Tick(nowMs);
             out.insert(out.end(), std::make_move_iterator(evs.begin()),
                        std::make_move_iterator(evs.end()));
+            if (s->IsReapable()) reapable.push_back(rid);   // 终局+背景期过→可收割
         }
+        for (const auto rid : reapable) sh.rooms.erase(rid);  // 收割：内存回落+ActiveRooms 指标准确
+        // 注：收割后同房重开=OpenRoom 重建全新 session（G2 worker 形语义）；
+        //     本房客户端已在 Ended+2s 快照期内收完收尾画面（bActive_=false 才可收割）
     }
 
     /** Serial 兼容壳（测试/直调方）：全部 shard 的 ProcessShard 合并——
@@ -294,12 +299,24 @@ public:
         auto& sh = shards_[idx];
         for (auto& [rid, s] : sh.rooms) s->AbortMatch();
     }
+    static constexpr std::size_t kMergeCap = 8192;   // 合流区上界（§4.6·压测定档）
+
+    /** worker 产物入合流（worker loop 调——锁瞬时）。
+     *  ep09 G7（P1-1）免丢策略：合流区满时**只丢 Snapshot**（表现类可再生——下一拍即新），
+     *  Must 类（Ended/Kill）与其余事件强制入队（允许短暂超界）——审计永不由合流区连坐丢弃。
+     *  裁决（v1.6）：设计原文的"Must 独立直投通道"以本免丢策略等价达成——保持 Fanout 单写者
+     *  （双通道需事件标记位防双写，复杂度>收益；33ms 帧消费下延迟解耦无感）。 */
     void PublishToMerge(std::size_t idx, std::vector<MatchEvent>&& evs) {
         auto& sh = shards_[idx];
         if (evs.empty()) return;
         std::lock_guard lk(sh.outMutex);
-        sh.outbox.insert(sh.outbox.end(), std::make_move_iterator(evs.begin()),
-                         std::make_move_iterator(evs.end()));
+        for (auto& e : evs) {
+            if (sh.outbox.size() >= kMergeCap && e.type == MatchEvent::Type::Snapshot) {
+                ++sh.dropCount;                          // G8：丢快照计数（横幅可读）
+                continue;
+            }
+            sh.outbox.push_back(std::move(e));           // Must/其余：强制入队（免丢）
+        }
     }
 
     /** 合流区收割（主线程 OnFrame 调——worker 版 OnFrameTick 的 body） */

@@ -56,10 +56,15 @@ public:
     ~TcpCommandListener() {
         stop_.store(true);
         if (fd_ >= 0) {
-            ::shutdown(fd_, SHUT_RDWR);
+            ::shutdown(fd_, SHUT_RDWR);   // 唤醒阻塞的 accept（Linux：shutdown 监听套接字 → accept 返回错误）
             ::close(fd_);
         }
-        if (th_.joinable()) th_.detach();
+        // ep09 关服修复（与 stdin 线程同类别·2026-11-12 实测钉死）：detach→join——原 detach 让
+        // accept 线程活过宿主（读已析构的 stop_/fd_=UAF·exit 期隐患）；shutdown 唤醒 accept →
+        // c<0 break → 线程在对象存活期内退出，join 立即返回。
+        if (th_.joinable()) th_.join();
+        // 已知边界（记录不处理）：每连接 Serve 线程仍 detach（阻塞于 recv(c)，c 按值捕获）——
+        //   关服时其不再触碰 self 直到客户端断开；根治须 Serve 线程注册表逐个 join（压测期清单）。
     }
 
     /** 命令回执回写（2026-11-08 拍摄观感修正）：编排器处理的响应此前只落服务器日志——

@@ -42,6 +42,9 @@ struct GameConfig {
     DeathmatchRules deathmatch{};
     RewindRules rewind{};
     BotTuning bot{};
+    // ep09 G4（P1-3）：配置版本随快照进 session——Fire/Kill/Ended 事件带实际使用版本
+    // （wire 零改动=ADR-24 内存事件结构；判定日志/审计对账撕裂窗口可量化）
+    std::string version{};
 
     // 任一不过 => 整表拒收、保留旧表 + 红字告警（§3.4）。
     // config_service.cpp 只调用本方法 + 做格式转换，不在适配器里重写规则。

@@ -99,6 +99,7 @@ inline sightline::match::GameConfig ComposeGameConfig(const ICombatParams& comba
     for (std::size_t i = 0; i < c.weapons.size(); ++i)
         c.weapons[i] = combat.Weapon(static_cast<EWeaponType>(i));
     c.weaponCount = version.Snapshot().weaponCount;
+    c.version = version.Version();              // ep09 G4：版本随快照进 session（事件对账）
     c.formula = combat.Formula();
     c.bot = tuning.Get();
     c.deathmatch = rules.Deathmatch();

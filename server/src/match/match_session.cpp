@@ -185,7 +185,7 @@ std::vector<MatchEvent> MatchSession::UpdateEntity(std::uint32_t playerId, float
     return {};
 }
 
-std::vector<MatchEvent> MatchSession::Tick(std::uint64_t nowMs) {
+std::vector<MatchEvent> MatchSession::TickImpl(std::uint64_t nowMs) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;
     // —— ep07：死亡 → 重生倒计时处理（服务器选点=离最近活敌最远·D7-03）——
@@ -297,6 +297,7 @@ void MatchSession::SetConfig(const GameConfig& c) {
     maxHp_ = c.maxHp == 0 ? 100 : c.maxHp;
     deathmatch_ = c.deathmatch;
     rewind_ = c.rewind;
+    if (!c.version.empty()) configVersion_ = c.version;   // ep09 G4：版本随快照（空=未注入·兼容）
 }
 
 std::uint8_t MatchSession::WeaponTypeOf(std::uint32_t playerId) const {
@@ -340,7 +341,7 @@ void MatchSession::SetGeometry(const MapGeometry& geometry) {
     }
 }
 
-std::vector<MatchEvent> MatchSession::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {
+std::vector<MatchEvent> MatchSession::FireImpl(std::uint32_t shooterPid, std::uint64_t nowMs) {
     std::vector<MatchEvent> out;
     if (!bActive_) return out;                               // ① 在对局中？
     Entity* shooter = nullptr;
@@ -504,6 +505,20 @@ std::vector<MatchEvent> MatchSession::Fire(std::uint32_t shooterPid, std::uint64
         ev.fireDiag.nearInvuln = nearInvuln;
     }
     out.push_back(std::move(ev));
+    return out;
+}
+
+// ===== ep09 G4（P1-3）：出口唯一——Fire/Tick 包装统一打 configVersion（多 return 的 Impl 单点收口）=====
+std::vector<MatchEvent> MatchSession::Fire(std::uint32_t shooterPid, std::uint64_t nowMs) {
+    auto out = FireImpl(shooterPid, nowMs);
+    if (!configVersion_.empty())
+        for (auto& e : out) e.configVersion = configVersion_;
+    return out;
+}
+std::vector<MatchEvent> MatchSession::Tick(std::uint64_t nowMs) {
+    auto out = TickImpl(nowMs);
+    if (!configVersion_.empty())
+        for (auto& e : out) e.configVersion = configVersion_;
     return out;
 }
 

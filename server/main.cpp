@@ -483,7 +483,11 @@ int main(int argc, char** argv) {
             LOG_INFO("[关服] 广播 KICKED(3) → " + std::to_string(connections.size()) + " 个在线连接后退出");
             writer.deliver(lobby.ShutdownBroadcast());
             app.Shutdown();          // ep08：停止接帧
-            tickDispatcher->Stop();  // ep09 G11：worker 停收→join（Serial 空操作）——残余 Mailbox 随停机序丢弃
+            tickDispatcher->Stop();  // ep09 G11（P1-4）：停收→join→残余消费→尾包入合流（四段幂等）
+            if (auto tail = tickDispatcher->OnFrameTick(nowMs()); !tail.empty()) {
+                writer.deliverMatch(tail);   // G11 尾包冲刷：合流区最后一搏（persistence Shutdown 前）
+                LOG_INFO("[关服] 尾包冲刷 " + std::to_string(tail.size()) + " 条事件");
+            }
 #if SIGHTLINE_HAS_DB
             if (realP) realP->Shutdown();   // 步骤 5（B6）：停 ingest → 2s 排水 → join worker
 #endif

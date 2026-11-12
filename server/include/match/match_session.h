@@ -124,6 +124,7 @@ struct MatchEvent {
     // —— ep09 步骤 4（G5·ADR-24 内存事件结构/wire 零改动）——
     bool patchOk = false;                              // PatchResult：该 VM 的 patch 成败
     std::string patchName;                             // PatchResult：脚本名（damage/bot_ai）
+    std::string configVersion;                         // G4（P1-3）：Fire/Kill/Ended 带实际使用版本（wire 零改动）
     std::vector<ScoreRow> scores;                      // Ended（结算比分）
 };
 
@@ -171,6 +172,9 @@ public:
     float PlayMinY() const { return playMinY_; }
     float PlayMaxY() const { return playMaxY_; }
     bool IsEnded() const { return bEnded_; }
+    /** ep09 G2（P1-2）：可收割判定——终局+结算背景期已过（快照停摆 bActive_=false）。
+     *  未开局 session（bEnded_=false）不可收割；收割后同房重开=OpenRoom 重建全新 session。 */
+    bool IsReapable() const { return bEnded_ && !bActive_; }
     std::uint32_t RoomId() const { return roomId_; }   // 常驻单局所属房间（人机驱动自愈只中止本房对局）
     const Entity* EntityById(std::uint32_t pid) const;
 
@@ -219,6 +223,7 @@ private:
     float playMinY_ = -kPlayAreaHalfUu, playMaxY_ = kPlayAreaHalfUu;
     bool bEnded_ = false;                  // ep07：终局置位（Fire/UpdateEntity 静默丢）
     std::uint8_t endReason_ = 0;
+    std::string configVersion_;                       // ep09 G4（P1-3）：SetConfig 携带（空=未注入）
     std::uint64_t snapshotStopAtMs = 0;    // ep07：Ended 后保留快照 2s（结算面板背景）再停
     // ep08：配置表副本（默认逐字段等于 ep07 常量，未注入时 238 断言行为零变化）
     std::array<WeaponParams, 4> weaponTable_{
@@ -234,6 +239,9 @@ private:
     RewindRules rewind_{};
     IDamagePolicy* damage_ = nullptr;   // 收口②：nullptr=内建 DamageApply（238 断言路径）
     Entity* FindEntity(std::uint32_t pid);             // 内部查找（非 const 版复用）
+    // ep09 G4：Fire/Tick 主体（多 return）——公共包装统一打 configVersion（出口唯一）
+    std::vector<MatchEvent> FireImpl(std::uint32_t shooterPid, std::uint64_t nowMs);
+    std::vector<MatchEvent> TickImpl(std::uint64_t nowMs);
 };
 
 } // namespace sightline::match

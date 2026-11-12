@@ -225,6 +225,11 @@ target_include_directories(test_account PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/incl
 target_link_libraries(test_account PRIVATE ${CRYPTO_LIB})
 add_test(NAME test_account COMMAND test_account)
 
+# ============ ep09 步骤 8：ADR-20 双模式对拍金标准（按房分片子流逐字节）============
+add_executable(test_dualmode_diff tests/test_dualmode_diff.cpp)
+target_link_libraries(test_dualmode_diff PRIVATE sightline_match sightline_lobby sightline_core Threads::Threads)
+add_test(NAME test_dualmode_diff COMMAND test_dualmode_diff)
+
 # ============ ep09 步骤 3：WorkerPool 并发（真线程·TSan L1 靶场）============
 add_executable(test_workers tests/test_workers.cpp)
 target_link_libraries(test_workers PRIVATE sightline_match sightline_lobby sightline_core Threads::Threads)

@@ -43,14 +43,21 @@ public:
             threads_[i] = std::thread([this, i] { Loop(i); });
     }
 
-    /** G11 启停序（草案 §4.9）：编排器已停 ingest（stopped_）→ 本函数只负责
-     *  置停→join→（残余 Mailbox 数据随进程退出丢弃——调用方保证投递已停）。
-     *  合流区残余由 main 停机排水收（persistence Shutdown 前最后一次 OnFrameTick）。 */
+    /** G11 启停序（P1-4 阶段化·草案 §4.9 的 worker 侧四段·每段幂等）：
+     *  ① 停收（running=false→workers 退出循环）② join（线程全停）
+     *  ③ 残余消费（主线程代跑：drain cmdQ/dataQ+末拍 ProcessShard——join 后单线程安全）
+     *  ④ 尾包入合流（调用方随后 DrainMerge 冲走——main 在 persistence Shutdown 前）
+     *  顺序反了丢事件——test_workers 断言锁定（§6.3）。 */
     void Stop() override {
         bool expect = true;
-        if (!running_.compare_exchange_strong(expect, false)) return;
+        if (!running_.compare_exchange_strong(expect, false)) return;   // ① 停收（幂等）
         for (auto& t : threads_)
-            if (t.joinable()) t.join();
+            if (t.joinable()) t.join();                                 // ② join
+        for (std::size_t i = 0; i < shards_.shardCount(); ++i) {        // ③④ 残余+尾包
+            std::vector<sightline::match::MatchEvent> tail;
+            shards_.ProcessShard(i, NowMs_(), tail);
+            shards_.PublishToMerge(i, std::move(tail));
+        }
     }
 
     /** 主线程每帧：收全部 worker 产物（合流区）——Fanout 由编排器统一（按 roomId 零改动） */
