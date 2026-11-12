@@ -12,6 +12,12 @@ endif()
 add_compile_options(-Wall -Wswitch -Werror=switch)
 
 find_package(Threads REQUIRED)
+# ep09 步骤 5（ADR-22）：Pbkdf2Hasher（IPasswordHasher 实现·header-only）需要 OpenSSL libcrypto——
+# 账号域与 DB 开关解耦（main 无条件构造 AccountService→vtable→EVP_sha256 符号）；DB 关时哈希不执行但符号必须可解析
+find_library(CRYPTO_LIB NAMES crypto)
+if(NOT CRYPTO_LIB)
+    message(FATAL_ERROR "ep09 步骤 5：找不到 OpenSSL libcrypto（libssl-dev）——账号域 PBKDF2 硬依赖")
+endif()
 find_package(PkgConfig QUIET)
 
 # ============ ep08 步骤 1：外部依赖（可选 · lite 默认零前置）============
@@ -96,7 +102,7 @@ target_include_directories(sightline_lobby PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
 
 # ============ 第 3 期：对局用例层（与 lobby 并列——D3-15：只认 PlayerId，与 lobby 互不 include） ============
 add_library(sightline_match STATIC
-    src/match/match_service.cpp
+    src/match/match_session.cpp
 )
 target_include_directories(sightline_match PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # 依赖规则自检：sightline_match 不得链接/包含 net，也不得包含 lobby——组合归适配层 wireMatch
@@ -110,6 +116,9 @@ add_library(sightline_adapters STATIC
 target_include_directories(sightline_adapters PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # 适配器依赖底座（Logger）——build.sh 手工链接掩掉了这层；CMake 按库边界必须显式声明
 target_link_libraries(sightline_adapters PUBLIC sightline_core)
+# ep09 步骤 5：adapters（persistence.h→password_pbkdf2.h）PUBLIC 挂 crypto——
+# 静态库传递链接：server/test_config/test_persistence 等链接方自动获得 -lcrypto（DSO missing 根除）
+target_link_libraries(sightline_adapters PUBLIC ${CRYPTO_LIB})
 # 步骤 5：三库翻译单元（文件级 #if SIGHTLINE_HAS_DB 守卫——宏由本开关统一给）
 if(SIGHTLINE_ENABLE_DB)
     target_sources(sightline_adapters PRIVATE
@@ -199,6 +208,27 @@ endif()
 add_executable(test_v48 tests/test_v48.cpp)
 target_link_libraries(test_v48 PRIVATE sightline_match)
 add_test(NAME test_v48 COMMAND test_v48)
+
+# ============ ep09 步骤 2：多房容器+Mailbox 单测（零 IO·header+match_session）============
+add_executable(test_shards tests/test_shards.cpp)
+target_link_libraries(test_shards PRIVATE sightline_match)
+add_test(NAME test_shards COMMAND test_shards)
+
+# ============ ep09 步骤 4：PatchAggregator 两阶段收口（纯逻辑零 IO·header-only）============
+add_executable(test_patch_agg tests/test_patch_agg.cpp)
+target_include_directories(test_patch_agg PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_test(NAME test_patch_agg COMMAND test_patch_agg)
+
+# ============ ep09 步骤 5：账号域纯逻辑（PBKDF2 往返·header-only+libcrypto）============
+add_executable(test_account tests/test_account.cpp)
+target_include_directories(test_account PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(test_account PRIVATE ${CRYPTO_LIB})
+add_test(NAME test_account COMMAND test_account)
+
+# ============ ep09 步骤 3：WorkerPool 并发（真线程·TSan L1 靶场）============
+add_executable(test_workers tests/test_workers.cpp)
+target_link_libraries(test_workers PRIVATE sightline_match sightline_lobby sightline_core Threads::Threads)
+add_test(NAME test_workers COMMAND test_workers)
 
 # ============ ep08 步骤 4：Lua 策略对拍/门禁（ENABLE_LUA 时才编）============
 if(SIGHTLINE_ENABLE_LUA)
