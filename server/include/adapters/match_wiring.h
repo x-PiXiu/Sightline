@@ -63,7 +63,10 @@ public:
             in.x = msg->x; in.y = msg->y; in.z = msg->z;
             in.yaw = msg->yaw; in.pitch = msg->pitch;
             in.flags = msg->flags; in.seq = msg->seq;
-            (void)shards_.Route(static_cast<uint32_t>(pid), std::move(in));   // ep09：投递化（drain 层消费）
+            // ep09 e2e 诊断（A1 合规：适配器层打日志）：Route 失败=不在快照/判旧——19 号静默丢会伪装成"上报链断"
+            if (!shards_.Route(static_cast<uint32_t>(pid), std::move(in)))
+                LOG_WARNING("[位置上报] 路由失败 pid=" + std::to_string(pid) +
+                            "（locate 快照未命中/epoch 判旧）fd=" + std::to_string(fd));
         }, true);
 
         // 22 RTT_REPORT（ep06 回溯量源·1Hz·6B）：客户端心跳自测 RTT 上报——域内钳 1000ms（D6-04）
@@ -118,7 +121,9 @@ public:
             sightline::match::MatchInput in;
             in.kind = sightline::match::MatchInput::Kind::Fire;
             in.atMs = Now_();                                // 注入钟（ADR-1 单钟·judgeAt 采样源）
-            (void)shards_.Route(static_cast<std::uint32_t>(pid), std::move(in));   // ep09：投递化
+            if (!shards_.Route(static_cast<std::uint32_t>(pid), std::move(in)))   // ep09：投递化
+                LOG_WARNING("[开火] 路由失败 pid=" + std::to_string(pid) +
+                            "（locate 快照未命中/epoch 判旧）fd=" + std::to_string(fd));
             // Fire 事件经 DrainAndApply 产出→编排器统一扇出（B1 三源统一点不变）
         }, true);
 
@@ -171,8 +176,8 @@ public:
             }
             if (accountSvc_) (void)accountSvc_->Register(fd, msg->account, msg->pass);   // G9：异步投递
         });
-        disp_.on(protocol::MSG_C2S_LOGIN, "登录",
-                 [this](int fd, const std::string& payload) {
+        disp_.on(protocol::MSG_C2S_ACCOUNT_LOGIN, "账号登录",   // ⚠ 32 号专用常量——曾误用 4 号 MSG_C2S_LOGIN
+                 [this](int fd, const std::string& payload) {  //   （游客登录帧进本逻辑打"非法长度"·ep09 e2e 抓出）
             const std::span<const std::uint8_t> bytes(
                 reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size());
             const auto msg = sightline::wire::AccountLoginMsg::Parse(bytes);

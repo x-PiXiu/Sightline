@@ -159,6 +159,9 @@ std::vector<Event> LobbyService::Join(int fd, uint32_t roomId) {
     auto rit = rooms_.find(roomId);
     if (rit == rooms_.end())       { out.push_back({EvType::JoinFail, fd, 0, roomId, 2}); return out; }
     if (roomByFd_.count(fd))       { out.push_back({EvType::JoinFail, fd, 0, roomId, 4}); return out; }
+    // ep07 ❗11 契约兑现（ep09 e2e 抓出的实现缺口——lobby.h:125 注释承诺但本函数无此分支）：
+    // 对局中的房不收人（码 5）。位置=已满(3)之前——对局中房即使未满同样拒。
+    if (RoomInMatch(roomId))       { out.push_back({EvType::JoinFail, fd, 0, roomId, 5}); return out; }
     Room& room = rit->second;
     if (room.full())               { out.push_back({EvType::JoinFail, fd, 0, roomId, 3}); return out; }
 
