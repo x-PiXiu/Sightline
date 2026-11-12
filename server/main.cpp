@@ -330,6 +330,10 @@ int main(int argc, char** argv) {
                                                                 shards.shardCount());
     else
         tickDispatcher = std::make_unique<adapters::SerialDispatcher>(shards, botDriver, lobby);
+    // ⚠ ep09 分桶压测实锤（2026-11-12）：刀 B 漏调 Start——WorkerPool 线程未起 → cmdQ 冻结 →
+    //   15 号名册永不广播（单测里测试自己调了 Start 所以绿——装配路径漏=部署级 bug）。
+    //   SerialDispatcher::Start 为空操作，此处统一调用（ITickDispatcher 生命周期契约：构造即启动）。
+    tickDispatcher->Start();
     // v1.6 收口②/G2：策略与配置视图直注对局用例/驱动器（真接线）。
     // 步骤 4（§10.2.6）：HAS_LUA 构建换 Lua 策略——Builtin 保留为 pcall 失败/脚本缺失的
     // 内建兜底（E2）与对拍基准；bot_ai.lua 步 8 已建（等价性对拍绿后默认切 Lua）。

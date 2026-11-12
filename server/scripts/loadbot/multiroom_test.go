@@ -43,9 +43,16 @@ const (
 )
 
 // ---------- TestMain：自起服务器 + 优雅退出回归 ----------
+// SIGHTLINE_E2E_EXTERNAL=1 → 跳过自起（压测场景：连用户正常启动的外部实例 :18888）。
+var targetAddr = e2eAddr // 测试连接目标（默认=自起实例；压测用例可切外部）
+
 var srvLog bytes.Buffer // 单进程写·Wait 后读（无并发）
 
 func TestMain(m *testing.M) {
+	if os.Getenv("SIGHTLINE_E2E_EXTERNAL") != "" {
+		// 外部模式：不起服务器、不做退出断言——6 个功能用例需连 targetAddr（由用例自行切换）
+		os.Exit(m.Run())
+	}
 	bin := "../../sightline_server"
 	if _, err := os.Stat(bin); err != nil {
 		fmt.Fprintf(os.Stderr, "[e2e] 缺少服务器二进制 %s——先 ./build.sh server\n", bin)
@@ -135,12 +142,18 @@ func mustJoin(t *testing.T, c *conn, roomID uint32) byte {
 	return pl[0]
 }
 
-// startAndWaitRoster：开局 → 等 15 号 → 解析名册 → 认领自己 pid + spawnIndex（出生点序）
+// startAndWaitRoster：开局（仅房主调——非房主发 start 会被拒但无回执，语义脏）→ 等 15 号
 func startAndWaitRoster(t *testing.T, c *conn, wantN int, selfName string) (uint32, map[uint32]string, int) {
 	t.Helper()
 	if err := c.send(msgStart, nil); err != nil {
 		t.Fatalf("start send: %v", err)
 	}
+	return waitRosterOnly(t, c, wantN, selfName)
+}
+
+// waitRosterOnly：等 15 号名册（不发 start——房主已发/压测房内全员只等广播）
+func waitRosterOnly(t *testing.T, c *conn, wantN int, selfName string) (uint32, map[uint32]string, int) {
+	t.Helper()
 	pl, err := c.waitMsg(msgMatchStart, time.Now().Add(20*time.Second))
 	if err != nil || len(pl) < 4 {
 		t.Fatalf("matchstart: err=%v len=%d", err, len(pl))
@@ -240,7 +253,7 @@ func yawTo(a, b spawnPt) float32 {
 
 func loginE2E(t *testing.T, name string) *conn {
 	t.Helper()
-	c, err := dial(e2eAddr)
+	c, err := dial(targetAddr) // 目标可切（压测用例连外部实例）
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
